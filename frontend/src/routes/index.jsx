@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '../contexts/AuthContext';
 import { LocationProvider } from '../contexts/LocationContext';
 import { PropertyProvider } from '../contexts/PropertyContext';
@@ -34,7 +34,7 @@ import BecomeBuilder from '../pages/BecomeBuilder';
 
 function AppRoutes() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <ScrollToTop />
       <AuthProvider>
         <LocationProvider>
@@ -79,7 +79,7 @@ function AppRoutes() {
           </PropertyProvider>
         </LocationProvider>
       </AuthProvider>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 
