@@ -39,9 +39,15 @@ export default function InteriorDesign() {
       description: 'Premium materials and craftsmanship guarantee',
       icon: CheckCircle2,
       price: 'Included'
+    },
+    {
+      id: 'business-plan',
+      title: 'Business Plan',
+      description: 'Get a complete interior business strategy including budgeting, vendor planning, and execution roadmap.',
+      icon: Palette,
+      price: '₹25,000'
     }
   ];
-
   const portfolio = [
     {
       id: 1,
@@ -95,7 +101,7 @@ export default function InteriorDesign() {
           {/* Services */}
           <div>
             <h3 className="text-lg font-semibold text-slate-900 mb-4">Our Design Services</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
               {services.map((service) => (
                 <div key={service.id} className="bg-white border border-slate-200 rounded-xl p-5 hover:border-primary/30 hover:shadow-md transition-all">
                   <div className="flex items-start justify-between mb-3">

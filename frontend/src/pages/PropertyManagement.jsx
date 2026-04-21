@@ -1,5 +1,190 @@
+// import { useState } from 'react';
+// import { Home, CheckCircle2, ArrowRight, Users, Wrench, FileText, Shield } from 'lucide-react';
+
+// export default function PropertyManagement() {
+//   const [formData, setFormData] = useState({
+//     name: '',
+//     email: '',
+//     phone: '',
+//     propertyType: 'residential',
+//     service: 'full-management',
+//     message: '',
+
+//     // ➕ ADDED REAL PROPERTY MANAGEMENT FIELDS (NOT REMOVING ANYTHING)
+//     propertyAddress: '',
+//     propertyValue: '',
+//     city: '',
+//     occupancyStatus: '',
+//     expectedRent: '',
+//     ownerType: '',
+//     agreementDuration: '',
+//     maintenanceBudget: '',
+//   });
+
+//   const handleSubmit = (e) => {
+//     e.preventDefault();
+//     console.log('Property management form submitted:', formData);
+//   };
+
+//   return (
+//     <div className="min-h-screen bg-gradient-to-b from-slate-100 to-white py-10 px-4 md:px-10">
+
+//       {/* HEADER */}
+//       <div className="max-w-5xl mx-auto text-center mb-10">
+//         <div className="flex items-center justify-center gap-3 mb-3">
+//           <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+//             <Home className="h-6 w-6 text-primary" />
+//           </div>
+//           <h2 className="text-3xl font-bold text-slate-900">
+//             Property Management Portal
+//           </h2>
+//         </div>
+//         <p className="text-slate-500">
+//           Complete property handling, tenant management, rent & maintenance system
+//         </p>
+//       </div>
+
+//       {/* FORM CARD (MATCHING AGREEMENT STYLE) */}
+//       <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-lg border p-6 md:p-10">
+
+//         <form onSubmit={handleSubmit} className="space-y-10">
+
+//           {/* ================= OWNER INFO ================= */}
+//           <section>
+//             <h2 className="text-lg font-semibold border-b pb-2 mb-4 text-slate-800">
+//               👤 Owner Information
+//             </h2>
+
+//             <div className="grid md:grid-cols-2 gap-5">
+//               <Input label="Full Name" value={formData.name} onChange={(e)=>setFormData({...formData,name:e.target.value})} />
+//               <Input label="Email Address" value={formData.email} onChange={(e)=>setFormData({...formData,email:e.target.value})} />
+//               <Input label="Phone Number" value={formData.phone} onChange={(e)=>setFormData({...formData,phone:e.target.value})} />
+//               <Select label="Owner Type" value={formData.ownerType} onChange={(e)=>setFormData({...formData,ownerType:e.target.value})}
+//                 options={["Individual","Company","NRI Owner"]}/>
+//             </div>
+//           </section>
+
+//           {/* ================= PROPERTY DETAILS ================= */}
+//           <section>
+//             <h2 className="text-lg font-semibold border-b pb-2 mb-4 text-slate-800">
+//               🏠 Property Details
+//             </h2>
+
+//             <div className="grid md:grid-cols-2 gap-5">
+//               <Select label="Property Type" value={formData.propertyType} onChange={(e)=>setFormData({...formData,propertyType:e.target.value})}
+//                 options={["residential","commercial","industrial"]}/>
+
+//               <Select label="Occupancy Status" value={formData.occupancyStatus} onChange={(e)=>setFormData({...formData,occupancyStatus:e.target.value})}
+//                 options={["Vacant","Occupied","Under Renovation"]}/>
+
+//               <Input label="Property Value (₹)" value={formData.propertyValue} onChange={(e)=>setFormData({...formData,propertyValue:e.target.value})} />
+//               <Input label="Expected Monthly Rent (₹)" value={formData.expectedRent} onChange={(e)=>setFormData({...formData,expectedRent:e.target.value})} />
+
+//               <div className="md:col-span-2">
+//                 <label className="text-sm text-slate-600">Property Address</label>
+//                 <textarea
+//                   value={formData.propertyAddress}
+//                   onChange={(e)=>setFormData({...formData,propertyAddress:e.target.value})}
+//                   rows="3"
+//                   className="w-full mt-1 px-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500"
+//                 />
+//               </div>
+
+//               <Input label="City" value={formData.city} onChange={(e)=>setFormData({...formData,city:e.target.value})} />
+//             </div>
+//           </section>
+
+//           {/* ================= SERVICE DETAILS (YOUR ORIGINAL + ENHANCED) ================= */}
+//           <section>
+//             <h2 className="text-lg font-semibold border-b pb-2 mb-4 text-slate-800">
+//               ⚙️ Service Requirements
+//             </h2>
+
+//             <div className="grid md:grid-cols-2 gap-5">
+
+//               <Select
+//                 label="Service Required"
+//                 value={formData.service}
+//                 onChange={(e)=>setFormData({...formData,service:e.target.value})}
+//                 options={[
+//                   "full-management",
+//                   "tenant-only",
+//                   "rent-only",
+//                   "maintenance-only"
+//                 ]}
+//               />
+
+//               <Input label="Maintenance Budget (₹/month)" value={formData.maintenanceBudget} onChange={(e)=>setFormData({...formData,maintenanceBudget:e.target.value})} />
+
+//               <Input label="Agreement Duration (months)" value={formData.agreementDuration} onChange={(e)=>setFormData({...formData,agreementDuration:e.target.value})} />
+
+//             </div>
+//           </section>
+
+//           {/* ================= YOUR ORIGINAL FIELD (KEPT AS IS) ================= */}
+//           <section>
+//             <h2 className="text-lg font-semibold border-b pb-2 mb-4 text-slate-800">
+//               📝 Additional Notes
+//             </h2>
+
+//             <textarea
+//               value={formData.message}
+//               onChange={(e)=>setFormData({...formData,message:e.target.value})}
+//               rows={4}
+//               className="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500"
+//               placeholder="Tell us about your property requirements..."
+//             />
+//           </section>
+
+//           {/* SUBMIT */}
+//           <button
+//             type="submit"
+//             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2"
+//           >
+//             Submit Property Management Request
+//             <ArrowRight className="h-4 w-4" />
+//           </button>
+
+//         </form>
+//       </div>
+//     </div>
+//   );
+// }
+
+// /* ================= INPUT COMPONENT ================= */
+// function Input({ label, ...props }) {
+//   return (
+//     <div>
+//       <label className="text-sm text-slate-600">{label}</label>
+//       <input
+//         {...props}
+//         className="w-full mt-1 px-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500"
+//       />
+//     </div>
+//   );
+// }
+
+// /* ================= SELECT COMPONENT ================= */
+// function Select({ label, options, ...props }) {
+//   return (
+//     <div>
+//       <label className="text-sm text-slate-600">{label}</label>
+//       <select
+//         {...props}
+//         className="w-full mt-1 px-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500"
+//       >
+//         <option value="">Select</option>
+//         {options.map((opt) => (
+//           <option key={opt} value={opt}>{opt}</option>
+//         ))}
+//       </select>
+//     </div>
+//   );
+// }
+
+
 import { useState } from 'react';
-import { Home, CheckCircle2, ArrowRight, Users, Wrench, FileText, Shield } from 'lucide-react';
+import { Home, ArrowRight } from 'lucide-react';
 
 export default function PropertyManagement() {
   const [formData, setFormData] = useState({
@@ -8,39 +193,17 @@ export default function PropertyManagement() {
     phone: '',
     propertyType: 'residential',
     service: 'full-management',
-    message: ''
-  });
+    message: '',
 
-  const services = [
-    {
-      id: 'tenant-sourcing',
-      title: 'Tenant Sourcing',
-      description: 'Find verified and reliable tenants for your property',
-      icon: Users,
-      price: '₹2,000'
-    },
-    {
-      id: 'rent-collection',
-      title: 'Rent Collection',
-      description: 'Hassle-free monthly rent collection and tracking',
-      icon: FileText,
-      price: '₹500/month'
-    },
-    {
-      id: 'maintenance',
-      title: 'Maintenance & Repairs',
-      description: '24/7 maintenance support and repair coordination',
-      icon: Wrench,
-      price: '₹1,000/month'
-    },
-    {
-      id: 'legal-compliance',
-      title: 'Legal Compliance',
-      description: 'Complete legal documentation and compliance management',
-      icon: Shield,
-      price: '₹3,000/year'
-    }
-  ];
+    propertyAddress: '',
+    propertyValue: '',
+    city: '',
+    occupancyStatus: '',
+    expectedRent: '',
+    ownerType: '',
+    agreementDuration: '',
+    maintenanceBudget: '',
+  });
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -49,106 +212,138 @@ export default function PropertyManagement() {
 
   return (
     <div className="p-6 md:p-8">
-      {/* Header */}
+
+      {/* HEADER */}
       <div className="mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Home className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900">Property Management</h2>
-            <p className="text-slate-500">End-to-end management of your property</p>
-          </div>
-        </div>
+        <h2 className="text-2xl font-semibold text-slate-900">
+          Property Management
+        </h2>
+        <p className="text-slate-500 mt-1">
+          Complete property handling, tenant management, rent & maintenance system
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Contact Form Only */}
-        <div className="lg:col-span-3">
-          {/* Contact Form */}
-          <div className="bg-slate-50 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">Manage Your Property</h3>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Full Name</label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    placeholder="Enter your name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    placeholder="your@email.com"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Phone</label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    placeholder="+91 98765 43210"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Property Type</label>
-                  <select
-                    value={formData.propertyType}
-                    onChange={(e) => setFormData({...formData, propertyType: e.target.value})}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  >
-                    <option value="residential">Residential</option>
-                    <option value="commercial">Commercial</option>
-                    <option value="industrial">Industrial</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Service Required</label>
-                <select
-                  value={formData.service}
-                  onChange={(e) => setFormData({...formData, service: e.target.value})}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                >
-                  <option value="full-management">Full Management</option>
-                  <option value="tenant-only">Tenant Management Only</option>
-                  <option value="rent-only">Rent Collection Only</option>
-                  <option value="maintenance-only">Maintenance Only</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Property Details</label>
-                <textarea
-                  value={formData.message}
-                  onChange={(e) => setFormData({...formData, message: e.target.value})}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  rows={3}
-                  placeholder="Tell us about your property..."
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full md:w-auto px-6 py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
-              >
-                Get Management Service
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            </form>
+      {/* FORM CARD */}
+      <div className="bg-slate-50 rounded-xl p-6">
+        <h3 className="text-lg font-medium text-slate-900 mb-4">
+          Fill Property Management Details
+        </h3>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* OWNER */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input label="Full Name" value={formData.name} onChange={(e)=>setFormData({...formData,name:e.target.value})} />
+            <Input label="Email Address" value={formData.email} onChange={(e)=>setFormData({...formData,email:e.target.value})} />
           </div>
-        </div>
+
+          <Input label="Phone Number" value={formData.phone} onChange={(e)=>setFormData({...formData,phone:e.target.value})} />
+
+          <Select label="Owner Type" value={formData.ownerType} onChange={(e)=>setFormData({...formData,ownerType:e.target.value})}
+            options={["Individual","Company","NRI Owner"]}/>
+
+          {/* PROPERTY */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Select label="Property Type" value={formData.propertyType} onChange={(e)=>setFormData({...formData,propertyType:e.target.value})}
+              options={["residential","commercial","industrial"]}/>
+
+            <Select label="Occupancy Status" value={formData.occupancyStatus} onChange={(e)=>setFormData({...formData,occupancyStatus:e.target.value})}
+              options={["Vacant","Occupied","Under Renovation"]}/>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input label="Property Value (₹)" value={formData.propertyValue} onChange={(e)=>setFormData({...formData,propertyValue:e.target.value})} />
+            <Input label="Expected Monthly Rent (₹)" value={formData.expectedRent} onChange={(e)=>setFormData({...formData,expectedRent:e.target.value})} />
+          </div>
+
+          <div>
+            <label className="block text-sm text-slate-600 mb-1">
+              Property Address
+            </label>
+            <textarea
+              value={formData.propertyAddress}
+              onChange={(e)=>setFormData({...formData,propertyAddress:e.target.value})}
+              rows="3"
+              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            />
+          </div>
+
+          <Input label="City" value={formData.city} onChange={(e)=>setFormData({...formData,city:e.target.value})} />
+
+          {/* SERVICE */}
+          <Select
+            label="Service Required"
+            value={formData.service}
+            onChange={(e)=>setFormData({...formData,service:e.target.value})}
+            options={[
+              "full-management",
+              "tenant-only",
+              "rent-only",
+              "maintenance-only"
+            ]}
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input label="Maintenance Budget (₹/month)" value={formData.maintenanceBudget} onChange={(e)=>setFormData({...formData,maintenanceBudget:e.target.value})} />
+            <Input label="Agreement Duration (months)" value={formData.agreementDuration} onChange={(e)=>setFormData({...formData,agreementDuration:e.target.value})} />
+          </div>
+
+          {/* NOTES */}
+          <div>
+            <label className="block text-sm text-slate-600 mb-1">
+              Additional Notes
+            </label>
+            <textarea
+              value={formData.message}
+              onChange={(e)=>setFormData({...formData,message:e.target.value})}
+              rows={4}
+              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="Tell us about your property requirements..."
+            />
+          </div>
+
+          {/* SUBMIT */}
+          <button
+            type="submit"
+            className="w-full md:w-auto px-6 py-3 bg-primary text-white rounded-xl font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+          >
+            Submit Property Management Request
+            <ArrowRight className="h-4 w-4" />
+          </button>
+
+        </form>
       </div>
+    </div>
+  );
+}
+
+/* INPUT */
+function Input({ label, ...props }) {
+  return (
+    <div>
+      <label className="block text-sm text-slate-600 mb-1">{label}</label>
+      <input
+        {...props}
+        className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+      />
+    </div>
+  );
+}
+
+/* SELECT */
+function Select({ label, options, ...props }) {
+  return (
+    <div>
+      <label className="block text-sm text-slate-600 mb-1">{label}</label>
+      <select
+        {...props}
+        className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+      >
+        <option value="">Select</option>
+        {options.map((opt) => (
+          <option key={opt} value={opt}>{opt}</option>
+        ))}
+      </select>
     </div>
   );
 }
