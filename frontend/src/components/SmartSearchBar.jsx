@@ -54,7 +54,7 @@ const FilterPopover = ({ label, active, children, summary }) => {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
-            className="absolute top-full left-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 p-6 min-w-[280px]"
+            className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[100] p-4 sm:p-6 w-[280px]"
           >
             {children}
           </motion.div>
@@ -112,7 +112,7 @@ function SmartSearchBar({ variant = 'hero' }) {
 
   return (
     <div className={`w-full ${variant === 'hero' ? 'max-w-6xl mx-auto' : ''}`}>
-      <div className="bg-white rounded-[24px] shadow-2xl border border-gray-100 relative z-20">
+      <div className="bg-white rounded-[24px] shadow-2xl border border-gray-100 relative z-20 w-full min-w-0">
     {/* Tabs Row */}
 <div className="flex items-center justify-between px-6 overflow-x-auto no-scrollbar border-b border-gray-100 gap-6">
   {CATEGORIES.map((cat) => (

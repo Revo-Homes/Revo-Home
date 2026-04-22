@@ -663,7 +663,7 @@ export default function RentalYieldCalculator() {
       </div>
 
       {/* ── KPI row ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 10, marginBottom: "1rem" }}>
+      <div className="ry-kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 10, marginBottom: "1rem" }}>
         <KpiCard label="Gross yield"    value={grossYield.toFixed(2) + "%"} sub="Before costs"       accentColor={tier.color} />
         <KpiCard label="Net yield"      value={netYield.toFixed(2) + "%"}   sub="After costs"        accentColor={tier.color} />
         <KpiCard label="Payback period" value={paybackStr}                  sub="To recover cost"    accentColor={tier.color} />
@@ -671,7 +671,7 @@ export default function RentalYieldCalculator() {
       </div>
 
       {/* ── Main two-col ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.2rem", marginBottom: "1.25rem" }}>
+      <div className="ry-main-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.2rem", marginBottom: "1.25rem" }}>
 
         {/* Left — inputs */}
         <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
@@ -848,6 +848,10 @@ export default function RentalYieldCalculator() {
           0%, 100% { opacity: 1; }
           50%       { opacity: 0.25; }
         }
+          @media (max-width: 640px) {
+    .ry-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    .ry-main-grid { grid-template-columns: 1fr !important; }
+  }
       `}</style>
     </div>
   );

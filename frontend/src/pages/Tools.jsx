@@ -589,8 +589,8 @@ export default function Tools() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 flex flex-col">
       {/* Category Navigation Bar - Prominent */}
       <nav className="w-full bg-white border-b border-slate-200 shadow-sm">
-        <div className="px-8 py-6">
-          <div className="flex items-center gap-10">
+        <div className="px-4 sm:px-8 py-4 sm:py-6">
+          <div className="flex items-center gap-5 sm:gap-10 overflow-x-auto no-scrollbar">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat}
@@ -609,7 +609,7 @@ export default function Tools() {
       </nav>
 
       {/* Main Content Layout - Grid */}
-      <div className="flex-1 grid grid-cols-[280px_1fr] overflow-y-auto">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[280px_1fr] overflow-y-auto">
         {/* Sidebar - Fixed width */}
         <motion.aside
           initial={{ opacity: 0, x: -20 }}
@@ -622,15 +622,15 @@ export default function Tools() {
               {activeCategory === 'All' ? 'All Services' : activeCategory}
             </p>
           </div>
-          <nav className="overflow-y-auto p-3">
-            <div className="space-y-1">
+          <nav className="overflow-x-auto lg:overflow-y-auto p-3">
+  <div className="flex lg:flex-col gap-1 lg:space-y-1">
               {sidebarServices.map((service) => {
                 const isActive = activeTabId === service.id;
                 return (
                   <button
                     key={service.id}
                     onClick={() => handleTabClick(service.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 group ${
+                    className={`w-full lg:w-full flex-shrink-0 flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 group ${
                       isActive
                         ? 'bg-gradient-to-r from-primary to-primary/90 text-white shadow-lg shadow-primary/25'
                         : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'

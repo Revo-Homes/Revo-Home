@@ -369,12 +369,12 @@ function ProfileCardSkeleton() {
 // ─── TABS ─────────────────────────────────────────────────────────────────────
 function Tabs({ active, onChange }) {
   return (
-    <div className="flex gap-1 p-1 bg-gray-100/80 rounded-2xl w-fit backdrop-blur-sm border border-gray-200/60">
+    <div className="flex gap-1 p-1 bg-gray-100/80 rounded-2xl w-full sm:w-fit overflow-x-auto no-scrollbar backdrop-blur-sm border border-gray-200/60">
       {TABS.map(tab => {
         const isActive = tab.id === active;
         return (
           <button key={tab.id} onClick={() => onChange(tab.id)}
-            className={`relative flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition-all duration-200
+            className={`relative flex-shrink-0 flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition-all duration-200
               ${isActive ? 'text-white' : 'text-gray-500 hover:text-gray-700 hover:bg-white/60'}`}
           >
             {isActive && (
@@ -530,7 +530,7 @@ function SecurityPanel({ viewModel }) {
         <div className="space-y-3">
           {items.map((item, i) => (
             <motion.div key={item.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
-              className="flex items-center gap-4 p-4 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+              className="flex flex-wrap items-center gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
                 ${item.verified ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-50 text-amber-500'}`}>
                 {item.verified

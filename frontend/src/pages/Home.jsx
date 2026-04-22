@@ -286,7 +286,7 @@ function Home() {
           </motion.div>
         )}
         
-        <div className="relative z-10 max-w-5xl mx-auto px-4 text-center pt-8 pb-20">
+        <div className="relative z-10 max-w-5xl w-full min-w-0 mx-auto px-4 text-center pt-24 sm:pt-8 pb-20">
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-4 animate-fade-in">
             Find Your Perfect Space
           </h1>

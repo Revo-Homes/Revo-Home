@@ -1105,13 +1105,10 @@ export default function BuyVsRentCalculator() {
       </div>
 
       {/* ══ BODY: sticky left inputs + scrollable right results ══ */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(270px, 330px) 1fr', alignItems: 'start' }}>
+      <div className="bvr-main-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(270px, 330px) 1fr', alignItems: 'start' }}>
 
         {/* ── LEFT: INPUTS ── */}
-        <div style={{
-          background: '#fff', borderRight: '1px solid #e5e7eb',
-          padding: '20px 18px', position: 'sticky', top: 0,
-        }}>
+       <div className="bvr-left-panel" style={{ background: '#fff', borderRight: '1px solid #e5e7eb', padding: '20px 18px', position: 'sticky', top: 0 }}>
 
           {/* Time horizon */}
           <div style={{ background: '#111827', borderRadius: 12, padding: '16px 16px 12px', marginBottom: 22 }}>
@@ -1172,7 +1169,7 @@ export default function BuyVsRentCalculator() {
 
         {/* ── RIGHT: RESULTS ── */}
        {/* Stat cards */}
-<div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}> 
+<div className="bvr-right-panel" style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}> 
         {infoPopup.open && (
   <div
     onClick={() => setInfoPopup({ ...infoPopup, open: false })}
@@ -1225,11 +1222,7 @@ export default function BuyVsRentCalculator() {
 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
 
   {/* ROW 1 */}
-  <div style={{
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: 10
-  }}>
+  <div className="bvr-stat-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
     <StatCard
   label="Monthly EMI"
   value={fmt(R.emi)}
@@ -1280,11 +1273,7 @@ export default function BuyVsRentCalculator() {
   </div>
 
   {/* ROW 2 → YOUR NEW GRID GOES HERE */}
-  <div style={{
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: 10
-  }}>
+ <div className="bvr-stat-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
 
     <StatCard
       label="Down Payment"
@@ -1338,7 +1327,7 @@ export default function BuyVsRentCalculator() {
 
 </div>
 
-         <div style={{ display: 'flex', gap: 6, marginBottom: 16, background: '#f3f4f6', padding: 4, borderRadius: 10, width: 'fit-content', alignItems: 'center' }}>
+         <div className="bvr-tabs" style={{ display: 'flex', gap: 6, marginBottom: 16, background: '#f3f4f6', padding: 4, borderRadius: 10, width: 'fit-content', alignItems: 'center' }}>
   {[
     { key: 'overview',     label: 'Overview',     icon: '📊' },
     { key: 'breakdown',    label: 'Breakdown',    icon: '🔍' },
@@ -1449,7 +1438,7 @@ export default function BuyVsRentCalculator() {
           {/* ── BREAKDOWN ── */}
           {activeTab === 'breakdown' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="bvr-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
 
                 <div style={{ background: '#fff', borderRadius: 14, padding: '18px 20px', border: '1px solid #fecaca' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
@@ -1496,7 +1485,7 @@ export default function BuyVsRentCalculator() {
 
               <div style={{ background: '#fff', borderRadius: 14, padding: '18px 20px', border: '1px solid #e5e7eb' }}>
                 <h3 style={{ margin: '0 0 14px', fontWeight: 900, fontSize: 14, color: '#111827' }}>⚖️ Price-to-Rent Ratio: {R.prRatio.toFixed(1)}x</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                <div className="bvr-three-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                   {[
                     { range: '< 15x',  label: 'Buying Favoured',  desc: 'Property is cheap vs rent. Strong case to buy.',                 good: true,    hit: R.prRatio < 15 },
                     { range: '15–20x', label: 'Borderline',        desc: 'Could go either way. Look at appreciation + returns.',           neutral: true, hit: R.prRatio >= 15 && R.prRatio <= 20 },
@@ -1543,7 +1532,7 @@ export default function BuyVsRentCalculator() {
                     : `Over ${horizon} years, renting at ${fmt(monthlyRent)}/month and investing the down payment (${fmt(R.downPayment)}) at ${investReturn}% returns builds ${fmt(Math.abs(R.gap))} more wealth than buying.`}
                 </p>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="bvr-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div style={{ background: '#fff', borderRadius: 14, padding: '18px 20px', border: '1px solid #e5e7eb' }}>
                   <h4 style={{ margin: '0 0 12px', fontWeight: 900, fontSize: 13, color: '#059669' }}>✅ Buy if…</h4>
                   {[
@@ -1585,6 +1574,18 @@ export default function BuyVsRentCalculator() {
 
         </div>{/* end right */}
       </div>{/* end grid */}
+      <style>{`
+  @media (max-width: 640px) {
+    .bvr-main-grid { grid-template-columns: 1fr !important; }
+    .bvr-left-panel { position: relative !important; top: auto !important; border-right: none !important; border-bottom: 1px solid #e5e7eb; }
+    .bvr-right-panel { padding: 12px !important; }
+    .bvr-stat-row { grid-template-columns: 1fr 1fr !important; }
+    .bvr-two-col { grid-template-columns: 1fr !important; }
+    .bvr-three-col { grid-template-columns: 1fr !important; }
+    .bvr-tabs { width: 100% !important; flex-wrap: wrap !important; }
+    .bvr-tabs button { flex: 1 1 auto !important; justify-content: center !important; }
+  }
+`}</style>
     </div>
   );
 }
