@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useProperty } from '../contexts/PropertyContext';
 import { useRevoLeadTracker } from '../hooks/useRevoLeadTracker';
@@ -17,6 +17,7 @@ import {
   CheckCircle2, 
   Phone, 
   MessageSquare,
+  MessageCircle,
   ChevronRight,
   ShieldCheck,
   Star,
@@ -24,6 +25,7 @@ import {
   Heart,
   Paintbrush,
   Trash2,
+  Plus,
   IndianRupee,
   Building2,
   Car,
@@ -32,11 +34,195 @@ import {
   Globe,
   Database,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Waves,
+  Dumbbell,
+  Trees,
+  Gamepad2,
+  Activity,
+  Users,
+  Video,
+  Siren,
+  Utensils,
+  Zap,
+  Droplets,
+  ArrowUpCircle,
+  Dog,
+  Wifi,
+  Calendar,
+  FileText,
+  Check,
+  Train,
+  Bus,
+  School,
+  Hospital,
+  ShoppingBag,
+  TrendingUp,
+  Clock,
+  Info,
+  Download,
+  Share2,
+  Navigation,
+  Landmark,
+  Briefcase,
+  Coffee,
+  Plane,
+  TrainFront,
+  Flame,
+  MoreHorizontal,
+  ExternalLink,
+  HelpCircle,
+  Menu
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 const PROPERTY_TYPES = ['Apartment', 'Villa', 'Independent House', 'Plot', 'Commercial'];
+
+// ============================================
+// SQUAREYARDS-STYLE DATA CONSTANTS
+// ============================================
+
+// Why Consider Section - Key Highlights
+const WHY_CONSIDER_DATA = [
+  { icon: MapPin, text: 'Prime location with excellent connectivity to highways and metro' },
+  { icon: Trees, text: 'Green surroundings with landscaped gardens and open spaces' },
+  { icon: ShieldCheck, text: '24x7 security with CCTV surveillance and video door phones' },
+  { icon: Building2, text: 'Premium construction quality with modern architecture' },
+  { icon: Car, text: 'Ample parking space with dedicated visitor parking' },
+  { icon: Zap, text: 'Power backup for common areas and apartments' },
+];
+
+// Location Benefits - Nearby Landmarks
+const LOCATION_BENEFITS_DATA = [
+  { name: 'Metro Station', distance: '0.5 km', icon: Train },
+  { name: 'Railway Station', distance: '3.2 km', icon: TrainFront },
+  { name: 'Shopping Mall', distance: '1.2 km', icon: ShoppingBag },
+  { name: 'Hospital', distance: '2.1 km', icon: Hospital },
+  { name: 'School', distance: '1.8 km', icon: School },
+  { name: 'Bus Stop', distance: '0.3 km', icon: Bus },
+  { name: 'Airport', distance: '12 km', icon: Plane },
+  { name: 'Highway', distance: '2.5 km', icon: Navigation },
+];
+
+// Price Configuration Data (Hardcoded fallback)
+const PRICE_CONFIG_DATA = [
+  { bhk: '1', area: '450-550', price: '45-55', unit: 'L' },
+  { bhk: '2', area: '850-1050', price: '85-105', unit: 'L' },
+  { bhk: '3', area: '1200-1500', price: '1.2-1.5', unit: 'Cr' },
+  { bhk: '4', area: '1800-2200', price: '1.8-2.5', unit: 'Cr' },
+];
+
+// Similar Properties Data
+const SIMILAR_PROPERTIES_DATA = [
+  { id: 1051, title: 'Luxury 3BHK in Prime Location', location: 'Koramangala, Bangalore', price: '1.85 Cr', bhk: '3', area: '1650', image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=400' },
+  { id: 1052, title: 'Spacious 2BHK with Garden View', location: 'HSR Layout, Bangalore', price: '95 L', bhk: '2', area: '1200', image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400' },
+  { id: 1053, title: 'Premium 4BHK Penthouse', location: 'Indiranagar, Bangalore', price: '3.2 Cr', bhk: '4', area: '2800', image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400' },
+];
+
+// Top Experts Mock Data - Backend Ready
+const MOCK_EXPERTS = [
+  {
+    id: 1,
+    name: "Kajal Chotelal Singh",
+    role: "Portfolio Manager",
+    totalProperties: 16,
+    languages: ["English", "Hindi"]
+  },
+  {
+    id: 2,
+    name: "Shubham Vishwakarma",
+    role: "Senior Investment Manager",
+    totalProperties: 13,
+    languages: ["English", "Hindi"]
+  },
+  {
+    id: 3,
+    name: "Rahul Sharma",
+    role: "Property Consultant",
+    totalProperties: 21,
+    languages: ["English", "Hindi", "Marathi"]
+  },
+  {
+    id: 4,
+    name: "Priya Patel",
+    role: "Real Estate Advisor",
+    totalProperties: 18,
+    languages: ["English", "Gujarati"]
+  }
+];
+
+// Avatar background colors
+const AVATAR_COLORS = ["#E8F0FE", "#FCE8E6", "#E6F4EA", "#FFF4E5"];
+
+// Map backend amenity names to display format
+const mapAmenityName = (amenityName) => {
+  const name = amenityName.toLowerCase();
+  
+  // Convert snake_case to Title Case
+  if (name.includes('security_24x7')) return '24x7 Security';
+  if (name.includes('power_backup')) return 'Power Backup';
+  if (name.includes('elevator') || name.includes('lift')) return 'Elevator/Lift';
+  if (name.includes('parking')) return 'Parking';
+  if (name.includes('gym')) return 'Gym';
+  if (name.includes('swimming_pool')) return 'Swimming Pool';
+  if (name.includes('garden')) return 'Garden';
+  if (name.includes('kids_play_area')) return 'Kids Play Area';
+  if (name.includes('community_hall')) return 'Community Hall';
+  if (name.includes('cctv')) return 'CCTV Surveillance';
+  if (name.includes('fire_alarm')) return 'Fire Alarm';
+  if (name.includes('wifi')) return 'WiFi';
+  if (name.includes('pet_friendly')) return 'Pet Friendly';
+  
+  // Default: convert underscores to spaces and capitalize
+  return amenityName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
+
+// Amenity icon mapping - comprehensive mapping from backend amenity names to icons
+const getAmenityIcon = (amenityName) => {
+  const name = amenityName.toLowerCase();
+  
+  // Swimming related
+  if (name.includes('swimming') || name.includes('pool')) return Waves;
+  
+  // Fitness related
+  if (name.includes('gym') || name.includes('fitness') || name.includes('dumbbell')) return Dumbbell;
+  
+  // Outdoor/Garden related
+  if (name.includes('garden') || name.includes('park') || name.includes('trees')) return Trees;
+  
+  // Kids/Play related
+  if (name.includes('kids') || name.includes('play') || name.includes('game')) return Gamepad2;
+  
+  // Sports related
+  if (name.includes('basketball') || name.includes('tennis') || name.includes('badminton') || 
+      name.includes('jogging') || name.includes('sport') || name.includes('court')) return Activity;
+  
+  // Community related
+  if (name.includes('community') || name.includes('hall') || name.includes('club') || name.includes('party')) return Users;
+  
+  // Food related
+  if (name.includes('restaurant') || name.includes('cafeteria') || name.includes('food') || name.includes('utensils')) return Utensils;
+  
+  // Security related
+  if (name.includes('security') || name.includes('guard') || name.includes('cctv') || name.includes('surveillance')) return ShieldCheck;
+  if (name.includes('video') || name.includes('camera')) return Video;
+  if (name.includes('siren') || name.includes('alarm') || name.includes('fire')) return Siren;
+  if (name.includes('gate') || name.includes('access') || name.includes('lock')) return Lock;
+  
+  // Utilities related
+  if (name.includes('water') || name.includes('droplet')) return Droplets;
+  if (name.includes('power') || name.includes('electricity') || name.includes('backup') || name.includes('zap')) return Zap;
+  if (name.includes('elevator') || name.includes('lift') || name.includes('up')) return ArrowUpCircle;
+  if (name.includes('parking') || name.includes('car') || name.includes('vehicle')) return Car;
+  if (name.includes('wifi') || name.includes('internet') || name.includes('network')) return Wifi;
+  if (name.includes('pet') || name.includes('dog') || name.includes('animal')) return Dog;
+  
+  // Building/Property related
+  if (name.includes('building') || name.includes('commercial') || name.includes('office')) return Building2;
+  
+  // Default icon
+  return Sparkles;
+};
 
 // Safely normalize any value to an array (handles JSON strings, objects, null)
 const toArray = (val, fallback = []) => {
@@ -48,6 +234,96 @@ const toArray = (val, fallback = []) => {
     return val.split(',').map(s => s.trim()).filter(Boolean);
   }
   return fallback;
+};
+
+// Parse nearby landmarks from backend data
+const parseNearbyLandmarks = (nearbyData) => {
+  if (!nearbyData || !Array.isArray(nearbyData) || nearbyData.length === 0) {
+    return null; // Return null to trigger fallback
+  }
+  
+  return nearbyData.map(item => {
+    // Handle string format like "Metro Station - 0.5 km"
+    if (typeof item === 'string') {
+      const parts = item.split('-');
+      const name = parts[0]?.trim() || item;
+      const distance = parts[1]?.trim() || 'Nearby';
+      return { name, distance, icon: getNearbyIcon(name) };
+    }
+    // Handle object format
+    if (typeof item === 'object' && item !== null) {
+      return {
+        name: item.name || item.landmark || 'Landmark',
+        distance: item.distance || item.dist || 'Nearby',
+        icon: getNearbyIcon(item.name || item.landmark || '')
+      };
+    }
+    return { name: String(item), distance: 'Nearby', icon: MapPin };
+  });
+};
+
+// Get appropriate icon for nearby landmark
+const getNearbyIcon = (name) => {
+  const lower = name.toLowerCase();
+  if (lower.includes('metro') || lower.includes('subway')) return Train;
+  if (lower.includes('railway') || lower.includes('train')) return TrainFront;
+  if (lower.includes('mall') || lower.includes('shopping')) return ShoppingBag;
+  if (lower.includes('hospital') || lower.includes('clinic') || lower.includes('medical')) return Hospital;
+  if (lower.includes('school') || lower.includes('college') || lower.includes('university')) return School;
+  if (lower.includes('bus')) return Bus;
+  if (lower.includes('airport')) return Plane;
+  if (lower.includes('highway') || lower.includes('road')) return Navigation;
+  if (lower.includes('park')) return Trees;
+  if (lower.includes('temple') || lower.includes('mosque') || lower.includes('church')) return Landmark;
+  if (lower.includes('bank') || lower.includes('atm')) return Building2;
+  if (lower.includes('restaurant') || lower.includes('food')) return Coffee;
+  return MapPin;
+};
+
+// Count nearby places by type
+const countNearbyByType = (nearbyData, type) => {
+  if (!nearbyData || !Array.isArray(nearbyData)) return 0;
+  const lowerType = type.toLowerCase();
+  return nearbyData.filter(item => {
+    const name = typeof item === 'string' ? item : (item.name || item.landmark || '');
+    return name.toLowerCase().includes(lowerType);
+  }).length;
+};
+
+// Parse highlights from property data
+const parseHighlights = (property) => {
+  // Try to get highlights from various possible backend fields
+  const highlights = 
+    toArray(property.highlights, null) ||
+    toArray(property.features, null) ||
+    toArray(property.selling_points, null);
+  
+  if (highlights && highlights.length > 0) {
+    return highlights.map((text, idx) => ({
+      icon: getHighlightIcon(text, idx),
+      text: typeof text === 'string' ? text : text.description || text.title || String(text)
+    }));
+  }
+  
+  return null; // Return null to trigger fallback
+};
+
+// Get icon for highlight based on text content
+const getHighlightIcon = (text, idx) => {
+  const lower = (text || '').toLowerCase();
+  if (lower.includes('location') || lower.includes('connectivity') || lower.includes('highway') || lower.includes('metro')) return MapPin;
+  if (lower.includes('green') || lower.includes('garden') || lower.includes('landscape') || lower.includes('park')) return Trees;
+  if (lower.includes('security') || lower.includes('cctv') || lower.includes('guard') || lower.includes('safe')) return ShieldCheck;
+  if (lower.includes('construction') || lower.includes('quality') || lower.includes('architecture') || lower.includes('modern')) return Building2;
+  if (lower.includes('parking')) return Car;
+  if (lower.includes('power') || lower.includes('backup') || lower.includes('electricity')) return Zap;
+  if (lower.includes('amenities') || lower.includes('facility')) return Sparkles;
+  if (lower.includes('school') || lower.includes('education')) return School;
+  if (lower.includes('hospital') || lower.includes('medical')) return Hospital;
+  if (lower.includes('mall') || lower.includes('shopping')) return ShoppingBag;
+  // Rotate through default icons
+  const defaults = [MapPin, Trees, ShieldCheck, Building2, Car, Zap, Sparkles, CheckCircle2];
+  return defaults[idx % defaults.length];
 };
 
 // ============================================
@@ -221,6 +497,112 @@ const renderFieldValue = (key, value) => {
   return <span className="font-semibold text-gray-900">{formatted}</span>;
 };
 
+// ============================================
+// SQUAREYARDS-STYLE HELPER COMPONENTS
+// ============================================
+
+const SectionCard = ({ children, className = '' }) => (
+  <div className={`bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8 shadow-lg shadow-gray-200/20 border border-gray-100/50 ${className}`}>
+    {children}
+  </div>
+);
+
+const SectionTitle = ({ icon: Icon, title, action }) => (
+  <div className="flex items-center justify-between mb-4">
+    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+      {Icon && <Icon className="text-primary" size={20} />}
+      {title}
+    </h3>
+    {action && <div>{action}</div>}
+  </div>
+);
+
+const InfoBadge = ({ icon: Icon, label, value, highlight = false }) => (
+  <div className={`flex items-center gap-2 rounded-lg px-3 py-2 ${highlight ? 'bg-primary/5 border border-primary/10' : 'bg-gray-50'}`}>
+    {Icon && <Icon size={16} className={highlight ? 'text-primary' : 'text-gray-500'} />}
+    <div>
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className={`text-sm font-semibold ${highlight ? 'text-primary' : 'text-gray-900'}`}>{value}</p>
+    </div>
+  </div>
+);
+
+const HighlightCard = ({ icon: Icon, text }) => (
+  <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+    <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+      <Icon size={16} className="text-primary" />
+    </div>
+    <p className="text-sm text-gray-700 leading-relaxed">{text}</p>
+  </div>
+);
+
+const LocationBenefitItem = ({ name, distance, icon: Icon }) => (
+  <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100 hover:border-primary/20 hover:shadow-sm transition-all">
+    <div className="w-10 h-10 bg-primary/5 rounded-lg flex items-center justify-center">
+      <Icon size={18} className="text-primary" />
+    </div>
+    <div className="flex-1">
+      <p className="text-sm font-semibold text-gray-900">{name}</p>
+      <p className="text-xs text-primary font-medium">{distance}</p>
+    </div>
+  </div>
+);
+
+const PriceConfigRow = ({ bhk, area, price, unit, isHighlighted = false }) => (
+  <div className={`flex items-center justify-between p-4 rounded-lg border ${isHighlighted ? 'border-primary bg-primary/5' : 'border-gray-100 bg-white hover:border-gray-200'} transition-all cursor-pointer`}>
+    <div className="flex items-center gap-4">
+      <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${isHighlighted ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'}`}>
+        <BedDouble size={20} />
+      </div>
+      <div>
+        <p className="font-bold text-gray-900">{bhk} BHK</p>
+        <p className="text-sm text-gray-500">{area} sq.ft</p>
+      </div>
+    </div>
+    <div className="text-right">
+      <p className="font-bold text-primary text-lg">₹{price} {unit}</p>
+      <p className="text-xs text-gray-500">Onwards</p>
+    </div>
+  </div>
+);
+
+const UpdateItem = ({ date, text }) => (
+  <div className="flex gap-4 pb-4 border-l-2 border-primary/20 pl-4 last:border-0 last:pb-0 relative">
+    <div className="absolute -left-[5px] top-1 w-2 h-2 bg-primary rounded-full" />
+    <div>
+      <p className="text-xs font-semibold text-primary mb-1">{date}</p>
+      <p className="text-sm text-gray-700">{text}</p>
+    </div>
+  </div>
+);
+
+const SimilarPropertyCard = ({ property }) => {
+  const navigate = useNavigate();
+  return (
+    <div 
+      onClick={() => navigate(`/properties/${property.id}`)}
+      className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-lg transition-all cursor-pointer group"
+    >
+      <div className="relative h-40 overflow-hidden">
+        <img src={property.image} alt={property.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        <div className="absolute top-2 left-2 px-2 py-1 bg-white/90 backdrop-blur-sm rounded-md text-xs font-semibold text-gray-900">
+          {property.bhk} BHK
+        </div>
+      </div>
+      <div className="p-4">
+        <h4 className="font-semibold text-gray-900 text-sm mb-1 line-clamp-1">{property.title}</h4>
+        <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+          <MapPin size={12} /> {property.location}
+        </p>
+        <div className="flex items-center justify-between">
+          <p className="font-bold text-primary">{property.price}</p>
+          <p className="text-xs text-gray-500">{property.area} sq.ft</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const MOCK_PROPERTY_EXTENDED = {
   id: 1,
   images: [
@@ -242,7 +624,179 @@ const MOCK_PROPERTY_EXTENDED = {
   amenities: ['Parking', 'Lift', 'Gym', 'Swimming Pool', 'Security', 'Power Backup', 'Club House'],
   nearby: ['Metro Station - 500m', 'Shopping Mall - 1km', 'Schools - 2km', 'Hospital - 1.5km'],
   owner: { name: 'Raj Kumar', phone: '+91 9876543210', verified: true },
+  // Extended data for SquareYards-style sections
+  developer: 'Revo Developers',
+  projectName: 'Revo Meridian Heights',
+  totalArea: '5.2 Acres',
+  totalUnits: '240',
+  totalTowers: '4',
+  totalFloors: 'G+24',
+  possessionDate: 'Dec 2024',
+  launchDate: 'Jan 2022',
+  pricePerSqft: '22,200',
+  priceTrend: '+5.8%',
+  rentalYield: '3.2%',
 };
+
+// Sticky Navigation Items
+const NAV_ITEMS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'floor-plans', label: 'Floor Plans' },
+  { id: 'amenities', label: 'Amenities' },
+  { id: 'location', label: 'Location' },
+  { id: 'experts', label: 'Experts' },
+  { id: 'price-trends', label: 'Price Trends' },
+  { id: 'reviews', label: 'Reviews' },
+];
+
+// Experts Carousel Component - Separate to avoid hooks order issues
+function ExpertsCarousel({ property, handleExpertContact }) {
+  const scrollRef = useRef(null);
+  const experts = property?.experts || MOCK_EXPERTS;
+  
+  const scroll = (direction) => {
+    if (scrollRef.current) {
+      const scrollAmount = direction === 'left' ? -320 : 320;
+      scrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+  
+  return (
+    <div className="relative">
+      {/* Navigation Arrows */}
+      {experts.length > 2 && (
+        <>
+          <button
+            onClick={() => scroll('left')}
+            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 z-10 w-10 h-10 bg-white rounded-full shadow-lg border border-gray-100 flex items-center justify-center hover:bg-gray-50 hover:shadow-xl transition-all duration-300 group"
+          >
+            <ChevronRight size={20} className="text-gray-600 rotate-180 group-hover:text-primary transition-colors" />
+          </button>
+          <button
+            onClick={() => scroll('right')}
+            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-3 z-10 w-10 h-10 bg-white rounded-full shadow-lg border border-gray-100 flex items-center justify-center hover:bg-gray-50 hover:shadow-xl transition-all duration-300 group"
+          >
+            <ChevronRight size={20} className="text-gray-600 group-hover:text-primary transition-colors" />
+          </button>
+        </>
+      )}
+      
+      {/* Horizontal scroll container */}
+      <div 
+        ref={scrollRef}
+        className="flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide scroll-smooth" 
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        {experts.map((expert, idx) => {
+          const initial = expert.name.charAt(0).toUpperCase();
+          const avatarColor = AVATAR_COLORS[idx % AVATAR_COLORS.length];
+          
+          return (
+            <motion.div 
+              key={expert.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.1, duration: 0.4 }}
+              whileHover={{ y: -8, scale: 1.02 }}
+              className="flex-shrink-0 w-[300px] sm:w-[320px] bg-white rounded-2xl p-5 border border-gray-100 shadow-md hover:shadow-2xl transition-all duration-300 snap-start cursor-pointer group"
+            >
+              {/* Top strip with gradient pastel background */}
+              <div 
+                className="h-16 rounded-xl mb-5 flex items-center justify-center relative overflow-hidden"
+                style={{ backgroundColor: avatarColor }}
+              >
+                {/* Decorative circles */}
+                <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-white/20" />
+                <div className="absolute -bottom-4 -left-4 w-12 h-12 rounded-full bg-white/20" />
+                
+                {/* Avatar circle with gradient ring */}
+                <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-lg border-3 border-white relative z-10 group-hover:scale-110 transition-transform duration-300">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                    <span className="text-xl font-bold bg-gradient-to-br from-gray-700 to-gray-900 bg-clip-text text-transparent">{initial}</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Name with verified badge */}
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="font-bold text-gray-900 text-lg truncate">
+                  {expert.name}
+                </h3>
+                <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0" title="Verified Expert">
+                  <Check size={12} className="text-white" />
+                </div>
+              </div>
+              
+              {/* Role with badge style */}
+              <div className="mb-4">
+                <span className="inline-block px-3 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
+                  {expert.role}
+                </span>
+              </div>
+              
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="bg-gray-50 rounded-xl p-3 text-center group-hover:bg-primary/5 transition-colors">
+                  <Building2 size={18} className="mx-auto mb-1 text-primary" />
+                  <p className="text-lg font-bold text-gray-900">{expert.totalProperties || 0}</p>
+                  <p className="text-xs text-gray-500">Properties</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3 text-center group-hover:bg-primary/5 transition-colors">
+                  <Globe size={18} className="mx-auto mb-1 text-primary" />
+                  <p className="text-xs font-medium text-gray-700 truncate">
+                    {expert.languages?.slice(0, 2).join(", ") || "English"}
+                  </p>
+                  <p className="text-xs text-gray-500">Languages</p>
+                </div>
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                {/* WhatsApp Button */}
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => handleExpertContact(expert)}
+                  className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center shadow-lg shadow-green-200 hover:shadow-green-300 transition-all"
+                  title="Contact on WhatsApp"
+                >
+                  <MessageCircle size={20} className="text-white" />
+                </motion.button>
+                
+                {/* Get a call back Button */}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleExpertContact(expert)}
+                  className="flex-1 py-3 bg-gradient-to-r from-primary to-primary-dark text-white text-sm font-semibold rounded-xl shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all flex items-center justify-center gap-2 group/btn"
+                >
+                  <Phone size={16} className="group-hover/btn:animate-pulse" />
+                  Get a call back
+                </motion.button>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+      
+      {/* Scroll indicator dots */}
+      {experts.length > 2 && (
+        <div className="flex justify-center gap-2 mt-4">
+          {experts.map((_, idx) => (
+            <motion.div 
+              key={idx}
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: idx * 0.1 }}
+              className="w-2 h-2 rounded-full bg-gray-300 hover:bg-primary transition-colors cursor-pointer"
+            />
+          ))}
+        </div>
+      )}
+      
+    </div>
+  );
+}
 
 function PropertyDetails() {
   const navigate = useNavigate();
@@ -264,6 +818,18 @@ function PropertyDetails() {
   const [newReview, setNewReview] = useState({ rating: 5, comment: '' });
   const [reviewToDelete, setReviewToDelete] = useState(null);
   const [enquirySent, setEnquirySent] = useState(false);
+  
+  // Document Download Payment State
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [hasPaidForDocuments, setHasPaidForDocuments] = useState(false);
+  
+  // SquareYards-style UI States
+  const [activeTab, setActiveTab] = useState('overview');
+  const [activeBhkTab, setActiveBhkTab] = useState('all');
+  const [showAllAmenities, setShowAllAmenities] = useState(false);
+  const [showMobileNav, setShowMobileNav] = useState(false);
+  const [expandedSection, setExpandedSection] = useState(null);
 
   const saved = isSaved(property?.propertyId || property?.id || id);
   
@@ -304,6 +870,111 @@ function PropertyDetails() {
     localStorage.setItem(`reviews_${id}`, JSON.stringify(updatedReviews));
     setShowReviewForm(false);
     setNewReview({ rating: 5, comment: '' });
+  };
+
+  // Document Download Payment Handler
+  const handleDownloadDocuments = () => {
+    if (!isLoggedIn) {
+      openLoginForPropertyDetails();
+      return;
+    }
+    setShowPaymentModal(true);
+  };
+
+  const initiatePayment = async () => {
+    setPaymentLoading(true);
+    
+    // Simulate payment processing (2 seconds)
+    setTimeout(() => {
+      // Mock successful payment
+      const mockPaymentId = `pay_${Date.now()}`;
+      const mockOrderId = `order_${Date.now()}`;
+      
+      console.log('Payment successful:', { paymentId: mockPaymentId, orderId: mockOrderId });
+      
+      // Store payment info in localStorage
+      const paymentHistory = JSON.parse(localStorage.getItem('document_payments') || '[]');
+      paymentHistory.push({
+        propertyId: id,
+        paymentId: mockPaymentId,
+        orderId: mockOrderId,
+        timestamp: new Date().toISOString(),
+        amount: 49,
+      });
+      localStorage.setItem('document_payments', JSON.stringify(paymentHistory));
+      
+      // Close modal and reset loading
+      setShowPaymentModal(false);
+      setPaymentLoading(false);
+      
+      // Generate and download document
+      generateAndDownloadDocument();
+      
+      // Show success message
+      alert('Payment successful! Your document is being downloaded.');
+    }, 2000);
+  };
+
+  const generateAndDownloadDocument = () => {
+    // Create a comprehensive property document using jsPDF
+    const { jsPDF } = require('jspdf');
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(20);
+    doc.setTextColor(99, 102, 241);
+    doc.text('Revo Homes - Property Document', 105, 20, { align: 'center' });
+    
+    // Property Details
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    let y = 40;
+    
+    doc.text('PROPERTY DETAILS', 20, y);
+    y += 10;
+    doc.setFontSize(10);
+    doc.text(`Property: ${property?.title || 'N/A'}`, 20, y);
+    y += 7;
+    doc.text(`Location: ${property?.location || 'N/A'}`, 20, y);
+    y += 7;
+    doc.text(`Price: ₹${property?.price?.toLocaleString() || 'N/A'}`, 20, y);
+    y += 7;
+    doc.text(`BHK: ${property?.bhk || 'N/A'}`, 20, y);
+    y += 7;
+    doc.text(`Area: ${property?.area || 'N/A'} sq.ft`, 20, y);
+    y += 15;
+    
+    // Owner Details
+    doc.setFontSize(12);
+    doc.text('OWNER INFORMATION', 20, y);
+    y += 10;
+    doc.setFontSize(10);
+    doc.text(`Name: ${property?.owner?.name || 'N/A'}`, 20, y);
+    y += 7;
+    doc.text(`Phone: ${property?.owner?.phone || 'N/A'}`, 20, y);
+    y += 15;
+    
+    // Amenities
+    if (property?.amenities && property.amenities.length > 0) {
+      doc.setFontSize(12);
+      doc.text('AMENITIES', 20, y);
+      y += 10;
+      doc.setFontSize(10);
+      property.amenities.slice(0, 10).forEach((amenity, idx) => {
+        doc.text(`• ${amenity}`, 20, y);
+        y += 6;
+      });
+    }
+    
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(128, 128, 128);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 280);
+    doc.text('This document is generated by Revo Homes. Payment verified.', 20, 285);
+    doc.text(`Payment ID: DOC_${Date.now()}`, 20, 290);
+    
+    // Download
+    doc.save(`${property?.title?.replace(/\s+/g, '_') || 'Property'}_Documents.pdf`);
   };
 
   useEffect(() => {
@@ -437,6 +1108,13 @@ function PropertyDetails() {
     await toggleFavorite(property?.propertyId || property?.id || id, !saved);
   };
 
+  // Handle expert contact - currently logs, ready for backend integration
+  const handleExpertContact = (expert) => {
+    console.log("Contact expert:", expert);
+    // Future: Integrate with backend API
+    // Example: api.post('/expert-contact', { expertId: expert.id, propertyId: id })
+  };
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8 animate-pulse">
@@ -469,578 +1147,713 @@ function PropertyDetails() {
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="bg-gray-50/50 min-h-screen"
+      className="bg-gradient-to-br from-gray-50 via-white to-gray-50/30 min-h-screen"
     >
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
         {/* Breadcrumbs */}
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
-          <span className="hover:text-primary cursor-pointer" onClick={() => navigate('/')}>Home</span>
-          <ChevronRight size={14} />
-          <span className="hover:text-primary cursor-pointer" onClick={() => navigate('/properties')}>Properties</span>
-          <ChevronRight size={14} />
-          <span className="text-gray-900 font-medium truncate">{property?.title || 'Property Details'}</span>
+        <div className="flex items-center gap-2 text-sm text-gray-500 mb-6 lg:mb-8">
+          <span className="hover:text-primary cursor-pointer transition-colors" onClick={() => navigate('/')}>Home</span>
+          <ChevronRight size={14} className="text-gray-400" />
+          <span className="hover:text-primary cursor-pointer transition-colors" onClick={() => navigate('/properties')}>Properties</span>
+          <ChevronRight size={14} className="text-gray-400" />
+          <span className="text-gray-900 font-medium truncate max-w-xs sm:max-w-none">{property?.title || 'Property Details'}</span>
         </div>
 
-        {/* Premium Image Gallery - Guest: Single Image | Authenticated: Full Gallery */}
-        <div className="mb-10 relative">
-          <div className="absolute top-6 left-6 z-10 flex flex-col gap-2 pointer-events-none">
-            <span className="px-6 py-2 bg-white/90 backdrop-blur-md text-gray-900 rounded-full text-xs font-black uppercase tracking-widest shadow-2xl border border-white/50">
+        {/* Premium HERO SECTION - Immersive Image with Gallery */}
+        <div className="mb-6 lg:mb-8 relative">
+          {/* Overlay Badges */}
+          <div className="absolute top-3 sm:top-4 left-3 sm:left-4 z-20 flex flex-col gap-1.5 pointer-events-none">
+            <span className="px-3 py-1.5 bg-white/95 backdrop-blur-lg text-gray-900 rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg border border-white/50">
               {property.propertyType}
             </span>
+            <span className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg flex items-center gap-1">
+              <Star size={10} className="fill-current" />
+              Featured
+            </span>
           </div>
+
           {isGuestView ? (
-            <div className="relative h-[400px] rounded-2xl overflow-hidden">
+            <div className="relative h-[280px] sm:h-[360px] lg:h-[420px] rounded-2xl overflow-hidden shadow-xl shadow-black/10">
               <img 
                 src={property.images?.[0] || property.image || MOCK_PROPERTY_EXTENDED.images[0]} 
                 alt={property.title}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-              <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between">
-                <p className="text-white/90 text-sm font-medium flex items-center gap-2">
-                  <Lock size={16} className="text-primary" />
-                  Sign in to see all {property.images?.length || 1} photos
-                </p>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+              
+              {/* Thumbnail Gallery Preview */}
+              <div className="absolute bottom-3 left-3 right-3 flex gap-1.5">
+                {property.images?.slice(0, 4).map((img, idx) => (
+                  <div key={idx} className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg overflow-hidden shadow-md border-2 border-white/50">
+                    <img src={img} alt={`Property ${idx + 1}`} className="w-full h-full object-cover" />
+                  </div>
+                ))}
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg bg-black/60 flex items-center justify-center border-2 border-white/50">
+                  <span className="text-white text-xs font-semibold">+{Math.max(0, (property.images?.length || 0) - 4)}</span>
+                </div>
+              </div>
+              
+              <div className="absolute bottom-20 sm:bottom-24 left-3 right-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Lock size={14} className="text-primary/90" />
+                  <p className="text-white/95 text-sm">
+                    Sign in to see all {property.images?.length || 1} photos
+                  </p>
+                </div>
                 <button 
                   onClick={openLoginForPropertyDetails}
-                  className="px-4 py-2 bg-white text-gray-900 font-semibold rounded-xl text-sm hover:bg-gray-100 transition-all"
+                  className="px-4 py-2 bg-white/95 backdrop-blur-lg text-gray-900 font-semibold rounded-lg text-sm hover:bg-white transition-all shadow-lg hover:shadow-xl active:scale-95"
                 >
                   Sign In
                 </button>
               </div>
             </div>
           ) : (
-            <ImageGallery images={property.images} title={property.title} />
+            <div className="rounded-2xl overflow-hidden shadow-xl shadow-black/10">
+              <ImageGallery images={property.images} title={property.title} />
+            </div>
           )}
+
+          {/* View All Photos CTA */}
+          <div className="mt-4 text-center">
+            <button 
+              onClick={() => setShowEMI(false) || setShowRental(false) || console.log('View all photos')}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary to-primary-dark text-white font-semibold rounded-lg hover:from-primary-dark hover:to-primary transition-all shadow-md hover:shadow-lg active:scale-95 text-sm"
+            >
+              <Eye size={16} />
+              View All Photos ({property.images?.length || 1})
+            </button>
+          </div>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        {/* SQUAREYARDS-STYLE STICKY NAVIGATION */}
+        <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-200 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 mb-6 hidden lg:block">
+          <div className="flex items-center gap-1 overflow-x-auto py-3 no-scrollbar">
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-all ${
+                  activeTab === item.id 
+                    ? 'bg-primary text-white shadow-md' 
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-10">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-8">
-            <section className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-100">
-              <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-8">
-                <div>
-                  <h1 className="text-3xl md:text-4xl font-black text-gray-900 leading-tight mb-3">
+          <div className="lg:col-span-2 space-y-6 lg:space-y-8">
+            {/* OVERVIEW SECTION */}
+            <section id="overview" className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8 shadow-lg shadow-gray-200/20 border border-gray-100/50">
+              {/* Property Title and Location */}
+              <div className="flex flex-col lg:flex-row justify-between items-start gap-4 lg:gap-6 mb-6">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="px-2 py-1 bg-primary/10 text-primary text-xs font-bold rounded-md uppercase">
+                      {property.propertyType}
+                    </span>
+                    <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-md uppercase flex items-center gap-1">
+                      <Star size={10} className="fill-current" /> Featured
+                    </span>
+                  </div>
+                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 leading-tight mb-2">
                     {property.title}
                   </h1>
-                  <p className="text-gray-500 flex items-center gap-2 text-lg">
-                    <MapPin className="text-primary" size={20} />
-                    {property.location}
-                  </p>
-                </div>
-                <div className="text-right flex flex-col items-end justify-center">
-                  <div className="flex items-center gap-4 mb-4">
-                    <button
-                      onClick={handleToggleFavorite}
-                      className={`p-4 rounded-2xl transition-all duration-300 shadow-xl flex items-center justify-center ${
-                        saved 
-                          ? 'bg-red-50 text-red-500 scale-110 shadow-red-200/50' 
-                          : 'bg-gray-50 text-gray-400 hover:text-red-400 hover:bg-white hover:scale-105 shadow-gray-200/50'
-                      } border border-white`}
-                      title={saved ? 'Remove from saved' : 'Save property'}
-                    >
-                      <Heart size={28} className={saved ? 'fill-current' : ''} />
-                    </button>
+                  <div className="flex items-center gap-2 text-gray-600 text-base">
+                    <MapPin className="text-primary flex-shrink-0" size={18} />
+                    <span className="font-medium">{property.location}</span>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Pricing Reference</p>
-                    <p className="text-5xl font-black text-primary tracking-tighter">
-                      ₹{property.price?.toLocaleString()}<span className="text-2xl font-bold text-gray-400">{property.listingType === 'rent' ? '/mo' : ''}</span>
+                </div>
+                <div className="flex items-center gap-3 lg:flex-col lg:items-end">
+                  <button
+                    onClick={handleToggleFavorite}
+                    className={`p-3 rounded-xl transition-all duration-300 shadow-lg flex items-center justify-center ${
+                      saved 
+                        ? 'bg-red-50 text-red-500 scale-105 shadow-red-200/50 hover:scale-110' 
+                        : 'bg-gray-50 text-gray-400 hover:text-red-400 hover:bg-white hover:scale-105 shadow-gray-200/50'
+                    } border border-white`}
+                    title={saved ? 'Remove from saved' : 'Save property'}
+                  >
+                    <Heart size={22} className={saved ? 'fill-current' : ''} />
+                  </button>
+                  <div className="text-right">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Price</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-primary tracking-tight">
+                      &#8377;{property.price?.toLocaleString()}<span className="text-lg sm:text-xl font-medium text-gray-400">{property.listingType === 'rent' ? '/mo' : ''}</span>
                     </p>
+                    <p className="text-xs text-gray-500 mt-1">₹{property.pricePerSqft || '22,200'}/sq.ft</p>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-6 bg-gray-50 rounded-3xl mb-10">
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-2">
-                    <BedDouble className="text-primary" size={24} />
-                  </div>
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-tighter">Beds</p>
-                  <p className="font-black text-gray-900">{property.bhk} BHK</p>
-                </div>
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-2">
-                    <Maximize className="text-primary" size={24} />
-                  </div>
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-tighter">Area</p>
-                  <p className="font-black text-gray-900">{property.area} sq.ft</p>
-                </div>
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-2">
-                    <Home className="text-primary" size={24} />
-                  </div>
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-tighter">Status</p>
-                  <p className="font-black text-gray-900">{property.furnished}</p>
-                </div>
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-2">
-                    <ShieldCheck className="text-primary" size={24} />
-                  </div>
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-tighter">Security</p>
-                  <p className="font-black text-gray-900">24/7 Gate</p>
-                </div>
+              {/* Key Highlights Row */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-6">
+                <InfoBadge icon={BedDouble} label="Configuration" value={`${property.bhk} BHK`} highlight />
+                <InfoBadge icon={Maximize} label="Carpet Area" value={`${property.area} sq.ft`} />
+                <InfoBadge icon={Home} label="Furnishing" value={property.furnished || 'Semi'} />
+                <InfoBadge icon={Building2} label="Developer" value={property.developer || 'Revo Developers'} />
+                <InfoBadge icon={Calendar} label="Possession" value={property.possessionDate || 'Dec 2024'} />
               </div>
 
-              <div className="space-y-10">
+              <div className="space-y-6">
                 <div>
-                  <h3 className="text-2xl font-black text-gray-900 mb-4 flex items-center gap-3">
+                  <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <FileText className="text-primary" size={18} />
                     Description
                   </h3>
-                  <p className="text-gray-600 leading-relaxed text-lg italic">
-                    {isGuestView && property.description && property.description.length > 150 ? (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    {isGuestView && property.description && property.description.length > 200 ? (
                       <>
-                        {property.description.substring(0, 150)}...
+                        <p className="text-gray-700 leading-relaxed text-sm mb-3">
+                          {property.description.substring(0, 200)}...
+                        </p>
                         <button 
                           onClick={openLoginForPropertyDetails}
-                          className="text-primary font-bold ml-1 hover:underline"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark transition-all"
                         >
+                          <Lock size={14} />
                           Sign in to read more
                         </button>
                       </>
                     ) : (
-                      property.description
-                    )}
-                  </p>
-                </div>
-
-                <div>
-                  <h3 className="text-2xl font-black text-gray-900 mb-6">
-                    Premium Amenities
-                    {isGuestView && property.amenities?.length > 4 && (
-                      <span className="text-sm font-normal text-gray-500 ml-2">
-                        (4 of {property.amenities.length})
-                      </span>
-                    )}
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {(isGuestView ? property.amenities?.slice(0, 4) : property.amenities)?.map((a) => (
-                      <button 
-                        key={a} 
-                        onClick={() => navigate(`/properties?amenity=${encodeURIComponent(a)}`)}
-                        className="flex items-center gap-3 p-4 bg-primary/5 rounded-2xl border border-primary/5 hover:border-primary/20 transition-all group cursor-pointer text-left w-full"
-                      >
-                        <div className="w-2 h-2 bg-primary rounded-full group-hover:scale-150 transition-transform" />
-                        <span className="font-bold text-gray-700">{a}</span>
-                      </button>
-                    ))}
-                    {isGuestView && property.amenities?.length > 4 && (
-                      <button 
-                        onClick={openLoginForPropertyDetails}
-                        className="flex items-center justify-center gap-2 p-4 bg-gray-100 rounded-2xl border border-gray-200 hover:bg-gray-200 transition-all cursor-pointer text-left w-full group"
-                      >
-                        <Lock size={16} className="text-gray-500" />
-                        <span className="font-semibold text-gray-600 text-sm">
-                          +{property.amenities.length - 4} more - Sign in
-                        </span>
-                      </button>
+                      <p className="text-gray-700 leading-relaxed text-sm">
+                        {property.description || 'No description available'}
+                      </p>
                     )}
                   </div>
                 </div>
 
-                {!isGuestView && (
-                  <div>
-                    <h3 className="text-2xl font-black text-gray-900 mb-6">Nearby Essentials</h3>
-                    <div className="space-y-3">
-                      {property.nearby.map((place) => (
-                        <div key={place} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl shadow-sm">
-                          <div className="flex items-center gap-3">
-                            <MapPin size={18} className="text-primary" />
-                            <span className="font-bold text-gray-700 tracking-tight">{place.split('-')[0]}</span>
-                          </div>
-                          <span className="text-sm font-black text-primary bg-primary/5 px-3 py-1 rounded-lg">
-                            {place.split('-')[1]}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {!isGuestView && (
-                  <div className="mt-8 border-t border-gray-100 pt-8">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-bold text-gray-900 text-xl">Property Location</h3>
-                      <span className="px-3 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded-full border border-blue-100 uppercase tracking-widest flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
-                        </svg>
-                        Map View
-                      </span>
-                    </div>
-
-                    <div className="relative h-[300px] w-full rounded-2xl overflow-hidden border border-gray-200">
-                      <iframe
-                        title="Property Location"
-                        src={`https://www.google.com/maps?q=${encodeURIComponent(property.location)}&output=embed`}
-                        className="w-full h-full border-0"
-                        loading="lazy"
-                        referrerPolicy="no-referrer-when-downgrade"
-                      ></iframe>
-                    </div>
-                  </div>
-                )}
-
-                {/* ============================================
-                    DYNAMIC PROPERTY SECTIONS - ALL DB FIELDS
-                    (HIDDEN FOR GUEST USERS)
-                    ============================================ */}
-                {!isGuestView && (
-                <div className="mt-10 pt-8 border-t border-gray-100">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-3">
-                      <Database className="text-primary" size={24} />
-                      Complete Property Details
-                    </h3>
-                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                      {Object.keys(property).filter(k => !EXCLUDED_FIELDS.includes(k) && isValidValue(property[k])).length} fields
-                    </span>
-                  </div>
-                  
-                  <div className="space-y-6">
-                    {PROPERTY_SECTIONS.map((section, sectionIndex) => {
-                      // Get valid fields for this section (non-null values)
-                      const validFields = section.fields.filter(fieldKey => {
-                        // Skip excluded fields
-                        if (EXCLUDED_FIELDS.includes(fieldKey)) return false;
-                        // Check if property has this field with valid value
-                        const value = property[fieldKey];
-                        return isValidValue(value);
-                      });
-                      
-                      // Skip section if no valid fields
-                      if (validFields.length === 0) return null;
-                      
-                      return (
-                        <motion.div
-                          key={section.title}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: sectionIndex * 0.05 }}
-                          className="bg-white rounded-2xl border border-gray-100 overflow-hidden"
-                        >
-                          {/* Section Header */}
-                          <div className="px-6 py-4 bg-gray-50/50 border-b border-gray-100 flex items-center gap-3">
-                            <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                              {section.icon === 'Home' && <Home size={16} className="text-primary" />}
-                              {section.icon === 'IndianRupee' && <IndianRupee size={16} className="text-primary" />}
-                              {section.icon === 'MapPin' && <MapPin size={16} className="text-primary" />}
-                              {section.icon === 'BedDouble' && <BedDouble size={16} className="text-primary" />}
-                              {section.icon === 'Maximize' && <Maximize size={16} className="text-primary" />}
-                              {section.icon === 'Building2' && <Building2 size={16} className="text-primary" />}
-                              {section.icon === 'Car' && <Car size={16} className="text-primary" />}
-                              {section.icon === 'Sparkles' && <Sparkles size={16} className="text-primary" />}
-                              {section.icon === 'ShieldCheck' && <ShieldCheck size={16} className="text-primary" />}
-                              {section.icon === 'Eye' && <Eye size={16} className="text-primary" />}
-                              {section.icon === 'Globe' && <Globe size={16} className="text-primary" />}
-                              {section.icon === 'Database' && <Database size={16} className="text-primary" />}
-                            </div>
-                            <h4 className="font-black text-gray-900">{section.title}</h4>
-                            <span className="ml-auto text-xs font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-full">
-                              {validFields.length}
-                            </span>
-                          </div>
-                          
-                          {/* Section Fields Grid */}
-                          <div className="p-6">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                              {validFields.map((fieldKey) => {
-                                const value = property[fieldKey];
-                                const renderedValue = renderFieldValue(fieldKey, value);
-                                
-                                if (!renderedValue) return null;
-                                
-                                return (
-                                  <div key={fieldKey} className="space-y-1">
-                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                                      {formatFieldLabel(fieldKey)}
-                                    </p>
-                                    <div className="text-sm">
-                                      {renderedValue}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                </div>
-                )}
-
-                {/* Reviews Section - Hidden for Guests */}
-                {!isGuestView && (
-                <div className="pt-10 border-t border-gray-100">
-                  <div className="flex items-center justify-between mb-8">
-                    <h3 className="text-2xl font-black text-gray-900 tracking-tight">Reviews & Ratings</h3>
-                    <div className="flex items-center gap-2 bg-amber-50 px-4 py-2 rounded-2xl border border-amber-100">
-                      <Star className="text-amber-500 fill-amber-500" size={18} />
-                      <span className="font-black text-amber-700">4.8</span>
-                      <span className="text-xs font-bold text-amber-600/60 uppercase tracking-widest">(24 Reviews)</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-6">
-                    {reviews.map((review, i) => (
-                      <div key={i} className="p-6 bg-gray-50/50 rounded-3xl border border-gray-100/50">
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center font-black text-primary">
-                                {review.name[0]}
-                              </div>
-                              <div>
-                                <p className="font-bold text-gray-900">{review.name}</p>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{review.date}</p>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center gap-4">
-                              <div className="flex text-amber-500">
-                                {[...Array(5)].map((_, starIdx) => (
-                                  <Star 
-                                    key={starIdx} 
-                                    size={14} 
-                                    className={starIdx < review.rating ? "fill-current" : "text-gray-200"} 
-                                  />
-                                ))}
-                              </div>
-                              {reviewToDelete === review.id ? (
-                                <div className="flex items-center gap-2 bg-red-50 p-1 rounded-xl border border-red-100 animate-in fade-in slide-in-from-right-2">
-                                  <span className="text-[10px] font-black text-red-600 uppercase px-2">Delete?</span>
-                                  <button 
-                                    onClick={() => handleDeleteReview(review.id)}
-                                    className="px-3 py-1 bg-red-500 text-white text-[10px] font-black rounded-lg hover:bg-red-600 transition-all uppercase"
-                                  >
-                                    Yes
-                                  </button>
-                                  <button 
-                                    onClick={() => setReviewToDelete(null)}
-                                    className="px-3 py-1 bg-white text-gray-500 text-[10px] font-black rounded-lg hover:bg-gray-100 transition-all uppercase border border-gray-100"
-                                  >
-                                    No
-                                  </button>
-                                </div>
-                              ) : (
-                                <button 
-                                  onClick={() => setReviewToDelete(review.id)}
-                                  className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                                  title="Delete Review"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <p className="text-gray-600 font-medium leading-relaxed italic">&ldquo;{review.comment}&rdquo;</p>
-                      </div>
-                    ))}
-                    
-                    {showReviewForm ? (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="p-8 bg-primary/5 rounded-[2.5rem] border-2 border-primary/10 shadow-inner"
-                      >
-                        <h4 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
-                          <Paintbrush className="text-primary" size={20} />
-                          Share your experience
-                        </h4>
-                        
-                        <div className="space-y-6">
-                          <div>
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">Your Rating</label>
-                            <div className="flex gap-2">
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <button
-                                  key={star}
-                                  onClick={() => setNewReview({ ...newReview, rating: star })}
-                                  className={`p-2 rounded-xl transition-all ${
-                                    star <= newReview.rating ? 'bg-amber-500 text-white' : 'bg-white text-gray-300'
-                                  }`}
-                                >
-                                  <Star size={20} className={star <= newReview.rating ? "fill-current" : ""} />
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">Comment</label>
-                            <textarea
-                              value={newReview.comment}
-                              onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
-                              className="w-full p-5 bg-white border border-gray-100 rounded-3xl outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium text-gray-700"
-                              rows={3}
-                              placeholder="Describe your visit..."
-                            />
-                          </div>
-                          
-                          <div className="flex gap-3 pt-2">
-                            <button
-                              onClick={handleAddReview}
-                              disabled={!newReview.comment.trim()}
-                              className="flex-1 py-4 bg-primary text-white text-xs font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-primary/20 hover:bg-primary-dark transition-all disabled:opacity-50"
-                            >
-                              Post Review
-                            </button>
-                            <button
-                              onClick={() => setShowReviewForm(false)}
-                              className="px-8 py-4 bg-white text-gray-500 text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-gray-50 transition-all"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ) : (
-                      <button 
-                        onClick={() => setShowReviewForm(true)}
-                        className="w-full py-5 bg-white border-2 border-dashed border-gray-200 rounded-[2rem] text-gray-400 font-black text-sm uppercase tracking-widest hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-3 group"
-                      >
-                        <Paintbrush size={18} className="group-hover:rotate-12 transition-transform" />
-                        Write a review
-                      </button>
-                    )}
-                  </div>
-                </div>
-                )}
-                
                 {/* Guest Login Prompt Banner */}
                 {isGuestView && (
-                  <div className="mt-8 p-6 bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-2xl">
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <Lock className="text-primary" size={24} />
+                  <div className="mt-4 p-4 bg-primary/5 border border-primary/10 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Lock className="text-primary" size={18} />
                       </div>
                       <div className="flex-1">
-                        <h3 className="font-bold text-gray-900 mb-1">Sign in to view complete details</h3>
-                        <p className="text-sm text-gray-600 mb-4">
-                          Get access to full property information, owner contact details, save favorites, and schedule visits.
+                        <h3 className="font-semibold text-gray-900 text-sm mb-1">Sign in to view complete details</h3>
+                        <p className="text-xs text-gray-600 mb-2">
+                          Get access to full property information, owner contact details, save favorites.
                         </p>
-                        <div className="flex gap-3">
-                          <button 
-                            onClick={openLoginForPropertyDetails}
-                            className="px-6 py-2 bg-primary text-white font-semibold rounded-xl hover:bg-primary-dark transition-all"
-                          >
-                            Sign In / Sign Up
-                          </button>
-                        </div>
+                        <button 
+                          onClick={openLoginForPropertyDetails}
+                          className="px-4 py-1.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark transition-all"
+                        >
+                          Sign In / Sign Up
+                        </button>
                       </div>
                     </div>
                   </div>
+                )}
+
+              </div>
+            </section>
+
+            {/* PRICE CONFIGURATION SECTION */}
+            <section id="floor-plans" className="SectionCard">
+              <SectionTitle 
+                icon={IndianRupee} 
+                title="Price List & Configuration" 
+                action={
+                  <div className="flex gap-2">
+                    {['all', '1', '2', '3', '4'].map((bhk) => (
+                      <button
+                        key={bhk}
+                        onClick={() => setActiveBhkTab(bhk)}
+                        className={`px-3 py-1 text-xs font-semibold rounded-full transition-all ${
+                          activeBhkTab === bhk 
+                            ? 'bg-primary text-white' 
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {bhk === 'all' ? 'All' : `${bhk} BHK`}
+                      </button>
+                    ))}
+                  </div>
+                }
+              />
+              <div className="space-y-3">
+                {PRICE_CONFIG_DATA.filter(item => activeBhkTab === 'all' || item.bhk === activeBhkTab).map((config, idx) => (
+                  <PriceConfigRow 
+                    key={idx} 
+                    bhk={config.bhk} 
+                    area={config.area} 
+                    price={config.price} 
+                    unit={config.unit}
+                    isHighlighted={property.bhk === config.bhk}
+                  />
+                ))}
+              </div>
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                <div className="flex items-start gap-3">
+                  <Info className="text-blue-600 flex-shrink-0 mt-0.5" size={16} />
+                  <p className="text-sm text-blue-800">
+                    Prices mentioned are indicative and subject to change. Please contact the developer for current pricing and availability.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            {/* ENHANCED FLOOR PLANS SECTION */}
+            <section className="SectionCard">
+              <SectionTitle icon={Maximize} title="Floor Plans & Unit Types" />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {['1 BHK', '2 BHK', '3 BHK', '4 BHK'].map((bhk, idx) => (
+                  <div 
+                    key={idx} 
+                    className={`bg-gray-50 rounded-lg p-4 text-center border-2 transition-all cursor-pointer hover:border-primary/30 ${property.bhk === String(idx + 1) ? 'border-primary bg-primary/5' : 'border-transparent'}`}
+                  >
+                    <div className="h-20 bg-white rounded-lg mb-3 flex items-center justify-center shadow-sm">
+                      <Maximize className="text-gray-300" size={32} />
+                    </div>
+                    <p className="font-bold text-gray-900">{bhk}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {idx === 0 ? '450-550' : idx === 1 ? '850-1050' : idx === 2 ? '1200-1500' : '1800-2200'} sq.ft
+                    </p>
+                    <p className="text-sm text-primary font-semibold mt-2">
+                      ₹{idx === 0 ? '45-55 L' : idx === 1 ? '85-105 L' : idx === 2 ? '1.2-1.5 Cr' : '1.8-2.5 Cr'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* ENHANCED AMENITIES SECTION */}
+            <section id="amenities" className="SectionCard">
+              <SectionTitle 
+                icon={Sparkles} 
+                title="Amenities & Features"
+                action={
+                  property.amenities?.length > 8 && (
+                    <button 
+                      onClick={() => setShowAllAmenities(!showAllAmenities)}
+                      className="text-sm text-primary font-semibold hover:underline"
+                    >
+                      {showAllAmenities ? 'Show Less' : `+${property.amenities.length - 8} More`}
+                    </button>
+                  )
+                }
+              />
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {(showAllAmenities ? property.amenities : property.amenities?.slice(0, 8))?.map((amenity, idx) => {
+                  const displayAmenity = mapAmenityName(amenity);
+                  const AmenityIcon = getAmenityIcon(displayAmenity);
+                  return (
+                    <div key={idx} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                      <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                        <AmenityIcon size={16} className="text-primary" />
+                      </div>
+                      <span className="text-sm text-gray-700 font-medium">{displayAmenity}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {(!property.amenities || property.amenities.length === 0) && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {['24x7 Security', 'Power Backup', 'Lift', 'Parking', 'Gym', 'Swimming Pool', 'Garden', 'Club House'].map((amenity, idx) => {
+                    const AmenityIcon = getAmenityIcon(amenity);
+                    return (
+                      <div key={idx} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                        <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                          <AmenityIcon size={16} className="text-primary" />
+                        </div>
+                        <span className="text-sm text-gray-700 font-medium">{amenity}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            {/* LOCATION BENEFITS SECTION - Dynamic from Backend */}
+            <section id="location" className="SectionCard">
+              <SectionTitle icon={Navigation} title="Location Benefits & Landmarks" />
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                {(parseNearbyLandmarks(property?.nearby) || LOCATION_BENEFITS_DATA).map((item, idx) => (
+                  <LocationBenefitItem key={idx} name={item.name} distance={item.distance} icon={item.icon} />
+                ))}
+              </div>
+              
+              {/* Map */}
+              <div className="rounded-xl overflow-hidden border border-gray-200 h-[300px]">
+                <iframe
+                  title="Property Location"
+                  src={`https://www.google.com/maps?q=${encodeURIComponent(property.location)}&output=embed`}
+                  className="w-full h-full border-0"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                ></iframe>
+              </div>
+              
+              {/* Social Infrastructure - Dynamic Counts from Backend */}
+              <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="p-3 bg-gray-50 rounded-lg text-center">
+                  <School className="mx-auto mb-1 text-primary" size={18} />
+                  <p className="text-xs text-gray-500">Schools</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {countNearbyByType(property?.nearby, 'school') || 5}+ Nearby
+                  </p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg text-center">
+                  <Hospital className="mx-auto mb-1 text-primary" size={18} />
+                  <p className="text-xs text-gray-500">Hospitals</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {countNearbyByType(property?.nearby, 'hospital') || 3}+ Nearby
+                  </p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg text-center">
+                  <ShoppingBag className="mx-auto mb-1 text-primary" size={18} />
+                  <p className="text-xs text-gray-500">Malls</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {countNearbyByType(property?.nearby, 'mall') || countNearbyByType(property?.nearby, 'shopping') || 4}+ Nearby
+                  </p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg text-center">
+                  <Briefcase className="mx-auto mb-1 text-primary" size={18} />
+                  <p className="text-xs text-gray-500">IT Parks</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {countNearbyByType(property?.nearby, 'it park') || countNearbyByType(property?.nearby, 'office') || countNearbyByType(property?.nearby, 'commercial') || 6}+ Nearby
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            {/* SIMILAR PROPERTIES SECTION */}
+            <section className="SectionCard">
+              <SectionTitle icon={Building2} title="Similar Properties in the Area" />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {SIMILAR_PROPERTIES_DATA.map((prop) => (
+                  <SimilarPropertyCard key={prop.id} property={prop} />
+                ))}
+              </div>
+            </section>
+
+            {/* TOP EXPERTS SECTION - Backend Ready */}
+            <section id="experts" className="SectionCard">
+              <SectionTitle 
+                icon={Award} 
+                title={property?.city ? `Top Experts in ${property.city}` : "Top Experts Near You"}
+              />
+              
+              {/* Backend-ready data extraction */}
+              <ExpertsCarousel property={property} handleExpertContact={handleExpertContact} />
+            </section>
+
+            {/* REVIEWS SECTION - LAST SECTION */}
+            <section id="reviews" className="SectionCard">
+              <SectionTitle 
+                icon={Star} 
+                title={`${property.title?.split(' ').slice(0, 3).join(' ') || 'Property'} Reviews & Rating`}
+              />
+              <p className="text-sm text-gray-500 mb-6">
+                Read the reviews about {property.title?.split(' ').slice(0, 3).join(' ') || 'this property'} located at {property.location || 'prime location'} and see what residents and real estate experts have to say about the project.
+              </p>
+              
+              {/* Rating Summary */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                {/* Overall Rating */}
+                <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-6 border border-amber-100">
+                  <div className="text-center">
+                    <div className="text-5xl font-bold text-gray-900 mb-2">
+                      {(reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length || 3.8).toFixed(1)}
+                    </div>
+                    <div className="flex justify-center gap-1 mb-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star 
+                          key={star} 
+                          size={20} 
+                          className={star <= Math.round(reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length || 3.8) ? "text-amber-400 fill-amber-400" : "text-gray-300"}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-sm text-gray-600">{reviews.length || 5} Ratings</p>
+                  </div>
+                </div>
+                
+                {/* Rating Breakdown */}
+                <div className="space-y-2">
+                  {[5, 4, 3, 2, 1].map((stars) => {
+                    const count = reviews.filter(r => r.rating === stars).length || (stars === 5 ? 1 : stars === 4 ? 2 : stars === 3 ? 2 : 0);
+                    const total = reviews.length || 5;
+                    const percentage = (count / total) * 100;
+                    return (
+                      <div key={stars} className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-gray-600 w-12">{stars} Star</span>
+                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-amber-400 rounded-full transition-all"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-semibold text-gray-900 w-6">{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              {/* Top Reviews */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-gray-900 mb-3">Top Reviews</h4>
+                {reviews.slice(0, 3).map((review, idx) => (
+                  <div key={review.id || idx} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="font-semibold text-primary text-sm">{review.name?.[0] || 'U'}</span>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-gray-900">{review.name}</span>
+                          <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">
+                            {idx === 0 ? 'Real estate agent' : 'Owner'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 mb-2">
+                          {[...Array(5)].map((_, i) => (
+                            <Star 
+                              key={i} 
+                              size={12} 
+                              className={i < review.rating ? "text-amber-400 fill-amber-400" : "text-gray-300"}
+                            />
+                          ))}
+                          <span className="text-xs text-gray-400 ml-1">{review.date}</span>
+                        </div>
+                        <p className="text-sm text-gray-600 leading-relaxed">{review.comment}</p>
+                      </div>
+                      {reviewToDelete === review.id ? (
+                        <div className="flex items-center gap-1">
+                          <button 
+                            onClick={() => handleDeleteReview(review.id)}
+                            className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+                          >
+                            Yes
+                          </button>
+                          <button 
+                            onClick={() => setReviewToDelete(null)}
+                            className="px-2 py-1 bg-gray-100 text-gray-500 text-xs rounded"
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={() => setReviewToDelete(review.id)}
+                          className="p-1 text-gray-300 hover:text-red-500 flex-shrink-0"
+                          title="Delete"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Write a Review */}
+              <div className="mt-6">
+                {showReviewForm ? (
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                    <h4 className="font-semibold text-gray-900 mb-3">Write a review</h4>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-2">Rating</label>
+                        <div className="flex gap-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              onClick={() => {
+                                if (!isGuestView) {
+                                  setNewReview({ ...newReview, rating: star });
+                                } else {
+                                  openLoginForPropertyDetails();
+                                }
+                              }}
+                              className={`p-1 rounded transition-all ${
+                                star <= newReview.rating ? 'text-amber-400' : 'text-gray-300'
+                              }`}
+                            >
+                              <Star size={24} className={star <= newReview.rating ? "fill-current" : ""} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-2">Your Review</label>
+                        <textarea
+                          value={newReview.comment}
+                          onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
+                          className="w-full p-3 bg-white border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 text-sm resize-none"
+                          rows={3}
+                          placeholder="Share your experience about this property..."
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleAddReview}
+                          disabled={!newReview.comment.trim()}
+                          className="flex-1 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark transition-all disabled:opacity-50"
+                        >
+                          Post Review
+                        </button>
+                        <button
+                          onClick={() => setShowReviewForm(false)}
+                          className="px-4 py-2.5 bg-gray-100 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-200 transition-all"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => {
+                      if (!isGuestView) {
+                        setShowReviewForm(true);
+                      } else {
+                        openLoginForPropertyDetails();
+                      }
+                    }}
+                    className="w-full py-3 bg-white border-2 border-dashed border-gray-300 rounded-xl text-gray-600 font-medium hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2"
+                  >
+                    <Plus size={18} />
+                    Write a review
+                  </button>
                 )}
               </div>
             </section>
           </div>
 
           {/* Right Sidebar - Conditional for Guest vs Authenticated */}
-          <div className="space-y-6">
-            <div className="sticky top-24 space-y-6">
+          <div className="space-y-4 sm:space-y-6">
+            <div className="sticky top-20 sm:top-24 space-y-4 sm:space-y-6">
               {/* Contact Card - Visible to All Users */}
               <motion.div 
-                className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white shadow-2xl shadow-gray-200/50 overflow-hidden relative"
+                className="bg-white rounded-xl p-4 border border-gray-100 shadow-lg"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
               >
-                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+                <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Phone className="text-primary" size={16} />
+                  Contact
+                </h3>
                 
-                <h3 className="text-xl font-black text-gray-900 mb-6 relative">Contact Details</h3>
-                
-                <div className="relative group mb-6">
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-4 mb-2">
-                      <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary-dark rounded-[1.25rem] flex items-center justify-center text-white text-2xl font-black shadow-lg">
-                        {property.owner?.name?.charAt(0) || 'O'}
-                      </div>
-                      <div>
-                        <h4 className="font-extrabold text-gray-900 text-lg leading-tight">{property.owner?.name || 'Owner'}</h4>
-                        <p className="text-xs font-black text-primary uppercase tracking-widest mt-1 italic flex items-center gap-1">
-                          <Award size={12} /> Verified Owner
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                        <Phone size={20} className="text-primary" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Phone Number</p>
-                        {/* Phone: +91 shown clear, rest blurred like barcode */}
-                        <div className="flex items-center gap-1 mt-1">
-                          <span className="font-black text-lg text-gray-900">+91</span>
-                          <span 
-                            className="font-black text-lg blur-[5px] select-none pointer-events-none text-gray-900 tracking-wider"
-                            title="Contact details are hidden for privacy"
-                          >
-                            {(property.owner?.phone || '+91 9876543210').replace('+91', '').trim()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-white text-lg font-semibold">
+                    {property.owner?.name?.charAt(0) || 'O'}
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-gray-900 text-sm">{property.owner?.name || 'Owner'}</h4>
+                    <p className="text-xs text-primary flex items-center gap-1">
+                      <Award size={10} /> Verified
+                    </p>
                   </div>
                 </div>
 
-                <div className="space-y-3">
+                <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg mb-4">
+                  <Phone size={14} className="text-primary" />
+                  <div className="flex items-center gap-1">
+                    <span className="font-semibold text-gray-900 text-sm">+91</span>
+                    <span 
+                      className="font-semibold text-sm blur-[3px] select-none text-gray-900"
+                      title="Hidden for privacy"
+                    >
+                      {(property.owner?.phone || '9876543210').replace('+91', '').trim()}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
                   <button
                     onClick={handleEnquiry}
-                    className="w-full py-5 bg-cta text-white font-black text-lg rounded-[1.25rem] hover:bg-cta-hover transition-all shadow-xl shadow-cta/20 hover:shadow-2xl hover:-translate-y-1 active:scale-95 flex justify-center items-center gap-3 group"
+                    className="w-full py-2.5 bg-primary text-white font-semibold text-sm rounded-lg hover:bg-primary-dark transition-all shadow-md flex justify-center items-center gap-2"
                   >
-                    <MessageSquare className="group-hover:rotate-12 transition-transform" size={24} />
+                    <MessageSquare size={16} />
                     Enquiry Now
                   </button>
-                  <p className="text-center text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
-                    Usually responds within ~2 hours
-                  </p>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => {
+                        if (!isLoggedIn) {
+                          openLoginForPropertyDetails();
+                          return;
+                        }
+                        console.log('Request callback');
+                      }}
+                      className="py-2 bg-emerald-50 text-emerald-700 font-medium text-xs rounded-lg hover:bg-emerald-100 transition-all flex items-center justify-center gap-1"
+                    >
+                      <Phone size={14} />
+                      Call Back
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!isLoggedIn) {
+                          openLoginForPropertyDetails();
+                          return;
+                        }
+                        console.log('Get brochure');
+                      }}
+                      className="py-2 bg-blue-50 text-blue-700 font-medium text-xs rounded-lg hover:bg-blue-100 transition-all flex items-center justify-center gap-1"
+                    >
+                      <Database size={14} />
+                      Brochure
+                    </button>
+                  </div>
                 </div>
               </motion.div>
 
-              {/* Calculators - Premium Segmented Action Bar (Visible to all, login-gated) */}
-              <div className="mt-4 mb-2">
-                <div className="flex items-center justify-between bg-white/90 backdrop-blur-sm border border-gray-200 rounded-full p-1.5 shadow-sm">
-                  {/* EMI Calculator Button */}
-                  <div
-                    onClick={() => {
-                      if (!isLoggedIn) {
-                        openLoginForPropertyDetails();
-                        return;
-                      }
-                      setShowEMI(true);
-                    }}
-                    className="group flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-semibold cursor-pointer transition-all duration-300 text-gray-700 hover:text-red-600 hover:bg-red-50 hover:scale-[1.03] hover:shadow-sm active:scale-[0.96]"
-                  >
-                    <svg className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {/* Calculators */}
+              <div className="space-y-2">
+                <div
+                  onClick={() => {
+                    if (!isLoggedIn) {
+                      openLoginForPropertyDetails();
+                      return;
+                    }
+                    setShowEMI(true);
+                  }}
+                  className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                >
+                  <div className="w-8 h-8 bg-red-50 rounded-lg flex items-center justify-center">
+                    <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                     </svg>
-                    <div className="flex flex-col leading-tight">
-                      <span>EMI Calculator</span>
-                      <small className="text-[11px] text-gray-400 font-medium">Monthly estimate</small>
-                    </div>
                   </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-semibold text-gray-900">EMI Calculator</h4>
+                    <p className="text-xs text-gray-500">Monthly estimate</p>
+                  </div>
+                  <ChevronRight size={16} className="text-gray-400" />
+                </div>
 
-                  {/* Divider */}
-                  <div className="w-px h-6 bg-gray-200" />
-
-                  {/* Rental Yield Button */}
-                  <div
-                    onClick={() => {
-                      if (!isLoggedIn) {
-                        openLoginForPropertyDetails();
-                        return;
-                      }
-                      setShowRental(true);
-                    }}
-                    className="group flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-semibold cursor-pointer transition-all duration-300 text-gray-700 hover:text-red-600 hover:bg-red-50 hover:scale-[1.03] hover:shadow-sm active:scale-[0.96]"
-                  >
-                    <svg className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div
+                  onClick={() => {
+                    if (!isLoggedIn) {
+                      openLoginForPropertyDetails();
+                      return;
+                    }
+                    setShowRental(true);
+                  }}
+                  className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                >
+                  <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center">
+                    <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                     </svg>
-                    <div className="flex flex-col leading-tight">
-                      <span>Rental Yield</span>
-                      <small className="text-[11px] text-gray-400 font-medium">Investment return</small>
-                    </div>
                   </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-semibold text-gray-900">Rental Yield</h4>
+                    <p className="text-xs text-gray-500">Investment return</p>
+                  </div>
+                  <ChevronRight size={16} className="text-gray-400" />
                 </div>
               </div>
             </div>
@@ -1048,47 +1861,80 @@ function PropertyDetails() {
         </div>
       </div>
 
-      {/* Bottom Enquiry Now Section - Authenticated Only */}
+      
+      {/* CTA Section - Authenticated Only */}
       {!isGuestView && (
-      <section className="bg-white border-t border-gray-100 py-10 mt-8 relative z-10">
-        <div className="max-w-2xl mx-auto px-4 text-center">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.98 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            className="bg-gray-950 rounded-[2rem] p-8 md:p-10 relative overflow-hidden group shadow-xl shadow-gray-900/40"
-          >
-            {/* Background Accent */}
-            <div className="absolute top-0 right-0 w-48 h-48 bg-primary/5 rounded-full blur-2xl -mr-24 -mt-24 group-hover:bg-primary/10 transition-all duration-700" />
-            
-            <div className="relative z-10">
-              <h2 className="text-xl md:text-2xl font-black text-white mb-2 uppercase tracking-tight">
-                Interested in <span className="text-primary">this property?</span>
-              </h2>
-              <p className="text-gray-400 text-xs md:text-sm font-medium mb-8 leading-relaxed max-w-md mx-auto italic">
-                Get more details, schedule a priority visit, or connect for pricing negotiations. Our support team is here to help.
-              </p>
-              
-              <button
-                onClick={handleEnquiry}
-                className="inline-flex items-center gap-3 px-8 py-4 bg-primary text-white font-black text-lg rounded-xl hover:bg-primary-dark transition-all shadow-lg shadow-primary/20 hover:shadow-xl hover:-translate-y-0.5 active:scale-95 group"
-              >
-                <MessageSquare className="group-hover:rotate-12 transition-transform" size={20} />
-                ENQUIRY NOW
-              </button>
-              
-              <div className="mt-6 flex items-center justify-center gap-4">
+        <section className="bg-gray-50 border-t border-gray-200 mt-12">
+          <div className="max-w-6xl mx-auto px-4 py-10">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              {/* Top bar with status */}
+              <div className="bg-green-50 border-b border-green-100 px-6 py-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                  <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Active Response</span>
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span className="text-green-700 text-sm font-medium">Owner is actively responding</span>
                 </div>
-                <div className="w-0.5 h-0.5 bg-gray-800 rounded-full" />
-                <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Secure Enquiry</span>
+                <div className="flex items-center gap-4 text-xs text-gray-500">
+                  <span className="flex items-center gap-1"><ShieldCheck size={12} /> Secure</span>
+                  <span className="flex items-center gap-1"><Clock size={12} /> 2h response</span>
+                </div>
+              </div>
+              
+              <div className="p-8 sm:p-10">
+                <div className="flex flex-col lg:flex-row items-start gap-8">
+                  {/* Left content */}
+                  <div className="flex-1">
+                    <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
+                      Interested in this property?
+                    </h2>
+                    <p className="text-gray-600 mb-6 max-w-xl">
+                      Get in touch with the owner to schedule a visit or get more information about this premium property
+                    </p>
+                    
+                    {/* Contact buttons */}
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        onClick={handleEnquiry}
+                        className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-primary hover:bg-primary-dark text-white font-semibold rounded-lg transition-all shadow-md hover:shadow-lg"
+                      >
+                        <MessageSquare size={18} />
+                        Send Enquiry
+                      </button>
+                      <button
+                        onClick={() => window.open(`tel:+91${property.owner?.phone || '9876543210'}`)}
+                        className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white hover:bg-gray-50 text-gray-700 font-semibold rounded-lg border-2 border-gray-300 hover:border-primary hover:text-primary transition-all"
+                      >
+                        <Phone size={18} />
+                        Call Owner
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Right - Download Documents */}
+                  <div className="lg:w-auto w-full">
+                    <div className="bg-primary/5 rounded-xl p-5 border border-primary/10">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 bg-white rounded-lg shadow-sm flex items-center justify-center flex-shrink-0">
+                          <Download size={20} className="text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-900 mb-1">Property Documents</h3>
+                          <p className="text-sm text-gray-500 mb-3">Download complete property details, legal documents & more</p>
+                          <button
+                            onClick={handleDownloadDocuments}
+                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-dark text-white text-sm font-semibold rounded-lg transition-all shadow-md hover:shadow-lg"
+                          >
+                            <IndianRupee size={14} />
+                            49 - Download Documents
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </motion.div>
-        </div>
-      </section>
+          </div>
+        </section>
       )}
 
       {/* Enquiry Modal */}
@@ -1270,6 +2116,125 @@ function PropertyDetails() {
     </motion.div>
   )}
 </AnimatePresence>
+
+      {/* Payment Modal for Document Download */}
+      <AnimatePresence>
+        {showPaymentModal && (
+          <motion.div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => !paymentLoading && setShowPaymentModal(false)}
+          >
+            <motion.div
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="bg-primary px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                      <Download size={20} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white">Download Documents</h3>
+                      <p className="text-white/80 text-xs">Complete property information</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => !paymentLoading && setShowPaymentModal(false)}
+                    className="text-white/80 hover:text-white transition-colors"
+                    disabled={paymentLoading}
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              {/* Content */}
+              <div className="p-6">
+                <div className="text-center mb-6">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-4">
+                    <FileText size={28} className="text-primary" />
+                  </div>
+                  <h4 className="text-xl font-bold text-gray-900 mb-2">Property Document Package</h4>
+                  <p className="text-gray-500 text-sm">
+                    Get complete property details including legal documents, floor plans, and specifications
+                  </p>
+                </div>
+                
+                {/* What's Included */}
+                <div className="bg-gray-50 rounded-xl p-4 mb-6">
+                  <h5 className="text-sm font-semibold text-gray-700 mb-3">What's included:</h5>
+                  <ul className="space-y-2 text-sm text-gray-600">
+                    <li className="flex items-center gap-2">
+                      <Check size={16} className="text-green-500" />
+                      Complete property details
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check size={16} className="text-green-500" />
+                      Legal documents & clearances
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check size={16} className="text-green-500" />
+                      Floor plans & layout
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check size={16} className="text-green-500" />
+                      Amenities & specifications
+                    </li>
+                  </ul>
+                </div>
+                
+                {/* Price */}
+                <div className="flex items-center justify-between bg-primary/10 rounded-xl p-4 mb-6">
+                  <div>
+                    <span className="text-gray-600 text-sm">One-time payment</span>
+                    <p className="text-xs text-gray-500 mt-0.5">Instant download after payment</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-2xl font-bold text-primary">₹49</span>
+                    <span className="text-gray-400 line-through text-sm ml-2">₹99</span>
+                  </div>
+                </div>
+                
+                {/* Pay Button */}
+                <button
+                  onClick={initiatePayment}
+                  disabled={paymentLoading}
+                  className="w-full py-3.5 bg-primary hover:bg-primary-dark text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {paymentLoading ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <IndianRupee size={18} />
+                      Pay ₹49 & Download
+                    </>
+                  )}
+                </button>
+                
+                <p className="text-center text-xs text-gray-400 mt-4">
+                  Secure payment powered by Razorpay
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
