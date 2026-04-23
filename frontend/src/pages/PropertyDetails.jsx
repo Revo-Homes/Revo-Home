@@ -82,6 +82,16 @@ import {
   Crown
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+const extractIdFromSlug = (slug) => {
+  if (!slug) return null;
+  // Matches rpid-r1050 pattern at end of slug
+  const match = slug.match(/rpid-r(\d+)$/);
+  if (match) return match[1];
+  // Fallback: last segment is plain number (old URLs still work)
+  const parts = slug.split('-');
+  const last = parts[parts.length - 1];
+  return isNaN(Number(last)) ? slug : last;
+};
 
 const PROPERTY_TYPES = ['Apartment', 'Villa', 'Independent House', 'Plot', 'Commercial'];
 
@@ -1437,7 +1447,8 @@ function EnquiryModal({
 
 function PropertyDetails() {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { slug } = useParams();
+const id = extractIdFromSlug(slug);
   const { isLoggedIn, isSubscribed, openLoginForPropertyDetails, user } = useAuth();
   const { getProperty, addEnquiry, isSaved, toggleFavorite } = useProperty();
   const { generateLead } = useRevoLeadTracker();

@@ -4,6 +4,19 @@ import { useNavigate } from 'react-router-dom';
 import { useProperty } from '../contexts/PropertyContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useRevoLeadTracker } from '../hooks/useRevoLeadTracker';
+const buildPropertyUrl = (id, title, location) => {
+  const slugify = (str) =>
+    (str || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .trim();
+
+  const titleSlug = slugify(title);
+  const citySlug = slugify((location || '').split(',')[0]);
+  return `/properties/${titleSlug}-${citySlug}-rpid-r${id}`; // rpid-r hides the number
+};
 
 const BADGE_CONFIG = {
   verified: { label: '✓ Verified', classes: 'bg-green-500 text-white' },
@@ -111,7 +124,7 @@ function PropertyCard({
     
     // Always navigate — restriction handled in PropertyDetails
     if (normalizedId) {
-      navigate(`/properties/${normalizedId}`);
+      navigate(buildPropertyUrl(normalizedId, title, location));
     }
   };
 

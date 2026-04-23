@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '../contexts/AuthContext';
 import { LocationProvider } from '../contexts/LocationContext';
 import { PropertyProvider } from '../contexts/PropertyContext';
@@ -34,7 +34,7 @@ import BecomeBuilder from '../pages/BecomeBuilder';
 
 function AppRoutes() {
   return (
-    <HashRouter>
+    <BrowserRouter>
       <ScrollToTop />
       <AuthProvider>
         <LocationProvider>
@@ -44,7 +44,7 @@ function AppRoutes() {
           <Route path="/" element={<MainLayout />}>
             <Route index element={<Home />} />
             <Route path="properties" element={<Properties />} />
-            <Route path="properties/:id" element={<PropertyDetails />} />
+            <Route path="properties/:slug" element={<PropertyDetails />} />
             <Route path="sell" element={<SellProperty />} />
             <Route path="tools" element={<Tools />} />
             <Route path="tools/emi-calculator" element={<EMICalculator />} />
@@ -79,7 +79,7 @@ function AppRoutes() {
           </PropertyProvider>
         </LocationProvider>
       </AuthProvider>
-    </HashRouter>
+    </BrowserRouter>
   );
 }
 
