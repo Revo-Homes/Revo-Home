@@ -35,6 +35,50 @@ const extractSingle = (response, keys = []) => {
   return preferred || response?.data || response || null;
 };
 
+const extractPagination = (response) => {
+  const pagination = response?.data?.pagination
+    || response?.pagination
+    || response?.data?.meta
+    || response?.meta
+    || null;
+
+  if (!pagination || typeof pagination !== 'object') return null;
+
+  const currentPage = Number(
+    pagination.currentPage
+    || pagination.current_page
+    || pagination.page
+    || 1
+  );
+
+  const totalPages = Number(
+    pagination.totalPages
+    || pagination.total_pages
+    || pagination.last_page
+    || 0
+  );
+
+  const totalItems = Number(
+    pagination.totalItems
+    || pagination.total_items
+    || pagination.total
+    || 0
+  );
+
+  return {
+    currentPage: Number.isFinite(currentPage) ? currentPage : 1,
+    totalPages: Number.isFinite(totalPages) ? totalPages : 0,
+    totalItems: Number.isFinite(totalItems) ? totalItems : 0,
+  };
+};
+
+const extractListingIdFromSlug = (value) => {
+  if (!value) return null;
+  const match = String(value).match(/rpid-r(\d+)$/i);
+  if (match) return match[1];
+  return null;
+};
+
 const buildPopularCities = (items) => {
   const counts = new Map();
 
@@ -152,6 +196,9 @@ const isBackendListingPayload = (data = {}) => {
     data.listing_id
   );
 };
+
+const LISTINGS_PAGE_SIZE = 100;
+const LISTINGS_MAX_PAGES = 25;
 
 export function PropertyProvider({ children }) {
   const { isLoggedIn, user } = useAuth();
@@ -409,109 +456,127 @@ export function PropertyProvider({ children }) {
     }
   ];
 
-  // Initialize properties and fetch from backend
+  const fetchAllListingsFromBackend = useCallback(async (params = {}) => {
+    const collected = [];
+    const seenIds = new Set();
+    let currentPage = 1;
+    let totalPages = 1;
+
+    do {
+      const response = await listingApi.search({
+        ...params,
+        organization_id: 1, // Restrict to Revo Homes organization
+        status: params.status || 'active', // Only show active properties by default
+        page: currentPage,
+        limit: params.limit || LISTINGS_PAGE_SIZE,
+        page_size: params.page_size || LISTINGS_PAGE_SIZE,
+        per_page: params.per_page || LISTINGS_PAGE_SIZE,
+      });
+
+      const rawItems = extractCollection(response, ['listings']);
+      const pagination = extractPagination(response);
+      let newItemsCount = 0;
+
+      rawItems.forEach((item) => {
+        const itemKey = item?.listing_id || item?.id || item?.slug || `${currentPage}-${collected.length}`;
+        if (seenIds.has(itemKey)) return;
+        seenIds.add(itemKey);
+        collected.push(normalizeProperty(item, userLocation));
+        newItemsCount += 1;
+      });
+
+      if (pagination?.totalPages > 0) {
+        totalPages = pagination.totalPages;
+      } else if (!rawItems.length || newItemsCount === 0) {
+        totalPages = currentPage;
+      } else if (rawItems.length < LISTINGS_PAGE_SIZE) {
+        totalPages = currentPage;
+      } else {
+        totalPages = Math.min(currentPage + 1, LISTINGS_MAX_PAGES);
+      }
+
+      currentPage += 1;
+    } while (currentPage <= totalPages && currentPage <= LISTINGS_MAX_PAGES);
+
+    return collected;
+  }, [userLocation]);
+
+  const applyPropertyCatalog = useCallback((catalogItems, featuredItems = null) => {
+    const nextProperties = catalogItems.length > 0
+      ? catalogItems
+      : sampleProperties.map(item => normalizeProperty(item, userLocation));
+
+    const nextFeatured = Array.isArray(featuredItems) && featuredItems.length > 0
+      ? featuredItems
+      : (() => {
+          const featuredProperties = nextProperties.filter((item) => item.featured);
+          if (featuredProperties.length >= 8) {
+            return featuredProperties.slice(0, 8);
+          }
+
+          return [
+            ...featuredProperties,
+            ...nextProperties
+              .filter((item) => !item.featured)
+              .slice(0, Math.max(0, 8 - featuredProperties.length))
+              .map((item) => ({ ...item, featured: true })),
+          ];
+        })();
+
+    setListings(nextProperties);
+    setProperties(nextProperties);
+    setFeatured(nextFeatured);
+    setPopularCities(buildPopularCities(nextProperties));
+  }, [userLocation]);
+
   useEffect(() => {
     const initializeProperties = async () => {
       setLoading(true);
+      setError(null);
+
       try {
-        // Fetch listings from backend
-        console.log('PropertyContext: Fetching listings from backend...');
-        const listingsResponse = await listingApi.search({ limit: 100 });
-        
-        const listings = extractCollection(listingsResponse, ['listings']).map(item => normalizeProperty(item, userLocation));
-        
-        // Debug: Log raw data structure
-        console.log('PropertyContext: Raw listings data:', extractCollection(listingsResponse, ['listings'])[0]);
-        console.log('PropertyContext: Sample normalized listing:', listings[0]);
-        
-        // For Revo Homes: Use listings only
-        setListings(listings);
-        
-        // Use listings as properties for admin pages
-        const backendProperties = listings;
-        
-        console.log('PropertyContext: Raw listings response:', listingsResponse);
-        console.log('PropertyContext: Normalized listings count:', listings.length);
-        console.log('PropertyContext: Total combined properties:', backendProperties.length);
-        
-        if (backendProperties.length > 0) {
-          console.log(`PropertyContext: Found ${backendProperties.length} properties from backend`);
-          setProperties(backendProperties);
-          
-          // Ensure we have at least 8 featured properties
-          const featuredProperties = backendProperties.filter(p => p.featured);
-          if (featuredProperties.length < 8) {
-            // Add more properties as featured if needed
-            const additionalFeatured = backendProperties
-              .filter(p => !p.featured)
-              .slice(0, 8 - featuredProperties.length)
-              .map(p => ({ ...p, featured: true }));
-            setFeatured([...featuredProperties, ...additionalFeatured]);
-          } else {
-            setFeatured(featuredProperties.slice(0, 8));
-          }
-        } else {
-          // Fallback to sample properties if backend is empty
-          console.log('PropertyContext: Backend empty, using sample properties');
-          const normalizedProperties = sampleProperties.map(item => normalizeProperty(item, userLocation));
-          setProperties(normalizedProperties);
-          setFeatured(normalizedProperties.filter(p => p.featured).slice(0, 8));
+        console.log('PropertyContext: Fetching full listings catalog from backend...');
+        const [catalogItems, featuredResponse] = await Promise.all([
+          fetchAllListingsFromBackend(),
+          listingApi.getFeatured().catch(() => null),
+        ]);
+
+        const featuredItems = extractCollection(featuredResponse, ['listings'])
+          .map(item => normalizeProperty(item, userLocation));
+
+        console.log('PropertyContext: Total normalized listings:', catalogItems.length);
+        applyPropertyCatalog(catalogItems, featuredItems);
+      } catch (fetchError) {
+        console.error('PropertyContext: Backend fetch failed, using sample properties:', fetchError);
+        applyPropertyCatalog([]);
+        if (fetchError?.status !== 401) {
+          setError(fetchError?.message || 'Failed to load properties');
         }
-      } catch (error) {
-        console.error('PropertyContext: Backend fetch failed, using sample properties:', error);
-        // Fallback to sample properties on error
-        const normalizedProperties = sampleProperties.map(item => normalizeProperty(item, userLocation));
-        setProperties(normalizedProperties);
-        setFeatured(normalizedProperties.filter(p => p.featured).slice(0, 8));
       } finally {
         setLoading(false);
       }
     };
 
     initializeProperties();
-  }, [userLocation]);
+  }, [applyPropertyCatalog, fetchAllListingsFromBackend, userLocation]);
 
   // Refresh properties function
   const refreshProperties = useCallback(async () => {
     setLoading(true);
     try {
-      console.log('PropertyContext: Refreshing listings from backend...');
-      const listingsResponse = await listingApi.search({ limit: 100 });
-      
-      const listings = extractCollection(listingsResponse, ['listings']).map(item => normalizeProperty(item, userLocation));
-      
-      // Set listings for Revo Homes
-      setListings(listings);
-      
-      // Use listings as properties for admin pages
-      const backendProperties = listings;
-      
-      console.log('PropertyContext: Refresh - Raw listings response:', listingsResponse);
-      console.log('PropertyContext: Refresh - Normalized listings count:', listings.length);
-      console.log('PropertyContext: Refresh - Total combined properties:', backendProperties.length);
-      
-      if (backendProperties.length > 0) {
-        console.log(`PropertyContext: Refreshed ${backendProperties.length} properties from backend`);
-        setProperties(backendProperties);
-        
-        // Ensure we have at least 8 featured properties
-        const featuredProperties = backendProperties.filter(p => p.featured);
-        if (featuredProperties.length < 8) {
-          const additionalFeatured = backendProperties
-            .filter(p => !p.featured)
-            .slice(0, 8 - featuredProperties.length)
-            .map(p => ({ ...p, featured: true }));
-          setFeatured([...featuredProperties, ...additionalFeatured]);
-        } else {
-          setFeatured(featuredProperties.slice(0, 8));
-        }
-      }
+      const [catalogItems, featuredResponse] = await Promise.all([
+        fetchAllListingsFromBackend(),
+        listingApi.getFeatured().catch(() => null),
+      ]);
+      const featuredItems = extractCollection(featuredResponse, ['listings'])
+        .map(item => normalizeProperty(item, userLocation));
+      applyPropertyCatalog(catalogItems, featuredItems);
     } catch (error) {
       console.error('PropertyContext: Refresh failed:', error);
     } finally {
       setLoading(false);
     }
-  }, [userLocation]);
+  }, [applyPropertyCatalog, fetchAllListingsFromBackend, userLocation]);
 
   const loadSavedAndEnquiries = useCallback(async () => {
     if (!isLoggedIn || !user) return;
@@ -576,40 +641,6 @@ export function PropertyProvider({ children }) {
     }
   }, [userLocation]);
 
-  const loadCatalog = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const [listingsResponse, featuredResponse] = await Promise.all([
-        listingApi.search({ limit: 50 }),
-        listingApi.getFeatured(),
-      ]);
-
-      const listingItems = extractCollection(listingsResponse, ['listings']).map(item => normalizeProperty(item, userLocation));
-      const featuredItems = extractCollection(featuredResponse, ['listings']).map(item => normalizeProperty(item, userLocation));
-
-      setProperties(listingItems);
-      setFeatured(featuredItems);
-      setPopularCities(buildPopularCities(listingItems));
-    } catch (err) {
-      console.error('PropertyContext: Catalog load failed:', err);
-      setProperties([]);
-      setFeatured([]);
-      setPopularCities([]);
-
-      if (err.status !== 401) {
-        setError(err.message || 'Failed to load properties');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadCatalog();
-  }, [loadCatalog]);
-
   useEffect(() => {
     if (isLoggedIn) {
       loadSavedAndEnquiries();
@@ -634,11 +665,11 @@ export function PropertyProvider({ children }) {
       return list;
     }
 
-    const response = await listingApi.search({ limit: 50 });
-    const list = buildPopularCities(extractCollection(response, ['listings']).map(item => normalizeProperty(item, userLocation)));
+    const fetchedListings = await fetchAllListingsFromBackend();
+    const list = buildPopularCities(fetchedListings);
     setPopularCities(list);
     return list;
-  }, [properties]);
+  }, [fetchAllListingsFromBackend, properties]);
 
   const fetchProperties = useCallback(async (params = {}) => {
     try {
@@ -749,20 +780,51 @@ export function PropertyProvider({ children }) {
     };
   };
 
-  const getProperty = useCallback(async (id) => {
+  const getProperty = useCallback(async (identifier, options = {}) => {
+    const slug = options?.slug || null;
+    const id = identifier ?? extractListingIdFromSlug(slug);
+
     // Revo Homes only uses listings - fetch from listing endpoint
     try {
       const listingResponse = await listingApi.getById(id);
       const listing = extractSingle(listingResponse, ['listing']);
       if (listing) {
-        return normalizeProperty(listing);
+        return normalizeProperty(listing, userLocation);
       }
     } catch (err) {
       console.error('PropertyContext: Listing fetch failed for id:', id, err);
     }
 
+    if (slug) {
+      try {
+        const listingResponse = await listingApi.getBySlug(slug);
+        const listing = extractSingle(listingResponse, ['listing']);
+        if (listing) {
+          return normalizeProperty(listing, userLocation);
+        }
+      } catch (err) {
+        console.error('PropertyContext: Listing fetch failed for slug:', slug, err);
+      }
+    }
+
+    const normalizedId = Number(id);
+    const fallbackProperty = [...properties, ...listings].find((item) => (
+      Number(item?.id) === normalizedId ||
+      Number(item?.listingId) === normalizedId ||
+      Number(item?.propertyId) === normalizedId ||
+      String(item?.slug) === String(slug) ||
+      String(item?.id) === String(id) ||
+      String(item?.listingId) === String(id) ||
+      String(item?.propertyId) === String(id)
+    ));
+
+    if (fallbackProperty) {
+      console.warn('PropertyContext: Using cached property fallback for identifier:', id || slug);
+      return fallbackProperty;
+    }
+
     return null;
-  }, []);
+  }, [listings, properties, userLocation]);
 
   const createProperty = useCallback(async (data) => {
     try {
@@ -849,9 +911,7 @@ export function PropertyProvider({ children }) {
 
     try {
       // Revo Homes only uses listings - fetch from listing API
-      const listingsResponse = await listingApi.search({ limit: 100 });
-      
-      const listings = extractCollection(listingsResponse, ['listings']).map(normalizeProperty);
+      const listings = await fetchAllListingsFromBackend();
       
       // Filter by current user
       const owned = listings.filter((item) => {
@@ -866,16 +926,14 @@ export function PropertyProvider({ children }) {
       console.error('Failed to fetch my listings:', err);
       return [];
     }
-  }, [isLoggedIn, user]);
+  }, [fetchAllListingsFromBackend, isLoggedIn, user]);
 
   const getUserProperties = useCallback(async () => {
     if (!isLoggedIn) return [];
 
     try {
       // Revo Homes only uses listings - fetch from listing API
-      const listingsResponse = await listingApi.search({ limit: 100 });
-      
-      const listings = extractCollection(listingsResponse, ['listings']).map(normalizeProperty);
+      const listings = await fetchAllListingsFromBackend();
       
       // Filter by current user
       const owned = listings.filter((item) => {
@@ -888,7 +946,7 @@ export function PropertyProvider({ children }) {
       console.error('Failed to fetch user listings:', err);
       return [];
     }
-  }, [isLoggedIn, user]);
+  }, [fetchAllListingsFromBackend, isLoggedIn, user]);
 
   const addEnquiry = useCallback(async (listingId, message) => {
     try {

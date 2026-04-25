@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Home, ArrowRight, Building2, Hammer, ClipboardList, Users } from 'lucide-react';
+import { buildStructuredMessage, submitPublicEnquiry } from '../services/publicEnquiry';
 
 export default function HomeConstruction() {
   const [formData, setFormData] = useState({
@@ -11,6 +12,9 @@ export default function HomeConstruction() {
     service: 'full-construction',
     message: ''
   });
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const services = [
     {
@@ -43,9 +47,33 @@ export default function HomeConstruction() {
     }
   ];
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Home construction form submitted:', formData);
+    setSubmitting(true);
+    setSubmitError('');
+
+    try {
+      await submitPublicEnquiry({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        subject: 'Home Construction Request',
+        message: buildStructuredMessage('Home construction enquiry', {
+          'Construction Type': formData.constructionType,
+          Service: formData.service,
+          Address: formData.address,
+        }, formData.message),
+        enquiryType: 'home_construction',
+        preferredLocation: formData.address,
+        sourcePage: '/services/home-construction',
+      });
+      setSubmitted(true);
+    } catch (error) {
+      console.error('Home construction enquiry failed:', error);
+      setSubmitError(error?.message || 'Failed to submit request');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -84,6 +112,11 @@ export default function HomeConstruction() {
       {/* Contact Form */}
       <div className="bg-slate-50 rounded-xl p-6">
         <h3 className="text-lg font-semibold text-slate-900 mb-4">Start Your Construction</h3>
+        {submitted && (
+          <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+            Your construction request has been submitted successfully.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
 
@@ -184,11 +217,16 @@ export default function HomeConstruction() {
           {/* Button */}
           <button
             type="submit"
+            disabled={submitting}
             className="w-full md:w-auto px-6 py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 flex items-center justify-center gap-2"
           >
-            Start Construction
+            {submitting ? 'Submitting...' : 'Start Construction'}
             <ArrowRight className="h-4 w-4" />
           </button>
+
+          {submitError && (
+            <p className="text-sm text-red-600">{submitError}</p>
+          )}
 
         </form>
       </div>

@@ -6,20 +6,15 @@ import { useProperty } from '../contexts/PropertyContext';
 
 function Properties() {
   const [searchParams] = useSearchParams();
-  const { listings, loading: propertyLoading } = useProperty();
+  const { listings = [], loading: propertyLoading, error } = useProperty();
   const [filteredProperties, setFilteredProperties] = useState([]);
   const [filters, setFilters] = useState({});
-  
-  // Debug logging
-  console.log('Properties.jsx: Received listings from context:', listings);
-  console.log('Properties.jsx: Property loading state:', propertyLoading);
 
   const handleFilterChange = React.useCallback((newFilters) => {
     setFilters(newFilters);
     if (!listings || listings.length === 0) return;
     
     let filtered = (listings || []).filter(p => !p.disabled);
-    console.log('Properties.jsx: Filtering', listings.length, 'listings with filters:', newFilters);
     
     if (newFilters.location) {
       filtered = filtered.filter((p) =>
@@ -32,7 +27,13 @@ function Properties() {
       filtered = filtered.filter((p) => p.listingType === newFilters.listingType);
     }
     if (newFilters.bhk?.length > 0) {
-      filtered = filtered.filter((p) => newFilters.bhk.includes(p.bhk?.toString()));
+      filtered = filtered.filter((p) => {
+        const bhkValue = Number.parseInt(String(p.bhk), 10);
+        return newFilters.bhk.some((selected) => {
+          if (selected === '5+') return bhkValue >= 5;
+          return String(bhkValue) === String(selected);
+        });
+      });
     }
     if (newFilters.budgetMin) {
       filtered = filtered.filter((p) => Number(p.price) >= Number(newFilters.budgetMin));
@@ -42,7 +43,12 @@ function Properties() {
     }
     if (newFilters.propertyType?.length > 0) {
       filtered = filtered.filter((p) =>
-        newFilters.propertyType.includes(p.propertyType)
+        newFilters.propertyType.some((type) => type.toLowerCase() === String(p.propertyType).toLowerCase())
+      );
+    }
+    if (newFilters.furnishing?.length > 0) {
+      filtered = filtered.filter((p) =>
+        newFilters.furnishing.some((item) => item.toLowerCase() === String(p.furnished).toLowerCase())
       );
     }
     if (newFilters.areaMin) {
@@ -51,8 +57,16 @@ function Properties() {
     if (newFilters.areaMax) {
       filtered = filtered.filter((p) => Number(p.area) <= Number(newFilters.areaMax));
     }
+    if (newFilters.amenities?.length > 0) {
+      filtered = filtered.filter((p) =>
+        newFilters.amenities.every((selectedAmenity) =>
+          (p.amenities || []).some((amenity) =>
+            String(amenity).toLowerCase().includes(selectedAmenity.toLowerCase())
+          )
+        )
+      );
+    }
     
-    console.log('Properties.jsx: Resulting listings count:', filtered.length);
     setFilteredProperties(filtered);
   }, [listings]);
 
@@ -73,17 +87,50 @@ function Properties() {
 
   const handleReset = () => {
     setFilters({});
-    setFilteredProperties(listings);
+    setFilteredProperties((listings || []).filter((item) => !item.disabled));
     window.history.replaceState(null, '', '/properties');
   };
 
+  const activeFilterCount = Object.values(filters).reduce((count, value) => {
+    if (Array.isArray(value)) return count + value.length;
+    return value ? count + 1 : count;
+  }, 0);
+
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-black text-gray-900">Properties Listing</h1>
-        <p className="text-gray-500 font-medium mt-1">
-          {filteredProperties.length} results found
-        </p>
+    <div className="max-w-7xl mx-auto px-4 py-6 lg:py-8">
+      <div className="mb-8 rounded-[28px] border border-gray-200 bg-gradient-to-br from-white via-orange-50/50 to-amber-50 p-6 sm:p-8 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.28em] text-primary/80">Property Search</p>
+            <h1 className="mt-2 text-3xl font-black text-gray-900 sm:text-4xl">Find the right property faster</h1>
+            <p className="mt-2 max-w-2xl text-sm font-medium text-gray-600 sm:text-base">
+              We&apos;re now showing the full catalog coming from the backend, with filters for budget, furnishing, amenities, and location.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:min-w-[280px]">
+            <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-400">Available</p>
+              <p className="mt-1 text-2xl font-black text-gray-900">{listings.filter((item) => !item.disabled).length}</p>
+            </div>
+            <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-400">Filtered</p>
+              <p className="mt-1 text-2xl font-black text-primary">{filteredProperties.length}</p>
+            </div>
+          </div>
+        </div>
+        <div className="mt-5 flex flex-wrap items-center gap-3 text-sm">
+          <span className="rounded-full bg-white px-4 py-2 font-semibold text-gray-700 shadow-sm ring-1 ring-gray-100">
+            {filteredProperties.length} results found
+          </span>
+          <span className="rounded-full bg-gray-900 px-4 py-2 font-semibold text-white shadow-sm">
+            {activeFilterCount} active filters
+          </span>
+          {error && (
+            <span className="rounded-full bg-red-50 px-4 py-2 font-semibold text-red-600 ring-1 ring-red-100">
+              {error}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8">
@@ -97,7 +144,7 @@ function Properties() {
                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
               {filteredProperties.map((prop) => (
                 <PropertyCard
                   key={prop.id}

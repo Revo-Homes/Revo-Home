@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useProperty } from '../contexts/PropertyContext';
 import { useRevoLeadTracker } from '../hooks/useRevoLeadTracker';
+import { buildStructuredMessage, splitFullName, submitPublicEnquiry } from '../services/publicEnquiry';
 import PropertyMap from "../components/PropertyMap";
 import ImageGallery from "../components/ImageGallery";
 import EMICalculator from './EMICalculator';
@@ -119,21 +120,6 @@ const LOCATION_BENEFITS_DATA = [
   { name: 'Bus Stop', distance: '0.3 km', icon: Bus },
   { name: 'Airport', distance: '12 km', icon: Plane },
   { name: 'Highway', distance: '2.5 km', icon: Navigation },
-];
-
-// Price Configuration Data (Hardcoded fallback)
-const PRICE_CONFIG_DATA = [
-  { bhk: '1', area: '450-550', price: '45-55', unit: 'L' },
-  { bhk: '2', area: '850-1050', price: '85-105', unit: 'L' },
-  { bhk: '3', area: '1200-1500', price: '1.2-1.5', unit: 'Cr' },
-  { bhk: '4', area: '1800-2200', price: '1.8-2.5', unit: 'Cr' },
-];
-
-// Similar Properties Data
-const SIMILAR_PROPERTIES_DATA = [
-  { id: 1051, title: 'Luxury 3BHK in Prime Location', location: 'Koramangala, Bangalore', price: '1.85 Cr', bhk: '3', area: '1650', image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=400' },
-  { id: 1052, title: 'Spacious 2BHK with Garden View', location: 'HSR Layout, Bangalore', price: '95 L', bhk: '2', area: '1200', image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400' },
-  { id: 1053, title: 'Premium 4BHK Penthouse', location: 'Indiranagar, Bangalore', price: '3.2 Cr', bhk: '4', area: '2800', image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400' },
 ];
 
 // Top Experts Mock Data - Backend Ready
@@ -478,6 +464,63 @@ const isValidValue = (value) => {
   if (Array.isArray(value) && value.length === 0) return false;
   if (typeof value === 'object' && Object.keys(value).length === 0) return false;
   return true;
+};
+
+const formatShortPrice = (value) => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return 'Price on request';
+  if (amount >= 10000000) return `Rs ${(amount / 10000000).toFixed(2)} Cr`;
+  if (amount >= 100000) return `Rs ${(amount / 100000).toFixed(2)} L`;
+  return `Rs ${amount.toLocaleString('en-IN')}`;
+};
+
+const buildPriceConfigurations = (property) => {
+  const unitSources = toArray(
+    property?.unitConfigurations || property?.units || property?.pricing || property?.price_configurations,
+    []
+  );
+
+  const normalizedUnits = unitSources
+    .map((unit, index) => {
+      if (typeof unit !== 'object' || unit === null) return null;
+      const bhk = unit.bhk || unit.configuration || unit.unit_type || property?.bhk || 'N/A';
+      const areaMin = unit.area_min || unit.areaMin || unit.carpet_area || unit.area || property?.area;
+      const areaMax = unit.area_max || unit.areaMax || unit.super_builtup_area || areaMin;
+      const priceMin = unit.price_min || unit.priceMin || unit.price || property?.price_min || property?.price;
+      const priceMax = unit.price_max || unit.priceMax || unit.price || property?.price_max || property?.price;
+
+      return {
+        id: unit.id || `${bhk}-${index}`,
+        bhk: String(bhk).replace(/[^0-9A-Za-z.+ -]/g, '').trim() || 'N/A',
+        area: areaMin && areaMax && String(areaMin) !== String(areaMax) ? `${areaMin}-${areaMax}` : `${areaMin || areaMax || 'N/A'}`,
+        priceLabel: priceMin && priceMax && Number(priceMin) !== Number(priceMax)
+          ? `${formatShortPrice(priceMin)} - ${formatShortPrice(priceMax)}`
+          : formatShortPrice(priceMin || priceMax),
+      };
+    })
+    .filter(Boolean);
+
+  if (normalizedUnits.length > 0) return normalizedUnits;
+
+  return [{
+    id: property?.id || 'current-property',
+    bhk: property?.bhk || 'N/A',
+    area: property?.area ? `${property.area}` : 'N/A',
+    priceLabel: formatShortPrice(property?.price || property?.price_min || property?.price_max),
+  }];
+};
+
+const buildSimilarProperties = (allListings, currentProperty) => {
+  if (!Array.isArray(allListings) || !currentProperty) return [];
+
+  return allListings
+    .filter((item) => item?.id !== currentProperty?.id)
+    .filter((item) => {
+      const sameCity = item?.city && currentProperty?.city && item.city === currentProperty.city;
+      const sameType = item?.propertyType && currentProperty?.propertyType && item.propertyType === currentProperty.propertyType;
+      return sameCity || sameType;
+    })
+    .slice(0, 3);
 };
 
 const renderFieldValue = (key, value) => {
@@ -1140,10 +1183,7 @@ function EnquiryModal({
           onClose();
         } catch (submitError) {
           console.error('Submission error:', submitError);
-          // Still close modal and show success in demo mode
-          alert('Enquiry submitted successfully! (Demo Mode)');
-          setShowOtpModal(false);
-          onClose();
+          alert(submitError?.message || 'Failed to submit enquiry. Please try again.');
         }
       } else {
         alert('Invalid OTP. Please try again. Use 123456 for demo.');
@@ -1448,9 +1488,9 @@ function EnquiryModal({
 function PropertyDetails() {
   const navigate = useNavigate();
   const { slug } = useParams();
-const id = extractIdFromSlug(slug);
+  const listingIdentifier = extractIdFromSlug(slug);
   const { isLoggedIn, isSubscribed, openLoginForPropertyDetails, user } = useAuth();
-  const { getProperty, addEnquiry, isSaved, toggleFavorite } = useProperty();
+  const { getProperty, addEnquiry, isSaved, toggleFavorite, listings = [] } = useProperty();
   const { generateLead } = useRevoLeadTracker();
   
   const [property, setProperty] = useState(null);
@@ -1478,25 +1518,32 @@ const id = extractIdFromSlug(slug);
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [expandedSection, setExpandedSection] = useState(null);
 
-  const saved = isSaved(property?.propertyId || property?.id || id);
+  const saved = isSaved(property?.propertyId || property?.id || listingIdentifier);
   
   // Guest view mode - no login required to view limited preview
   const isGuestView = !isLoggedIn;
+  const priceConfigurations = buildPriceConfigurations(property);
+  const similarProperties = buildSimilarProperties(listings, property);
 
   // Load reviews from localStorage
   useEffect(() => {
-    const savedReviews = JSON.parse(localStorage.getItem(`reviews_${id}`) || '[]');
+    let savedReviews = [];
+    try {
+      savedReviews = JSON.parse(localStorage.getItem(`reviews_${listingIdentifier}`) || '[]');
+    } catch (error) {
+      console.error('PropertyDetails: Failed to parse saved reviews', error);
+    }
     const initialReviews = [
       { id: '1', name: 'Amit Singh', date: '2 days ago', rating: 5, comment: 'Beautiful property, exactly as shown in the pictures. The owner was very helpful.' },
       { id: '2', name: 'Sneha Rao', date: '1 week ago', rating: 4, comment: 'Great location and amenities. The power backup is very reliable.' }
     ];
     setReviews(savedReviews.length > 0 ? savedReviews : initialReviews);
-  }, [id]);
+  }, [listingIdentifier]);
 
   const handleDeleteReview = (reviewId) => {
     const updatedReviews = reviews.filter(r => r.id !== reviewId);
     setReviews(updatedReviews);
-    localStorage.setItem(`reviews_${id}`, JSON.stringify(updatedReviews));
+    localStorage.setItem(`reviews_${listingIdentifier}`, JSON.stringify(updatedReviews));
     setReviewToDelete(null);
   };
 
@@ -1514,7 +1561,7 @@ const id = extractIdFromSlug(slug);
     };
     const updatedReviews = [reviewObj, ...reviews];
     setReviews(updatedReviews);
-    localStorage.setItem(`reviews_${id}`, JSON.stringify(updatedReviews));
+    localStorage.setItem(`reviews_${listingIdentifier}`, JSON.stringify(updatedReviews));
     setShowReviewForm(false);
     setNewReview({ rating: 5, comment: '' });
   };
@@ -1542,7 +1589,7 @@ const id = extractIdFromSlug(slug);
       // Store payment info in localStorage
       const paymentHistory = JSON.parse(localStorage.getItem('document_payments') || '[]');
       paymentHistory.push({
-        propertyId: id,
+        propertyId: listingIdentifier,
         paymentId: mockPaymentId,
         orderId: mockOrderId,
         timestamp: new Date().toISOString(),
@@ -1627,7 +1674,7 @@ const id = extractIdFromSlug(slug);
   useEffect(() => {
     const fetchProperty = async () => {
       setLoading(true);
-      const data = await getProperty(id);
+      const data = await getProperty(listingIdentifier, { slug });
       if (data) {
         // Ensure fetched ID is used, and handle images plural vs singular
         const galleryImages = data.images && data.images.length > 0 
@@ -1690,13 +1737,15 @@ const id = extractIdFromSlug(slug);
         
         // Log all available fields for debugging
         console.log('🏠 Property Data Fields:', Object.keys(dynamicData).sort());
-          
+        
         setProperty(dynamicData);
+      } else {
+        setProperty(null);
       }
       setLoading(false);
     };
     fetchProperty();
-  }, [id, getProperty]);
+  }, [getProperty, listingIdentifier, slug]);
 
   // Lead Generation on Page View (Property Click Result)
   useEffect(() => {
@@ -1744,7 +1793,7 @@ const id = extractIdFromSlug(slug);
       openLoginForPropertyDetails();
       return;
     }
-    await toggleFavorite(property?.propertyId || property?.id || id, !saved);
+    await toggleFavorite(property?.propertyId || property?.id || listingIdentifier, !saved);
   };
 
   // Handle expert contact - currently logs, ready for backend integration
@@ -1773,6 +1822,36 @@ const id = extractIdFromSlug(slug);
           <div className="space-y-6">
             <div className="bg-white rounded-[2.5rem] p-8 h-[400px]" />
             <div className="bg-white rounded-[2.5rem] p-8 h-[300px]" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!property) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-16 sm:py-20">
+        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 sm:p-10 text-center">
+          <div className="mx-auto mb-5 w-14 h-14 rounded-full bg-red-50 text-red-500 flex items-center justify-center">
+            <Home size={28} />
+          </div>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-3">Property unavailable</h1>
+          <p className="text-gray-600 max-w-xl mx-auto mb-6">
+            We couldn&apos;t load this property right now because the listing service returned an error or no matching data.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              onClick={() => navigate('/properties')}
+              className="px-5 py-3 rounded-xl bg-primary text-white font-medium hover:opacity-90 transition-opacity"
+            >
+              Browse properties
+            </button>
+            <button
+              onClick={() => navigate(-1)}
+              className="px-5 py-3 rounded-xl border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+            >
+              Go back
+            </button>
           </div>
         </div>
       </div>
@@ -1856,7 +1935,12 @@ const id = extractIdFromSlug(slug);
           {/* View All Photos CTA */}
           <div className="mt-4 text-center">
             <button 
-              onClick={() => setShowEMI(false) || setShowRental(false) || console.log('View all photos')}
+              onClick={() => {
+                if (isGuestView) {
+                  openLoginForPropertyDetails();
+                  return;
+                }
+              }}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary to-primary-dark text-white font-semibold rounded-lg hover:from-primary-dark hover:to-primary transition-all shadow-md hover:shadow-lg active:scale-95 text-sm"
             >
               <Eye size={16} />
@@ -1865,6 +1949,7 @@ const id = extractIdFromSlug(slug);
           </div>
         </div>
         {/* SQUAREYARDS-STYLE STICKY NAVIGATION */}
+        {!isGuestView && (
         <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-200 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 mb-6 hidden lg:block">
           <div className="flex items-center gap-1 overflow-x-auto py-3 no-scrollbar">
             {NAV_ITEMS.map((item) => (
@@ -1885,6 +1970,7 @@ const id = extractIdFromSlug(slug);
             ))}
           </div>
         </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-10">
           {/* Main Content */}
@@ -1948,24 +2034,9 @@ const id = extractIdFromSlug(slug);
                     Description
                   </h3>
                   <div className="bg-gray-50 p-4 rounded-lg">
-                    {isGuestView && property.description && property.description.length > 200 ? (
-                      <>
-                        <p className="text-gray-700 leading-relaxed text-sm mb-3">
-                          {property.description.substring(0, 200)}...
-                        </p>
-                        <button 
-                          onClick={openLoginForPropertyDetails}
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark transition-all"
-                        >
-                          <Lock size={14} />
-                          Sign in to read more
-                        </button>
-                      </>
-                    ) : (
-                      <p className="text-gray-700 leading-relaxed text-sm">
-                        {property.description || 'No description available'}
-                      </p>
-                    )}
+                    <p className="text-gray-700 leading-relaxed text-sm">
+                      {property.description || 'No description available'}
+                    </p>
                   </div>
                 </div>
 
@@ -1995,6 +2066,8 @@ const id = extractIdFromSlug(slug);
               </div>
             </section>
 
+            {!isGuestView && (
+            <>
             {/* PRICE CONFIGURATION SECTION */}
             <section id="floor-plans" className="SectionCard">
               <SectionTitle 
@@ -2019,14 +2092,16 @@ const id = extractIdFromSlug(slug);
                 }
               />
               <div className="space-y-3">
-                {PRICE_CONFIG_DATA.filter(item => activeBhkTab === 'all' || item.bhk === activeBhkTab).map((config, idx) => (
+                {priceConfigurations
+                  .filter((item) => activeBhkTab === 'all' || String(item.bhk) === activeBhkTab)
+                  .map((config) => (
                   <PriceConfigRow 
-                    key={idx} 
+                    key={config.id} 
                     bhk={config.bhk} 
                     area={config.area} 
-                    price={config.price} 
-                    unit={config.unit}
-                    isHighlighted={property.bhk === config.bhk}
+                    price={config.priceLabel}
+                    unit=""
+                    isHighlighted={String(property.bhk) === String(config.bhk)}
                   />
                 ))}
               </div>
@@ -2168,10 +2243,15 @@ const id = extractIdFromSlug(slug);
             <section className="SectionCard">
               <SectionTitle icon={Building2} title="Similar Properties in the Area" />
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {SIMILAR_PROPERTIES_DATA.map((prop) => (
+                {similarProperties.map((prop) => (
                   <SimilarPropertyCard key={prop.id} property={prop} />
                 ))}
               </div>
+              {similarProperties.length === 0 && (
+                <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-5 text-sm text-gray-500">
+                  Similar properties will appear here as more matching listings are available from the backend.
+                </div>
+              )}
             </section>
 
             {/* TOP EXPERTS SECTION - Backend Ready */}
@@ -2367,37 +2447,39 @@ const id = extractIdFromSlug(slug);
                 )}
               </div>
             </section>
+            </>
+            )}
           </div>
 
           {/* Right Sidebar - New Contact Side Panel */}
           <div className="space-y-4 sm:space-y-6">
             <div className="sticky top-20 sm:top-24 space-y-4 sm:space-y-6">
-              {/* New Contact Side Panel Component */}
-              <ContactSidePanel
-                property={property}
-                isLoggedIn={isLoggedIn}
-                user={user}
-                onEnquiryClick={() => setShowEnquiryForm(true)}
-                onCallbackClick={() => {
-                  if (!isLoggedIn) {
-                    openLoginForPropertyDetails();
-                    return;
-                  }
-                  // Show callback modal or trigger callback request
-                  alert('Callback request submitted! We will contact you shortly.');
-                }}
-                onBrochureClick={() => {
-                  if (!isLoggedIn) {
-                    openLoginForPropertyDetails();
-                    return;
-                  }
-                  setShowPaymentModal(true);
-                }}
-                onLoginClick={openLoginForPropertyDetails}
-              />
+              {!isGuestView ? (
+                <>
+                <ContactSidePanel
+                  property={property}
+                  isLoggedIn={isLoggedIn}
+                  user={user}
+                  onEnquiryClick={() => setShowEnquiryForm(true)}
+                  onCallbackClick={() => {
+                    if (!isLoggedIn) {
+                      openLoginForPropertyDetails();
+                      return;
+                    }
+                    alert('Callback request submitted! We will contact you shortly.');
+                  }}
+                  onBrochureClick={() => {
+                    if (!isLoggedIn) {
+                      openLoginForPropertyDetails();
+                      return;
+                    }
+                    setShowPaymentModal(true);
+                  }}
+                  onLoginClick={openLoginForPropertyDetails}
+                />
 
-              {/* Calculators */}
-              <div className="space-y-2">
+                {/* Calculators */}
+                <div className="space-y-2">
                 <div
                   onClick={() => {
                     if (!isLoggedIn) {
@@ -2442,6 +2524,24 @@ const id = extractIdFromSlug(slug);
                   <ChevronRight size={16} className="text-gray-400" />
                 </div>
               </div>
+                </>
+              ) : (
+                <div className="rounded-2xl border border-primary/10 bg-gradient-to-br from-white to-primary/5 p-6 shadow-sm">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+                    <Lock className="text-primary" size={22} />
+                  </div>
+                  <h3 className="mt-4 text-lg font-bold text-gray-900">Login to unlock full property details</h3>
+                  <p className="mt-2 text-sm text-gray-600">
+                    View amenities, floor plans, location insights, owner contact details, expert help, and document access after signing in.
+                  </p>
+                  <button
+                    onClick={openLoginForPropertyDetails}
+                    className="mt-4 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-primary-dark"
+                  >
+                    Sign In to Continue
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2533,54 +2633,69 @@ const id = extractIdFromSlug(slug);
         onLoginClick={openLoginForPropertyDetails}
         onSubmit={async (leadData) => {
           try {
-            // Log the lead data for debugging
-            console.log('Submitting lead:', leadData);
-            
-            // Try to generate lead (may fail if not authenticated)
+            const { firstName, lastName } = splitFullName(leadData.name);
+            const enquiryMessage = buildStructuredMessage(
+              `Property enquiry for ${property.title || 'listing'}`,
+              {
+                'Phone Verified': leadData.verified ? 'Yes' : 'No',
+                'Listing Type': property.listingType,
+                'Property Type': property.propertyType,
+                'Location': property.location,
+              },
+              leadData.message
+            );
+
+            await generateLead(property.id, user?.id || null, {
+              listingId: property.id,
+              propertyId: property.propertyId,
+              title: property.title,
+              price: property.price,
+              location: property.location,
+              propertyType: property.propertyType,
+              bhk: property.bhk,
+              area: property.area,
+              listingType: property.listingType,
+              city: property.city,
+              state: property.state,
+              userFirstName: firstName,
+              userLastName: lastName,
+              userEmail: leadData.email,
+              userPhone: leadData.phone,
+              priority: 'high',
+              is_hot: true,
+              score: 85,
+              notes: enquiryMessage,
+              utm_content: 'enquiry_submission_with_otp',
+              leadEvent: 'inquiry',
+              verified: true,
+              otpVerified: true,
+              timestamp: leadData.timestamp
+            });
+
+            await submitPublicEnquiry({
+              name: leadData.name,
+              email: leadData.email,
+              phone: leadData.phone,
+              subject: `Property enquiry: ${property.title || 'Listing'}`,
+              message: enquiryMessage,
+              enquiryType: 'property_inquiry',
+              preferredLocation: property.location,
+              preferredPropertyTypes: property.propertyType,
+              propertyId: property.propertyId,
+              listingId: property.id,
+              sourcePage: window.location.pathname,
+            });
+
             try {
-              await generateLead(property.id, user?.id || 'guest', {
-                listingId: property.id,
-                propertyId: property.propertyId,
-                title: property.title,
-                price: property.price,
-                location: property.location,
-                propertyType: property.propertyType,
-                bhk: property.bhk,
-                area: property.area,
-                listingType: property.listingType,
-                city: property.city,
-                state: property.state,
-                userFirstName: leadData.name,
-                userEmail: leadData.email || 'guest@example.com',
-                userPhone: leadData.phone,
-                priority: 'high',
-                is_hot: true,
-                score: 85,
-                notes: `ENQUIRY: ${leadData.message}`,
-                utm_content: 'enquiry_submission_with_otp',
-                leadEvent: 'inquiry',
-                verified: true,
-                otpVerified: true,
-                timestamp: leadData.timestamp
-              });
-            } catch (leadError) {
-              console.log('Lead generation skipped or failed:', leadError);
+              await addEnquiry(property.id, enquiryMessage);
+            } catch (enquiryError) {
+              console.log('Listing enquiry API skipped or failed:', enquiryError);
             }
 
-            // Try original enquiry logic
-            try {
-              await addEnquiry(property.id, leadData.message);
-            } catch (enquiryError) {
-              console.log('Enquiry API skipped or failed:', enquiryError);
-            }
-            
-            // Always show success in demo mode
-            console.log('Enquiry submitted successfully (Demo Mode)');
             return Promise.resolve();
           } catch (error) {
             console.error('Lead submission error:', error);
-            // Still resolve to not block the UI
-            return Promise.resolve();
+            return Promise.reject(error);
           }
         }}
       />

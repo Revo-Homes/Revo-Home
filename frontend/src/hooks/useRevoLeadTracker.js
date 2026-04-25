@@ -44,8 +44,10 @@ const buildLeadPayload = (propertyData = {}, userId) => ({
 
 export const useRevoLeadTracker = () => {
   const generateLead = useCallback(async (primaryId, userId, propertyData = {}) => {
-    const listingId = propertyData.listingId || propertyData.listing_id || primaryId;
-    const propertyId = propertyData.propertyId || propertyData.property_id || null;
+    // Fix: Only fallback to primaryId for listingId if it's explicitly marked as a listing
+    const isListing = Boolean(propertyData.listingType || propertyData.listing_id || propertyData.listingId);
+    const listingId = propertyData.listingId || propertyData.listing_id || (isListing ? primaryId : null);
+    const propertyId = propertyData.propertyId || propertyData.property_id || (!isListing ? primaryId : null);
     const leadEvent = propertyData.leadEvent || 'visit';
 
     if (!listingId && !propertyId) {

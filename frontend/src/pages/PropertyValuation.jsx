@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { TrendingUp, CheckCircle2, ArrowRight, MapPin, Home, Calculator } from 'lucide-react';
+import { buildStructuredMessage, submitPublicEnquiry } from '../services/publicEnquiry';
 
 export default function PropertyValuation() {
   const [formData, setFormData] = useState({
@@ -13,6 +14,9 @@ export default function PropertyValuation() {
   });
 
   const [valuationResult, setValuationResult] = useState(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const services = [
     {
@@ -84,9 +88,34 @@ export default function PropertyValuation() {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Property valuation form submitted:', formData);
+    setSubmitting(true);
+    setSubmitError('');
+
+    try {
+      await submitPublicEnquiry({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        subject: 'Property Valuation Request',
+        message: buildStructuredMessage('Professional valuation enquiry', {
+          'Property Type': formData.propertyType,
+          Area: formData.area,
+          Location: formData.location,
+        }, formData.message),
+        enquiryType: 'property_valuation',
+        preferredLocation: formData.location,
+        preferredPropertyTypes: formData.propertyType,
+        sourcePage: '/tools/property-valuation',
+      });
+      setSubmitted(true);
+    } catch (error) {
+      console.error('Property valuation enquiry failed:', error);
+      setSubmitError(error?.message || 'Failed to submit request');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -231,6 +260,11 @@ export default function PropertyValuation() {
           {/* Contact Form */}
           <div className="bg-slate-50 rounded-xl p-6">
             <h3 className="text-lg font-semibold text-slate-900 mb-4">Get Professional Valuation</h3>
+            {submitted && (
+              <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                Your valuation request has been submitted successfully.
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -290,11 +324,15 @@ export default function PropertyValuation() {
               </div>
               <button
                 type="submit"
+                disabled={submitting}
                 className="w-full md:w-auto px-6 py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
               >
-                Get Expert Valuation
+                {submitting ? 'Submitting...' : 'Get Expert Valuation'}
                 <ArrowRight className="h-4 w-4" />
               </button>
+              {submitError && (
+                <p className="text-sm text-red-600">{submitError}</p>
+              )}
             </form>
           </div>
         </div>

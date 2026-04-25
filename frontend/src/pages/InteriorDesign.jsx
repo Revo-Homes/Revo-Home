@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Paintbrush, CheckCircle2, ArrowRight, Palette, Home, Star } from 'lucide-react';
+import { buildStructuredMessage, submitPublicEnquiry } from '../services/publicEnquiry';
 
 export default function InteriorDesign() {
   const [formData, setFormData] = useState({
@@ -10,6 +11,9 @@ export default function InteriorDesign() {
     budget: '2-5-lakhs',
     message: ''
   });
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const services = [
     {
@@ -75,9 +79,31 @@ export default function InteriorDesign() {
     }
   ];
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Interior design form submitted:', formData);
+    setSubmitting(true);
+    setSubmitError('');
+
+    try {
+      await submitPublicEnquiry({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        subject: 'Interior Design Quote Request',
+        message: buildStructuredMessage('Interior design enquiry', {
+          'Space Type': formData.spaceType,
+          'Budget Range': formData.budget,
+        }, formData.message),
+        enquiryType: 'interior_design',
+        sourcePage: '/services/interior-design',
+      });
+      setSubmitted(true);
+    } catch (error) {
+      console.error('Interior design enquiry failed:', error);
+      setSubmitError(error?.message || 'Failed to submit request');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -169,6 +195,11 @@ export default function InteriorDesign() {
           {/* Contact Form */}
           <div className="bg-slate-50 rounded-xl p-6">
             <h3 className="text-lg font-semibold text-slate-900 mb-4">Get a Design Quote</h3>
+            {submitted && (
+              <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                Your design enquiry has been submitted successfully.
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -244,11 +275,15 @@ export default function InteriorDesign() {
               </div>
               <button
                 type="submit"
+                disabled={submitting}
                 className="w-full md:w-auto px-6 py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
               >
-                Get Design Quote
+                {submitting ? 'Submitting...' : 'Get Design Quote'}
                 <ArrowRight className="h-4 w-4" />
               </button>
+              {submitError && (
+                <p className="text-sm text-red-600">{submitError}</p>
+              )}
             </form>
           </div>
         </div>
