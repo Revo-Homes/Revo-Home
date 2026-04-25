@@ -3,6 +3,8 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useProperty } from '../contexts/PropertyContext';
 import { useRevoLeadTracker } from '../hooks/useRevoLeadTracker';
+import { buildStructuredMessage, splitFullName, submitPublicEnquiry } from '../services/publicEnquiry';
+import reviewService from '../services/reviewService';
 import PropertyMap from "../components/PropertyMap";
 import ImageGallery from "../components/ImageGallery";
 import EMICalculator from './EMICalculator';
@@ -100,73 +102,12 @@ const PROPERTY_TYPES = ['Apartment', 'Villa', 'Independent House', 'Plot', 'Comm
 // ============================================
 
 // Why Consider Section - Key Highlights
-const WHY_CONSIDER_DATA = [
-  { icon: MapPin, text: 'Prime location with excellent connectivity to highways and metro' },
-  { icon: Trees, text: 'Green surroundings with landscaped gardens and open spaces' },
-  { icon: ShieldCheck, text: '24x7 security with CCTV surveillance and video door phones' },
-  { icon: Building2, text: 'Premium construction quality with modern architecture' },
-  { icon: Car, text: 'Ample parking space with dedicated visitor parking' },
-  { icon: Zap, text: 'Power backup for common areas and apartments' },
-];
+const WHY_CONSIDER_DATA = [];
 
 // Location Benefits - Nearby Landmarks
-const LOCATION_BENEFITS_DATA = [
-  { name: 'Metro Station', distance: '0.5 km', icon: Train },
-  { name: 'Railway Station', distance: '3.2 km', icon: TrainFront },
-  { name: 'Shopping Mall', distance: '1.2 km', icon: ShoppingBag },
-  { name: 'Hospital', distance: '2.1 km', icon: Hospital },
-  { name: 'School', distance: '1.8 km', icon: School },
-  { name: 'Bus Stop', distance: '0.3 km', icon: Bus },
-  { name: 'Airport', distance: '12 km', icon: Plane },
-  { name: 'Highway', distance: '2.5 km', icon: Navigation },
-];
-
-// Price Configuration Data (Hardcoded fallback)
-const PRICE_CONFIG_DATA = [
-  { bhk: '1', area: '450-550', price: '45-55', unit: 'L' },
-  { bhk: '2', area: '850-1050', price: '85-105', unit: 'L' },
-  { bhk: '3', area: '1200-1500', price: '1.2-1.5', unit: 'Cr' },
-  { bhk: '4', area: '1800-2200', price: '1.8-2.5', unit: 'Cr' },
-];
-
-// Similar Properties Data
-const SIMILAR_PROPERTIES_DATA = [
-  { id: 1051, title: 'Luxury 3BHK in Prime Location', location: 'Koramangala, Bangalore', price: '1.85 Cr', bhk: '3', area: '1650', image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=400' },
-  { id: 1052, title: 'Spacious 2BHK with Garden View', location: 'HSR Layout, Bangalore', price: '95 L', bhk: '2', area: '1200', image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400' },
-  { id: 1053, title: 'Premium 4BHK Penthouse', location: 'Indiranagar, Bangalore', price: '3.2 Cr', bhk: '4', area: '2800', image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400' },
-];
+const LOCATION_BENEFITS_DATA = [];
 
 // Top Experts Mock Data - Backend Ready
-const MOCK_EXPERTS = [
-  {
-    id: 1,
-    name: "Kajal Chotelal Singh",
-    role: "Portfolio Manager",
-    totalProperties: 16,
-    languages: ["English", "Hindi"]
-  },
-  {
-    id: 2,
-    name: "Shubham Vishwakarma",
-    role: "Senior Investment Manager",
-    totalProperties: 13,
-    languages: ["English", "Hindi"]
-  },
-  {
-    id: 3,
-    name: "Rahul Sharma",
-    role: "Property Consultant",
-    totalProperties: 21,
-    languages: ["English", "Hindi", "Marathi"]
-  },
-  {
-    id: 4,
-    name: "Priya Patel",
-    role: "Real Estate Advisor",
-    totalProperties: 18,
-    languages: ["English", "Gujarati"]
-  }
-];
 
 // Avatar background colors
 const AVATAR_COLORS = ["#E8F0FE", "#FCE8E6", "#E6F4EA", "#FFF4E5"];
@@ -480,6 +421,87 @@ const isValidValue = (value) => {
   return true;
 };
 
+const formatShortPrice = (value) => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return 'Price on request';
+  if (amount >= 10000000) return `Rs ${(amount / 10000000).toFixed(2)} Cr`;
+  if (amount >= 100000) return `Rs ${(amount / 100000).toFixed(2)} L`;
+  return `Rs ${amount.toLocaleString('en-IN')}`;
+};
+
+const buildPriceConfigurations = (property) => {
+  const unitSources = toArray(
+    property?.unitConfigurations || property?.units || property?.pricing || property?.price_configurations,
+    []
+  );
+
+  const normalizedUnits = unitSources
+    .map((unit, index) => {
+      if (typeof unit !== 'object' || unit === null) return null;
+      const bhk = unit.bhk || unit.configuration || unit.unit_type || property?.bhk || 'N/A';
+      const areaMin = unit.area_min || unit.areaMin || unit.carpet_area || unit.area || property?.area;
+      const areaMax = unit.area_max || unit.areaMax || unit.super_builtup_area || areaMin;
+      const priceMin = unit.price_min || unit.priceMin || unit.price || property?.price_min || property?.price;
+      const priceMax = unit.price_max || unit.priceMax || unit.price || property?.price_max || property?.price;
+
+      return {
+        id: unit.id || `${bhk}-${index}`,
+        bhk: String(bhk).replace(/[^0-9A-Za-z.+ -]/g, '').trim() || 'N/A',
+        area: areaMin && areaMax && String(areaMin) !== String(areaMax) ? `${areaMin}-${areaMax}` : `${areaMin || areaMax || 'N/A'}`,
+        priceLabel: priceMin && priceMax && Number(priceMin) !== Number(priceMax)
+          ? `${formatShortPrice(priceMin)} - ${formatShortPrice(priceMax)}`
+          : formatShortPrice(priceMin || priceMax),
+      };
+    })
+    .filter(Boolean);
+
+  if (normalizedUnits.length > 0) return normalizedUnits;
+
+  return [{
+    id: property?.id || 'current-property',
+    bhk: property?.bhk || 'N/A',
+    area: property?.area ? `${property.area}` : 'N/A',
+    priceLabel: formatShortPrice(property?.price || property?.price_min || property?.price_max),
+  }];
+};
+
+const normalizeBhkLabel = (value) => {
+  if (!value && value !== 0) return 'N/A';
+  const text = String(value).trim();
+  if (!text) return 'N/A';
+  return /bhk/i.test(text) ? text : `${text} BHK`;
+};
+
+const formatCompactCurrency = (value) => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  return `₹${amount.toLocaleString('en-IN')}`;
+};
+
+const formatDateLabel = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString('en-IN', {
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
+const buildSimilarProperties = (allListings, currentProperty) => {
+  if (!Array.isArray(allListings) || !currentProperty) return [];
+
+  return allListings
+    .filter((item) => item?.id !== currentProperty?.id)
+    .filter((item) => {
+      const sameCity = item?.city && currentProperty?.city && item.city === currentProperty.city;
+      const sameType = item?.propertyType && currentProperty?.propertyType && item.propertyType === currentProperty.propertyType;
+      return sameCity || sameType;
+    })
+    .slice(0, 3);
+};
+
 const renderFieldValue = (key, value) => {
   if (!isValidValue(value)) return null;
   
@@ -620,40 +642,6 @@ const SimilarPropertyCard = ({ property }) => {
   );
 };
 
-const MOCK_PROPERTY_EXTENDED = {
-  id: 1,
-  images: [
-    'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200',
-    'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200',
-    'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=1200',
-    'https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=1200',
-    'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=1200',
-    'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=1200',
-  ],
-  price: 45000,
-  location: 'Koramangala, Bangalore',
-  title: 'Modern 3BHK Apartment with Premium Amenities',
-  bhk: '3',
-  area: '1850',
-  propertyType: 'Apartment',
-  furnished: 'Fully Furnished',
-  description: 'Beautiful 3BHK apartment in prime Koramangala location. This spacious home features a large living room, modular kitchen, and 3 well-ventilated bedrooms with attached bathrooms. The property comes with premium fittings and is ready to move in.',
-  amenities: ['Parking', 'Lift', 'Gym', 'Swimming Pool', 'Security', 'Power Backup', 'Club House'],
-  nearby: ['Metro Station - 500m', 'Shopping Mall - 1km', 'Schools - 2km', 'Hospital - 1.5km'],
-  owner: { name: 'Raj Kumar', phone: '+91 9876543210', verified: true },
-  // Extended data for SquareYards-style sections
-  developer: 'Revo Developers',
-  projectName: 'Revo Meridian Heights',
-  totalArea: '5.2 Acres',
-  totalUnits: '240',
-  totalTowers: '4',
-  totalFloors: 'G+24',
-  possessionDate: 'Dec 2024',
-  launchDate: 'Jan 2022',
-  pricePerSqft: '22,200',
-  priceTrend: '+5.8%',
-  rentalYield: '3.2%',
-};
 
 // Sticky Navigation Items
 const NAV_ITEMS = [
@@ -661,15 +649,15 @@ const NAV_ITEMS = [
   { id: 'floor-plans', label: 'Floor Plans' },
   { id: 'amenities', label: 'Amenities' },
   { id: 'location', label: 'Location' },
-  { id: 'experts', label: 'Experts' },
+  { id: 'agents', label: 'Agents' },
   { id: 'price-trends', label: 'Price Trends' },
   { id: 'reviews', label: 'Reviews' },
 ];
 
-// Experts Carousel Component - Separate to avoid hooks order issues
-function ExpertsCarousel({ property, handleExpertContact }) {
+// Agents Carousel Component - Separate to avoid hooks order issues
+function AgentsCarousel({ property, handleAgentContact }) {
   const scrollRef = useRef(null);
-  const experts = property?.experts || MOCK_EXPERTS;
+  const agents = property?.agents || property?.assigned_agents || [];
   
   const scroll = (direction) => {
     if (scrollRef.current) {
@@ -681,7 +669,7 @@ function ExpertsCarousel({ property, handleExpertContact }) {
   return (
     <div className="relative">
       {/* Navigation Arrows */}
-      {experts.length > 2 && (
+      {agents.length > 2 && (
         <>
           <button
             onClick={() => scroll('left')}
@@ -704,349 +692,99 @@ function ExpertsCarousel({ property, handleExpertContact }) {
         className="flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide scroll-smooth" 
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
-        {experts.map((expert, idx) => {
-          const initial = expert.name.charAt(0).toUpperCase();
-          const avatarColor = AVATAR_COLORS[idx % AVATAR_COLORS.length];
-          
-          return (
-            <motion.div 
-              key={expert.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1, duration: 0.4 }}
-              whileHover={{ y: -8, scale: 1.02 }}
-              className="flex-shrink-0 w-[300px] sm:w-[320px] bg-white rounded-2xl p-5 border border-gray-100 shadow-md hover:shadow-2xl transition-all duration-300 snap-start cursor-pointer group"
-            >
-              {/* Top strip with gradient pastel background */}
-              <div 
-                className="h-16 rounded-xl mb-5 flex items-center justify-center relative overflow-hidden"
-                style={{ backgroundColor: avatarColor }}
+        {agents.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            No agents assigned to this property yet.
+          </div>
+        ) : (
+          agents.map((agent, idx) => {
+            const initial = agent.name?.charAt(0).toUpperCase() || 'A';
+            const avatarColor = AVATAR_COLORS[idx % AVATAR_COLORS.length];
+            
+            return (
+              <motion.div
+                key={agent.id || idx}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.1 }}
+                className="flex-shrink-0 w-[280px] bg-white rounded-xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow snap-start"
               >
-                {/* Decorative circles */}
-                <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-white/20" />
-                <div className="absolute -bottom-4 -left-4 w-12 h-12 rounded-full bg-white/20" />
-                
-                {/* Avatar circle with gradient ring */}
-                <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-lg border-3 border-white relative z-10 group-hover:scale-110 transition-transform duration-300">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                    <span className="text-xl font-bold bg-gradient-to-br from-gray-700 to-gray-900 bg-clip-text text-transparent">{initial}</span>
+                {/* Avatar & Name */}
+                <div className="flex items-center gap-3 mb-4">
+                  <div 
+                    className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold"
+                    style={{ backgroundColor: avatarColor }}
+                  >
+                    {initial}
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900">{agent.name || 'Agent'}</h4>
+                    <p className="text-xs text-gray-500">{agent.role || 'Real Estate Agent'}</p>
                   </div>
                 </div>
-              </div>
-              
-              {/* Name with verified badge */}
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-bold text-gray-900 text-lg truncate">
-                  {expert.name}
-                </h3>
-                <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0" title="Verified Expert">
-                  <Check size={12} className="text-white" />
+
+                {/* Stats */}
+                <div className="flex items-center gap-4 mb-4 text-sm">
+                  <div className="flex items-center gap-1">
+                    <Briefcase size={14} className="text-gray-400" />
+                    <span className="text-gray-600">{agent.experience || '5+'} yrs</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Building2 size={14} className="text-gray-400" />
+                    <span className="text-gray-600">{agent.deals || '50+'} deals</span>
+                  </div>
                 </div>
-              </div>
-              
-              {/* Role with badge style */}
-              <div className="mb-4">
-                <span className="inline-block px-3 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
-                  {expert.role}
-                </span>
-              </div>
-              
-              {/* Stats Grid */}
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="bg-gray-50 rounded-xl p-3 text-center group-hover:bg-primary/5 transition-colors">
-                  <Building2 size={18} className="mx-auto mb-1 text-primary" />
-                  <p className="text-lg font-bold text-gray-900">{expert.totalProperties || 0}</p>
-                  <p className="text-xs text-gray-500">Properties</p>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-3 text-center group-hover:bg-primary/5 transition-colors">
-                  <Globe size={18} className="mx-auto mb-1 text-primary" />
-                  <p className="text-xs font-medium text-gray-700 truncate">
-                    {expert.languages?.slice(0, 2).join(", ") || "English"}
-                  </p>
-                  <p className="text-xs text-gray-500">Languages</p>
-                </div>
-              </div>
-              
-              {/* Action Buttons */}
-              <div className="flex gap-3">
-                {/* WhatsApp Button */}
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => handleExpertContact(expert)}
-                  className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center shadow-lg shadow-green-200 hover:shadow-green-300 transition-all"
-                  title="Contact on WhatsApp"
+
+                {/* Contact Button */}
+                <button
+                  onClick={() => handleAgentContact(agent)}
+                  className="w-full py-2.5 bg-primary/10 text-primary font-medium rounded-lg hover:bg-primary hover:text-white transition-all text-sm flex items-center justify-center gap-2"
                 >
-                  <MessageCircle size={20} className="text-white" />
-                </motion.button>
-                
-                {/* Get a call back Button */}
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => handleExpertContact(expert)}
-                  className="flex-1 py-3 bg-gradient-to-r from-primary to-primary-dark text-white text-sm font-semibold rounded-xl shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all flex items-center justify-center gap-2 group/btn"
-                >
-                  <Phone size={16} className="group-hover/btn:animate-pulse" />
-                  Get a call back
-                </motion.button>
-              </div>
-            </motion.div>
-          );
-        })}
+                  <Phone size={14} />
+                  Contact Agent
+                </button>
+              </motion.div>
+            );
+          })
+        )}
       </div>
       
       {/* Scroll indicator dots */}
-      {experts.length > 2 && (
+      {agents.length > 2 && (
         <div className="flex justify-center gap-2 mt-4">
-          {experts.map((_, idx) => (
+          {agents.map((_, idx) => (
             <motion.div 
               key={idx}
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: idx * 0.1 }}
-              className="w-2 h-2 rounded-full bg-gray-300 hover:bg-primary transition-colors cursor-pointer"
+              className="w-2 h-2 rounded-full bg-primary/30"
             />
           ))}
         </div>
       )}
-      
     </div>
   );
-}
+};
 
 // ============================================
 // CONTACT SIDE PANEL COMPONENT
 // ============================================
-function ContactSidePanel({ 
-  property, 
-  isLoggedIn, 
-  user, 
-  onEnquiryClick, 
-  onCallbackClick, 
-  onBrochureClick,
-  onLoginClick 
-}) {
-  const owner = property?.owner || { name: 'Premium Owner', phone: '+91 9876543210', verified: true };
-  const maskedPhone = owner.phone ? owner.phone.replace(/\d(?=\d{3})/g, 'X') : '+91 XXXXXX3210';
-  const fullPhone = owner.phone || '+91 9876543210';
-  const ownerEmail = property?.owner?.email || 'contact@revohomes.in';
-  
-  return (
-    <div className="space-y-4">
-      {/* Main Contact Card */}
-      <motion.div 
-        className="bg-white rounded-2xl p-5 border border-gray-100 shadow-lg hover:shadow-xl transition-shadow"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-            <Phone className="text-primary" size={16} />
-            Contact Owner
-          </h3>
-          {owner.verified && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-600 text-[10px] font-semibold rounded-full border border-amber-100">
-              <Crown size={10} />
-              PREMIUM
-            </span>
-          )}
-        </div>
-        
-        {/* Owner Info */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary-dark rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-lg shadow-primary/20">
-            {owner.name?.charAt(0) || 'O'}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-gray-900 text-sm truncate">{owner.name || 'Premium Owner'}</h4>
-            <p className="text-xs text-gray-500 flex items-center gap-1">
-              <CheckCircle2 size={10} className="text-green-500" />
-              Verified Owner
-            </p>
-          </div>
-        </div>
 
-        {/* Masked Phone - Always Visible */}
-        <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl mb-4 border border-gray-100">
-          <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-            <Phone size={14} className="text-primary" />
-          </div>
-          <div className="flex-1">
-            <p className="text-xs text-gray-500 mb-0.5">Phone Number</p>
-            <p className="font-semibold text-gray-900 text-sm font-mono">{maskedPhone}</p>
-          </div>
-          <Lock size={14} className="text-gray-400" />
-        </div>
-
-        {/* CTA Buttons */}
-        <div className="space-y-2.5">
-          <motion.button
-            whileHover={{ scale: 1.02, y: -2 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={onEnquiryClick}
-            className="w-full py-3 bg-gradient-to-r from-primary to-primary-dark text-white font-semibold text-sm rounded-xl hover:shadow-lg hover:shadow-primary/30 transition-all flex justify-center items-center gap-2 shadow-md"
-          >
-            <MessageSquare size={16} />
-            Enquiry Now
-          </motion.button>
-          
-          <div className="grid grid-cols-2 gap-2">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={onCallbackClick}
-              className="py-2.5 bg-emerald-50 text-emerald-700 font-semibold text-xs rounded-xl hover:bg-emerald-100 transition-all flex items-center justify-center gap-1.5 border border-emerald-100"
-            >
-              <Phone size={14} />
-              Call Back
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={onBrochureClick}
-              className="py-2.5 bg-blue-50 text-blue-700 font-semibold text-xs rounded-xl hover:bg-blue-100 transition-all flex items-center justify-center gap-1.5 border border-blue-100"
-            >
-              <FileDown size={14} />
-              Brochure
-            </motion.button>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Contact Details Section - Login Gated */}
-      <motion.div 
-        className="bg-white rounded-2xl p-5 border border-gray-100 shadow-lg"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-        <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Shield className="text-primary" size={16} />
-          Contact Details
-        </h3>
-        
-        {isLoggedIn ? (
-          /* Logged In - Show Full Details */
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl border border-green-100">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <Phone size={18} className="text-green-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs text-green-600 font-medium mb-0.5">Phone Number</p>
-                <p className="font-semibold text-gray-900">{fullPhone}</p>
-              </div>
-              <a 
-                href={`tel:${fullPhone}`}
-                className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 transition-colors"
-              >
-                Call
-              </a>
-            </div>
-            
-            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Mail size={18} className="text-blue-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs text-blue-600 font-medium mb-0.5">Email Address</p>
-                <p className="font-semibold text-gray-900 text-sm">{ownerEmail}</p>
-              </div>
-              <a 
-                href={`mailto:${ownerEmail}`}
-                className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Email
-              </a>
-            </div>
-            
-            <div className="mt-3 p-2 bg-amber-50 rounded-lg border border-amber-100">
-              <p className="text-xs text-amber-700 text-center">
-                <Award size={12} className="inline mr-1" />
-                You have access to premium contact details
-              </p>
-            </div>
-          </div>
-        ) : (
-          /* Not Logged In - Show Locked State */
-          <div className="space-y-4">
-            <div className="relative">
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200 blur-[2px] select-none">
-                <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
-                  <Phone size={18} className="text-gray-400" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-gray-400 mb-0.5">Phone Number</p>
-                  <p className="font-semibold text-gray-400">+91 98765XXXXX</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200 blur-[2px] select-none mt-3">
-                <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
-                  <Mail size={18} className="text-gray-400" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-gray-400 mb-0.5">Email Address</p>
-                  <p className="font-semibold text-gray-400 text-sm">contact@xxxxxx.in</p>
-                </div>
-              </div>
-              
-              {/* Lock Overlay */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[1px] rounded-xl">
-                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-2">
-                  <Lock size={20} className="text-primary" />
-                </div>
-                <p className="text-sm font-semibold text-gray-900 mb-1">Login Required</p>
-                <p className="text-xs text-gray-500 text-center mb-3 px-4">View complete contact details</p>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={onLoginClick}
-                  className="px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary-dark transition-colors"
-                >
-                  Login to View
-                </motion.button>
-              </div>
-            </div>
-          </div>
-        )}
-      </motion.div>
-    </div>
-  );
-}
-
-// ============================================
-// ENQUIRY MODAL COMPONENT (ClearDeals Style)
-// ============================================
-function EnquiryModal({ 
-  isOpen, 
-  onClose, 
-  property, 
-  user,
-  isLoggedIn,
-  onLoginClick,
-  onSubmit 
-}) {
+function ContactSidePanel({ property, isLoggedIn, isSubscribed, user, onUpgrade, onShowPayment, onToggleFavorite, saved, isGuestView, openLoginForPropertyDetails }) {
   const [formData, setFormData] = useState({
-    name: user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : '',
-    email: user?.email || '',
-    phone: user?.phone || '',
-    message: `I am interested in ${property?.title || 'this property'}. Please contact me with more details.`
+    name: '',
+    email: '',
+    phone: '',
+    message: ''
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showOtpModal, setShowOtpModal] = useState(false);
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [captchaVerified, setCaptchaVerified] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [countdown, setCountdown] = useState(0);
-  const otpRefs = useRef([]);
-  const captchaRef = useRef(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const { addEnquiry } = useProperty();
+  const { generateLead } = useRevoLeadTracker();
 
-  // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
       setFormData({
@@ -1056,26 +794,12 @@ function EnquiryModal({
         message: `I am interested in ${property?.title || 'this property'}. Please contact me with more details.`
       });
       setErrors({});
-      setCaptchaVerified(false);
-      setOtp(['', '', '', '', '', '']);
-      setShowOtpModal(false);
-      setOtpSent(false);
-      setCountdown(0);
     }
   }, [isOpen, user, property]);
-
-  // Countdown timer for OTP resend
-  useEffect(() => {
-    if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [countdown]);
 
   const validateForm = () => {
     const newErrors = {};
     if (!formData.name.trim()) newErrors.name = 'Full name is required';
-    // Email is optional - only validate if provided
     if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Please enter a valid email';
     }
@@ -1088,369 +812,161 @@ function EnquiryModal({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSendOtp = async () => {
+  const handleSubmit = async () => {
     if (!validateForm()) return;
-    if (!captchaVerified) {
-      alert('Please complete the CAPTCHA verification');
-      return;
-    }
-    
     setIsSubmitting(true);
-    
-    // Simulate OTP API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setOtpSent(true);
-    setShowOtpModal(true);
-    setCountdown(30);
-    setIsSubmitting(false);
-  };
-
-  const handleVerifyOtp = async () => {
-    const enteredOtp = otp.join('');
-    if (enteredOtp.length !== 6) {
-      alert('Please enter complete OTP');
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
     try {
-      // Simulate OTP verification
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mock successful verification - accept 123456 or any 6 digits for demo
-      const isVerified = enteredOtp === '123456' || enteredOtp === '000000';
-      
-      if (isVerified) {
-        // Submit the lead
-        const leadData = {
-          propertyId: property?.id,
-          propertyTitle: property?.title,
-          userId: user?.id,
-          ...formData,
-          verified: true,
-          timestamp: new Date().toISOString(),
-          otpVerified: true
-        };
-        
-        try {
-          await onSubmit(leadData);
-          setShowOtpModal(false);
-          onClose();
-        } catch (submitError) {
-          console.error('Submission error:', submitError);
-          // Still close modal and show success in demo mode
-          alert('Enquiry submitted successfully! (Demo Mode)');
-          setShowOtpModal(false);
-          onClose();
-        }
-      } else {
-        alert('Invalid OTP. Please try again. Use 123456 for demo.');
-      }
+      await addEnquiry({
+        propertyId: property?.id,
+        propertyTitle: property?.title,
+        userId: user?.id,
+        ...formData,
+        timestamp: new Date().toISOString(),
+      });
+      setIsOpen(false);
     } catch (error) {
-      console.error('OTP verification error:', error);
-      alert('Something went wrong. Please try again.');
+      console.error('Enquiry submission error:', error);
+      alert(error?.message || 'Failed to submit enquiry. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleOtpChange = (index, value) => {
-    if (!/^\d*$/.test(value)) return;
-    
-    const newOtp = [...otp];
-    newOtp[index] = value.slice(-1);
-    setOtp(newOtp);
-    
-    // Auto-focus next input
-    if (value && index < 5) {
-      otpRefs.current[index + 1]?.focus();
-    }
-  };
-
-  const handleOtpKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      otpRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleResendOtp = async () => {
-    setIsSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setCountdown(30);
-    setOtp(['', '', '', '', '', '']);
-    setIsSubmitting(false);
-    alert('New OTP sent!');
-  };
-
-  if (!isOpen) return null;
-
   return (
-    <AnimatePresence>
-      {/* Main Enquiry Form Modal */}
-      {!showOtpModal ? (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="bg-white rounded-2xl p-6 md:p-8 max-w-md w-full shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">Send Enquiry</h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  {property?.title || 'Property'}
-                </p>
-              </div>
-              <button 
-                onClick={onClose}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X size={20} className="text-gray-500" />
-              </button>
-            </div>
+    <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg shadow-gray-200/20 border border-gray-100/50 overflow-hidden">
+      {/* Header */}
+      <div className="p-4 sm:p-5 border-b border-gray-100 bg-gradient-to-r from-primary/5 to-transparent">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <span className="text-lg font-semibold text-primary">
+              {property?.owner?.name?.[0] || 'A'}
+            </span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="font-semibold text-gray-900 text-sm truncate">
+              {property?.owner?.name || 'Property Agent'}
+            </h4>
+            <p className="text-xs text-gray-500">Verified Agent</p>
+          </div>
+          <FavoriteButton saved={saved} onClick={onToggleFavorite} />
+        </div>
+      </div>
 
-            {!isLoggedIn && (
-              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                <p className="text-sm text-amber-700">
-                  <Info size={14} className="inline mr-1" />
-                  Please <button onClick={onLoginClick} className="font-semibold underline">login</button> for faster submission
-                </p>
-              </div>
-            )}
+      {/* Contact Form or CTA */}
+      <div className="p-4 sm:p-5">
+        {isLoggedIn ? (
+          <div className="space-y-3">
+            <button
+              onClick={() => setIsOpen(true)}
+              className="w-full py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary-dark transition-all flex items-center justify-center gap-2"
+            >
+              <Phone size={18} />
+              Get a Call Back
+            </button>
+            <button
+              onClick={() => window.open(`tel:${property?.owner?.phone || '+1234567890'}`)}
+              className="w-full py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-all flex items-center justify-center gap-2"
+            >
+              <Phone size={18} />
+              Call Agent
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <button
+              onClick={openLoginForPropertyDetails}
+              className="w-full py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary-dark transition-all"
+            >
+              Login to Contact Agent
+            </button>
+            <p className="text-xs text-center text-gray-500">
+              Login to view agent details and contact information
+            </p>
+          </div>
+        )}
+      </div>
 
-            {/* Form Fields */}
-            <div className="space-y-4">
-              {/* Name Field */}
+      {/* Enquiry Modal */}
+      {isOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold mb-4">Send Enquiry</h3>
+            <div className="space-y-3">
               <div>
-                <label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                  Full Name <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={e => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Enter your full name"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm"
-                  />
-                </div>
+                <label className="text-sm font-medium">Name *</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full mt-1 p-2 border rounded-lg"
+                  placeholder="Your name"
+                />
                 {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
               </div>
-
-              {/* Email Field */}
               <div>
-                <label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                  Email <span className="text-gray-400">(Optional)</span>
-                </label>
-                <div className="relative">
-                  <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={e => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="Enter your email"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm"
-                  />
-                </div>
-                {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
-              </div>
-
-              {/* Phone Field */}
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                  Phone Number <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <Phone size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="+91 98765 43210"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm"
-                  />
-                </div>
+                <label className="text-sm font-medium">Phone *</label>
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full mt-1 p-2 border rounded-lg"
+                  placeholder="Your phone number"
+                />
                 {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
               </div>
-
-              {/* Message Field */}
               <div>
-                <label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                  Message <span className="text-gray-400">(Optional)</span>
-                </label>
-                <div className="relative">
-                  <MessageSquare size={18} className="absolute left-3 top-3 text-gray-400" />
-                  <textarea
-                    value={formData.message}
-                    onChange={e => setFormData({ ...formData, message: e.target.value })}
-                    placeholder="Tell us more about your requirements..."
-                    rows={3}
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm resize-none"
-                  />
-                </div>
-              </div>
-
-              {/* CAPTCHA Simulation */}
-              <div className="p-3 bg-gray-50 rounded-xl border border-gray-200">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    id="captcha"
-                    checked={captchaVerified}
-                    onChange={e => setCaptchaVerified(e.target.checked)}
-                    className="w-5 h-5 text-primary border-gray-300 rounded focus:ring-primary"
-                  />
-                  <label htmlFor="captcha" className="text-sm text-gray-600">
-                    I'm not a robot
-                  </label>
-                  <Shield size={20} className="text-green-500 ml-auto" />
-                </div>
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <motion.button
-              whileHover={{ scale: 1.02, y: -2 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleSendOtp}
-              disabled={isSubmitting}
-              className="w-full mt-6 py-3.5 bg-gradient-to-r from-primary to-primary-dark text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/30 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <Shield size={18} />
-                  Send Enquiry
-                </>
-              )}
-            </motion.button>
-
-            <p className="text-center text-xs text-gray-400 mt-4">
-              Your information is secure and will not be shared
-            </p>
-          </motion.div>
-        </motion.div>
-      ) : (
-        /* OTP Verification Modal */
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4"
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="bg-white rounded-2xl p-6 md:p-8 max-w-sm w-full shadow-2xl"
-          >
-            <div className="text-center mb-6">
-              <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Shield size={24} className="text-primary" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900">Verify OTP</h3>
-              <p className="text-sm text-gray-500 mt-2">
-                Enter the 6-digit code sent to<br/>
-                <span className="font-medium text-gray-700">{formData.phone}</span>
-              </p>
-              {/* Mock OTP Notice */}
-              <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">
-                <p className="text-xs text-amber-700">
-                  <strong>Demo Mode:</strong> Use OTP <span className="font-bold text-primary">123456</span>
-                </p>
-              </div>
-            </div>
-
-            {/* OTP Inputs */}
-            <div className="flex justify-center gap-2 mb-6">
-              {otp.map((digit, index) => (
+                <label className="text-sm font-medium">Email</label>
                 <input
-                  key={index}
-                  ref={el => otpRefs.current[index] = el}
-                  type="text"
-                  maxLength={1}
-                  value={digit}
-                  onChange={e => handleOtpChange(index, e.target.value)}
-                  onKeyDown={e => handleOtpKeyDown(index, e)}
-                  className="w-11 h-12 text-center text-xl font-bold bg-gray-50 border-2 border-gray-200 rounded-xl focus:border-primary focus:bg-white outline-none transition-all"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full mt-1 p-2 border rounded-lg"
+                  placeholder="Your email (optional)"
                 />
-              ))}
+              </div>
+              <div>
+                <label className="text-sm font-medium">Message</label>
+                <textarea
+                  value={formData.message}
+                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                  className="w-full mt-1 p-2 border rounded-lg"
+                  rows={3}
+                  placeholder="Your message"
+                />
+              </div>
             </div>
-
-            {/* Verify Button */}
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleVerifyOtp}
-              disabled={isSubmitting}
-              className="w-full py-3.5 bg-gradient-to-r from-primary to-primary-dark text-white font-semibold rounded-xl hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-70"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
-                  Verifying...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 size={18} />
-                  Verify & Submit
-                </>
-              )}
-            </motion.button>
-
-            {/* Resend OTP */}
-            <div className="text-center mt-4">
-              {countdown > 0 ? (
-                <p className="text-sm text-gray-500">
-                  Resend OTP in <span className="font-semibold">{countdown}s</span>
-                </p>
-              ) : (
-                <button
-                  onClick={handleResendOtp}
-                  disabled={isSubmitting}
-                  className="text-sm text-primary font-semibold hover:underline disabled:opacity-50"
-                >
-                  Resend OTP
-                </button>
-              )}
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => setIsOpen(false)}
+                className="flex-1 py-2 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="flex-1 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50"
+              >
+                {isSubmitting ? 'Sending...' : 'Send'}
+              </button>
             </div>
-
-            <button
-              onClick={() => setShowOtpModal(false)}
-              className="w-full mt-4 py-2 text-gray-500 text-sm font-medium hover:bg-gray-50 rounded-lg transition-colors"
-            >
-              Back to Form
-            </button>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
-    </AnimatePresence>
+    </div>
   );
 }
+
+// ============================================
+// MAIN PROPERTY DETAILS COMPONENT
+// ============================================
 
 function PropertyDetails() {
   const navigate = useNavigate();
   const { slug } = useParams();
-const id = extractIdFromSlug(slug);
+  const listingIdentifier = extractIdFromSlug(slug);
   const { isLoggedIn, isSubscribed, openLoginForPropertyDetails, user } = useAuth();
-  const { getProperty, addEnquiry, isSaved, toggleFavorite } = useProperty();
+  const { getProperty, addEnquiry, isSaved, toggleFavorite, listings = [] } = useProperty();
   const { generateLead } = useRevoLeadTracker();
   
   const [property, setProperty] = useState(null);
@@ -1461,8 +977,15 @@ const id = extractIdFromSlug(slug);
   
   // Dynamic Reviews State
   const [reviews, setReviews] = useState([]);
+  const [reviewStats, setReviewStats] = useState({
+    average_rating: 0,
+    total_reviews: 0,
+    distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }
+  });
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewError, setReviewError] = useState(null);
   const [showReviewForm, setShowReviewForm] = useState(false);
-  const [newReview, setNewReview] = useState({ rating: 5, comment: '' });
+  const [newReview, setNewReview] = useState({ rating: 5, comment: '', title: '' });
   const [reviewToDelete, setReviewToDelete] = useState(null);
   const [enquirySent, setEnquirySent] = useState(false);
   
@@ -1478,901 +1001,99 @@ const id = extractIdFromSlug(slug);
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [expandedSection, setExpandedSection] = useState(null);
 
-  const saved = isSaved(property?.propertyId || property?.id || id);
+  const saved = isSaved(property?.propertyId || property?.id || listingIdentifier);
   
   // Guest view mode - no login required to view limited preview
   const isGuestView = !isLoggedIn;
+  const priceConfigurations = buildPriceConfigurations(property);
+  const similarProperties = buildSimilarProperties(listings, property);
 
-  // Load reviews from localStorage
-  useEffect(() => {
-    const savedReviews = JSON.parse(localStorage.getItem(`reviews_${id}`) || '[]');
-    const initialReviews = [
-      { id: '1', name: 'Amit Singh', date: '2 days ago', rating: 5, comment: 'Beautiful property, exactly as shown in the pictures. The owner was very helpful.' },
-      { id: '2', name: 'Sneha Rao', date: '1 week ago', rating: 4, comment: 'Great location and amenities. The power backup is very reliable.' }
-    ];
-    setReviews(savedReviews.length > 0 ? savedReviews : initialReviews);
-  }, [id]);
+  // Get property ID for reviews (propertyId from property data, not listing ID)
+  const propertyIdForReviews = property?.propertyId || property?.property_id || property?.id || listingIdentifier;
 
-  const handleDeleteReview = (reviewId) => {
-    const updatedReviews = reviews.filter(r => r.id !== reviewId);
-    setReviews(updatedReviews);
-    localStorage.setItem(`reviews_${id}`, JSON.stringify(updatedReviews));
-    setReviewToDelete(null);
-  };
-
-  const handleAddReview = () => {
-    if (!isLoggedIn) {
-      openLoginForPropertyDetails();
-      return;
-    }
-    const reviewObj = {
-      id: Date.now().toString(),
-      name: 'User', // In a real app, use auth user name
-      date: 'Just now',
-      rating: newReview.rating,
-      comment: newReview.comment,
-    };
-    const updatedReviews = [reviewObj, ...reviews];
-    setReviews(updatedReviews);
-    localStorage.setItem(`reviews_${id}`, JSON.stringify(updatedReviews));
-    setShowReviewForm(false);
-    setNewReview({ rating: 5, comment: '' });
-  };
-
-  // Document Download Payment Handler
-  const handleDownloadDocuments = () => {
-    if (!isLoggedIn) {
-      openLoginForPropertyDetails();
-      return;
-    }
-    setShowPaymentModal(true);
-  };
-
-  const initiatePayment = async () => {
-    setPaymentLoading(true);
-    
-    // Simulate payment processing (2 seconds)
-    setTimeout(() => {
-      // Mock successful payment
-      const mockPaymentId = `pay_${Date.now()}`;
-      const mockOrderId = `order_${Date.now()}`;
-      
-      console.log('Payment successful:', { paymentId: mockPaymentId, orderId: mockOrderId });
-      
-      // Store payment info in localStorage
-      const paymentHistory = JSON.parse(localStorage.getItem('document_payments') || '[]');
-      paymentHistory.push({
-        propertyId: id,
-        paymentId: mockPaymentId,
-        orderId: mockOrderId,
-        timestamp: new Date().toISOString(),
-        amount: 49,
-      });
-      localStorage.setItem('document_payments', JSON.stringify(paymentHistory));
-      
-      // Close modal and reset loading
-      setShowPaymentModal(false);
-      setPaymentLoading(false);
-      
-      // Generate and download document
-      generateAndDownloadDocument();
-      
-      // Show success message
-      alert('Payment successful! Your document is being downloaded.');
-    }, 2000);
-  };
-
-  const generateAndDownloadDocument = () => {
-    // Create a comprehensive property document using jsPDF
-    const { jsPDF } = require('jspdf');
-    const doc = new jsPDF();
-    
-    // Header
-    doc.setFontSize(20);
-    doc.setTextColor(99, 102, 241);
-    doc.text('Revo Homes - Property Document', 105, 20, { align: 'center' });
-    
-    // Property Details
-    doc.setFontSize(12);
-    doc.setTextColor(0, 0, 0);
-    let y = 40;
-    
-    doc.text('PROPERTY DETAILS', 20, y);
-    y += 10;
-    doc.setFontSize(10);
-    doc.text(`Property: ${property?.title || 'N/A'}`, 20, y);
-    y += 7;
-    doc.text(`Location: ${property?.location || 'N/A'}`, 20, y);
-    y += 7;
-    doc.text(`Price: ₹${property?.price?.toLocaleString() || 'N/A'}`, 20, y);
-    y += 7;
-    doc.text(`BHK: ${property?.bhk || 'N/A'}`, 20, y);
-    y += 7;
-    doc.text(`Area: ${property?.area || 'N/A'} sq.ft`, 20, y);
-    y += 15;
-    
-    // Owner Details
-    doc.setFontSize(12);
-    doc.text('OWNER INFORMATION', 20, y);
-    y += 10;
-    doc.setFontSize(10);
-    doc.text(`Name: ${property?.owner?.name || 'N/A'}`, 20, y);
-    y += 7;
-    doc.text(`Phone: ${property?.owner?.phone || 'N/A'}`, 20, y);
-    y += 15;
-    
-    // Amenities
-    if (property?.amenities && property.amenities.length > 0) {
-      doc.setFontSize(12);
-      doc.text('AMENITIES', 20, y);
-      y += 10;
-      doc.setFontSize(10);
-      property.amenities.slice(0, 10).forEach((amenity, idx) => {
-        doc.text(`• ${amenity}`, 20, y);
-        y += 6;
-      });
-    }
-    
-    // Footer
-    doc.setFontSize(8);
-    doc.setTextColor(128, 128, 128);
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 280);
-    doc.text('This document is generated by Revo Homes. Payment verified.', 20, 285);
-    doc.text(`Payment ID: DOC_${Date.now()}`, 20, 290);
-    
-    // Download
-    doc.save(`${property?.title?.replace(/\s+/g, '_') || 'Property'}_Documents.pdf`);
-  };
-
-  useEffect(() => {
-    const fetchProperty = async () => {
-      setLoading(true);
-      const data = await getProperty(id);
-      if (data) {
-        // Ensure fetched ID is used, and handle images plural vs singular
-        const galleryImages = data.images && data.images.length > 0 
-          ? data.images 
-          : [data.image || MOCK_PROPERTY_EXTENDED.images[0]];
-          
-        // Preserve ALL backend fields - no selective mapping
-        // Create comprehensive property data object with all fields from API
-        const dynamicData = {
-          // First, spread all raw data to preserve every field
-          ...data,
-          
-          // UI-specific fallbacks (only if not present in data)
-          images: galleryImages,
-          
-          // Ensure display title exists (falls back to name or generated title)
-          title: data.title || data.name || `${data.bhk || '3'} BHK ${data.property_type_id ? PROPERTY_TYPES[data.property_type_id - 1] || 'Property' : 'Property'} in ${data.locality || 'Prime Location'}`,
-          
-          // Ensure location string exists
-          location: data.location || `${data.locality || data.address_line1 || 'Prime Location'}, ${data.city || 'City'}`,
-          
-          // Ensure price display exists
-          price: data.price || data.price_min || data.price_max || MOCK_PROPERTY_EXTENDED.price,
-          
-          // Ensure property type display exists  
-          propertyType: data.property_type || data.propertyType || (data.property_type_id ? PROPERTY_TYPES[data.property_type_id - 1] || 'Property' : 'Apartment'),
-          
-          // Ensure BHK display exists
-          bhk: data.bhk || data.bedrooms || '3',
-          
-          // Ensure area display exists
-          area: data.area || data.carpet_area || data.total_area || data.super_builtup_area || MOCK_PROPERTY_EXTENDED.area,
-          
-          // Owner info with fallback
-          owner: data.owner || { 
-            name: data.created_by ? 'Premium Owner' : 'Premium Owner', 
-            phone: '+91 9' + String(data.id || '').padEnd(9, '0'),
-            verified: true 
-          },
-          
-          // Normalize amenities to array
-          amenities: toArray(
-            data.amenities || data.features,
-            Number(data.bhk) > 2
-              ? ['Parking', 'Lift', 'Gym', 'Swimming Pool', 'Security', 'Power Backup', 'Club House']
-              : ['Parking', 'Lift', 'Security', 'Power Backup']
-          ),
-          
-          // Normalize nearby to array
-          nearby: toArray(data.nearby, [
-            `Metro Station - ${Math.floor(Math.random() * 2000) + 200}m`,
-            `Shopping Mall - ${Math.floor(Math.random() * 3) + 1}km`,
-            `Schools - ${Math.floor(Math.random() * 5) + 1}km`,
-            `Hospital - ${Math.floor(Math.random() * 4) + 1}km`
-          ]),
-          
-          // Listing type for UI
-          listingType: data.listing_type || data.listingType || 'buy',
-        };
-        
-        // Log all available fields for debugging
-        console.log('🏠 Property Data Fields:', Object.keys(dynamicData).sort());
-          
-        setProperty(dynamicData);
-      }
-      setLoading(false);
-    };
-    fetchProperty();
-  }, [id, getProperty]);
-
-  // Lead Generation on Page View (Property Click Result)
-  useEffect(() => {
-    if (isLoggedIn && user && property) {
-      console.log('?? Property viewed - generating/updating lead');
-      
-      // Determine if this is a listing or property based on available data
-      const isListing = property.listingType || property.listing_id;
-      const leadData = {
-        title: property.title,
-        price: property.price,
-        location: property.location,
-        propertyType: property.propertyType,
-        bhk: property.bhk,
-        area: property.area,
-        listingType: property.listingType,
-        city: property.city,
-        state: property.state,
-        userFirstName: user.first_name,
-        userLastName: user.last_name,
-        userEmail: user.email,
-        userPhone: user.phone
-      };
-
-      if (isListing) {
-        // This is a listing, use listing ID
-        leadData.listingId = property.id;
-        leadData.propertyId = property.propertyId || property.property_id;
-      } else {
-        // This is a property, use property ID
-        leadData.propertyId = property.id;
-        leadData.listingId = property.listing_id;
-      }
-
-      generateLead(property.id, user.id, leadData);
-    }
-  }, [isLoggedIn, user?.id, property?.id, generateLead]); // Only track specific IDs to prevent re-renders
-
-  const handleUpgrade = () => {
-    navigate('/subscription');
-  };
-
-  const handleToggleFavorite = async () => {
-    if (!isLoggedIn) {
-      openLoginForPropertyDetails();
-      return;
-    }
-    await toggleFavorite(property?.propertyId || property?.id || id, !saved);
-  };
-
-  // Handle expert contact - currently logs, ready for backend integration
-  const handleExpertContact = (expert) => {
-    console.log("Contact expert:", expert);
-    // Future: Integrate with backend API
-    // Example: api.post('/expert-contact', { expertId: expert.id, propertyId: id })
+  // Handle agent contact
+  const handleAgentContact = (agent) => {
+    console.log("Contact agent:", agent);
   };
 
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8 animate-pulse">
-        {/* Gallery Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 h-[400px] md:h-[550px] mb-10">
-          <div className="md:col-span-2 md:row-span-2 bg-gray-200 rounded-2xl" />
-          <div className="bg-gray-200 rounded-2xl hidden md:block" />
-          <div className="bg-gray-200 rounded-2xl hidden md:block" />
-          <div className="bg-gray-200 rounded-2xl hidden md:block" />
-          <div className="bg-gray-200 rounded-2xl hidden md:block" />
-        </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          <div className="lg:col-span-2 space-y-8">
-            <div className="bg-white rounded-[2.5rem] p-8 md:p-10 h-[600px]" />
+        <div className="space-y-4">
+          <div className="bg-gray-200 rounded-lg h-64"></div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-gray-200 p-4 rounded-lg h-32"></div>
+            <div className="bg-gray-200 p-4 rounded-lg h-32"></div>
+            <div className="bg-gray-200 p-4 rounded-lg h-32"></div>
           </div>
-          <div className="space-y-6">
-            <div className="bg-white rounded-[2.5rem] p-8 h-[400px]" />
-            <div className="bg-white rounded-[2.5rem] p-8 h-[300px]" />
-          </div>
+          <div className="bg-gray-200 rounded-lg h-96"></div>
         </div>
       </div>
     );
   }
 
-  // Note: Guest users can now view limited property preview
-  // Full details require authentication (handled via isGuestView flag)
-
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="bg-gradient-to-br from-gray-50 via-white to-gray-50/30 min-h-screen"
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
-        {/* Breadcrumbs */}
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-6 lg:mb-8">
-          <span className="hover:text-primary cursor-pointer transition-colors" onClick={() => navigate('/')}>Home</span>
-          <ChevronRight size={14} className="text-gray-400" />
-          <span className="hover:text-primary cursor-pointer transition-colors" onClick={() => navigate('/properties')}>Properties</span>
-          <ChevronRight size={14} className="text-gray-400" />
-          <span className="text-gray-900 font-medium truncate max-w-xs sm:max-w-none">{property?.title || 'Property Details'}</span>
-        </div>
-
-        {/* Premium HERO SECTION - Immersive Image with Gallery */}
-        <div className="mb-6 lg:mb-8 relative">
-          {/* Overlay Badges */}
-          <div className="absolute top-3 sm:top-4 left-3 sm:left-4 z-20 flex flex-col gap-1.5 pointer-events-none">
-            <span className="px-3 py-1.5 bg-white/95 backdrop-blur-lg text-gray-900 rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg border border-white/50">
-              {property.propertyType}
-            </span>
-            <span className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg flex items-center gap-1">
-              <Star size={10} className="fill-current" />
-              Featured
-            </span>
-          </div>
-
-          {isGuestView ? (
-            <div className="relative h-[280px] sm:h-[360px] lg:h-[420px] rounded-2xl overflow-hidden shadow-xl shadow-black/10">
-              <img 
-                src={property.images?.[0] || property.image || MOCK_PROPERTY_EXTENDED.images[0]} 
-                alt={property.title}
-                className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-              
-              {/* Thumbnail Gallery Preview */}
-              <div className="absolute bottom-3 left-3 right-3 flex gap-1.5">
-                {property.images?.slice(0, 4).map((img, idx) => (
-                  <div key={idx} className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg overflow-hidden shadow-md border-2 border-white/50">
-                    <img src={img} alt={`Property ${idx + 1}`} className="w-full h-full object-cover" />
-                  </div>
-                ))}
-                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg bg-black/60 flex items-center justify-center border-2 border-white/50">
-                  <span className="text-white text-xs font-semibold">+{Math.max(0, (property.images?.length || 0) - 4)}</span>
-                </div>
-              </div>
-              
-              <div className="absolute bottom-20 sm:bottom-24 left-3 right-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Lock size={14} className="text-primary/90" />
-                  <p className="text-white/95 text-sm">
-                    Sign in to see all {property.images?.length || 1} photos
-                  </p>
-                </div>
-                <button 
-                  onClick={openLoginForPropertyDetails}
-                  className="px-4 py-2 bg-white/95 backdrop-blur-lg text-gray-900 font-semibold rounded-lg text-sm hover:bg-white transition-all shadow-lg hover:shadow-xl active:scale-95"
-                >
-                  Sign In
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-2xl overflow-hidden shadow-xl shadow-black/10">
-              <ImageGallery images={property.images} title={property.title} />
-            </div>
-          )}
-
-          {/* View All Photos CTA */}
-          <div className="mt-4 text-center">
-            <button 
-              onClick={() => setShowEMI(false) || setShowRental(false) || console.log('View all photos')}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary to-primary-dark text-white font-semibold rounded-lg hover:from-primary-dark hover:to-primary transition-all shadow-md hover:shadow-lg active:scale-95 text-sm"
+    <div className="min-h-screen bg-gray-50">
+      {/* Navigation */}
+      <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex items-center justify-between h-16">
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
             >
-              <Eye size={16} />
-              View All Photos ({property.images?.length || 1})
+              <ArrowLeft size={20} />
+              <span className="font-medium">Back</span>
             </button>
+            <h1 className="text-lg font-semibold text-gray-900 truncate max-w-md">
+              {property?.title || 'Property Details'}
+            </h1>
+            <FavoriteButton saved={saved} onClick={handleToggleFavorite} />
           </div>
         </div>
-        {/* SQUAREYARDS-STYLE STICKY NAVIGATION */}
-        <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-200 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 mb-6 hidden lg:block">
-          <div className="flex items-center gap-1 overflow-x-auto py-3 no-scrollbar">
-            {NAV_ITEMS.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setActiveTab(item.id);
-                  document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }}
-                className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-all ${
-                  activeTab === item.id 
-                    ? 'bg-primary text-white shadow-md' 
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-10">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6 lg:space-y-8">
-            {/* OVERVIEW SECTION */}
-            <section id="overview" className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8 shadow-lg shadow-gray-200/20 border border-gray-100/50">
-              {/* Property Title and Location */}
-              <div className="flex flex-col lg:flex-row justify-between items-start gap-4 lg:gap-6 mb-6">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="px-2 py-1 bg-primary/10 text-primary text-xs font-bold rounded-md uppercase">
-                      {property.propertyType}
-                    </span>
-                    <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-md uppercase flex items-center gap-1">
-                      <Star size={10} className="fill-current" /> Featured
-                    </span>
-                  </div>
-                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 leading-tight mb-2">
-                    {property.title}
-                  </h1>
-                  <div className="flex items-center gap-2 text-gray-600 text-base">
-                    <MapPin className="text-primary flex-shrink-0" size={18} />
-                    <span className="font-medium">{property.location}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 lg:flex-col lg:items-end">
-                  <button
-                    onClick={handleToggleFavorite}
-                    className={`p-3 rounded-xl transition-all duration-300 shadow-lg flex items-center justify-center ${
-                      saved 
-                        ? 'bg-red-50 text-red-500 scale-105 shadow-red-200/50 hover:scale-110' 
-                        : 'bg-gray-50 text-gray-400 hover:text-red-400 hover:bg-white hover:scale-105 shadow-gray-200/50'
-                    } border border-white`}
-                    title={saved ? 'Remove from saved' : 'Save property'}
-                  >
-                    <Heart size={22} className={saved ? 'fill-current' : ''} />
-                  </button>
-                  <div className="text-right">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Price</p>
-                    <p className="text-2xl sm:text-3xl font-bold text-primary tracking-tight">
-                      &#8377;{property.price?.toLocaleString()}<span className="text-lg sm:text-xl font-medium text-gray-400">{property.listingType === 'rent' ? '/mo' : ''}</span>
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">₹{property.pricePerSqft || '22,200'}/sq.ft</p>
-                  </div>
-                </div>
+          <div className="lg:col-span-2 space-y-8">
+            {/* Property Gallery */}
+            <div className="bg-white rounded-2xl overflow-hidden shadow-lg">
+              <div className="relative h-96">
+                <img
+                  src={property?.image || 'https://via.placeholder.com/800x600'}
+                  alt={property?.title}
+                  className="w-full h-full object-cover"
+                />
               </div>
+            </div>
 
-              {/* Key Highlights Row */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-6">
-                <InfoBadge icon={BedDouble} label="Configuration" value={`${property.bhk} BHK`} highlight />
-                <InfoBadge icon={Maximize} label="Carpet Area" value={`${property.area} sq.ft`} />
-                <InfoBadge icon={Home} label="Furnishing" value={property.furnished || 'Semi'} />
-                <InfoBadge icon={Building2} label="Developer" value={property.developer || 'Revo Developers'} />
-                <InfoBadge icon={Calendar} label="Possession" value={property.possessionDate || 'Dec 2024'} />
-              </div>
-
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <FileText className="text-primary" size={18} />
-                    Description
-                  </h3>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    {isGuestView && property.description && property.description.length > 200 ? (
-                      <>
-                        <p className="text-gray-700 leading-relaxed text-sm mb-3">
-                          {property.description.substring(0, 200)}...
-                        </p>
-                        <button 
-                          onClick={openLoginForPropertyDetails}
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark transition-all"
-                        >
-                          <Lock size={14} />
-                          Sign in to read more
-                        </button>
-                      </>
-                    ) : (
-                      <p className="text-gray-700 leading-relaxed text-sm">
-                        {property.description || 'No description available'}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Guest Login Prompt Banner */}
-                {isGuestView && (
-                  <div className="mt-4 p-4 bg-primary/5 border border-primary/10 rounded-lg">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Lock className="text-primary" size={18} />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900 text-sm mb-1">Sign in to view complete details</h3>
-                        <p className="text-xs text-gray-600 mb-2">
-                          Get access to full property information, owner contact details, save favorites.
-                        </p>
-                        <button 
-                          onClick={openLoginForPropertyDetails}
-                          className="px-4 py-1.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark transition-all"
-                        >
-                          Sign In / Sign Up
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-              </div>
-            </section>
-
-            {/* PRICE CONFIGURATION SECTION */}
-            <section id="floor-plans" className="SectionCard">
-              <SectionTitle 
-                icon={IndianRupee} 
-                title="Price List & Configuration" 
-                action={
-                  <div className="flex gap-2">
-                    {['all', '1', '2', '3', '4'].map((bhk) => (
-                      <button
-                        key={bhk}
-                        onClick={() => setActiveBhkTab(bhk)}
-                        className={`px-3 py-1 text-xs font-semibold rounded-full transition-all ${
-                          activeBhkTab === bhk 
-                            ? 'bg-primary text-white' 
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                      >
-                        {bhk === 'all' ? 'All' : `${bhk} BHK`}
-                      </button>
-                    ))}
-                  </div>
-                }
-              />
-              <div className="space-y-3">
-                {PRICE_CONFIG_DATA.filter(item => activeBhkTab === 'all' || item.bhk === activeBhkTab).map((config, idx) => (
-                  <PriceConfigRow 
-                    key={idx} 
-                    bhk={config.bhk} 
-                    area={config.area} 
-                    price={config.price} 
-                    unit={config.unit}
-                    isHighlighted={property.bhk === config.bhk}
-                  />
-                ))}
-              </div>
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
-                <div className="flex items-start gap-3">
-                  <Info className="text-blue-600 flex-shrink-0 mt-0.5" size={16} />
-                  <p className="text-sm text-blue-800">
-                    Prices mentioned are indicative and subject to change. Please contact the developer for current pricing and availability.
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            {/* ENHANCED FLOOR PLANS SECTION */}
-            <section className="SectionCard">
-              <SectionTitle icon={Maximize} title="Floor Plans & Unit Types" />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {['1 BHK', '2 BHK', '3 BHK', '4 BHK'].map((bhk, idx) => (
-                  <div 
-                    key={idx} 
-                    className={`bg-gray-50 rounded-lg p-4 text-center border-2 transition-all cursor-pointer hover:border-primary/30 ${property.bhk === String(idx + 1) ? 'border-primary bg-primary/5' : 'border-transparent'}`}
-                  >
-                    <div className="h-20 bg-white rounded-lg mb-3 flex items-center justify-center shadow-sm">
-                      <Maximize className="text-gray-300" size={32} />
-                    </div>
-                    <p className="font-bold text-gray-900">{bhk}</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {idx === 0 ? '450-550' : idx === 1 ? '850-1050' : idx === 2 ? '1200-1500' : '1800-2200'} sq.ft
-                    </p>
-                    <p className="text-sm text-primary font-semibold mt-2">
-                      ₹{idx === 0 ? '45-55 L' : idx === 1 ? '85-105 L' : idx === 2 ? '1.2-1.5 Cr' : '1.8-2.5 Cr'}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {/* ENHANCED AMENITIES SECTION */}
-            <section id="amenities" className="SectionCard">
-              <SectionTitle 
-                icon={Sparkles} 
-                title="Amenities & Features"
-                action={
-                  property.amenities?.length > 8 && (
-                    <button 
-                      onClick={() => setShowAllAmenities(!showAllAmenities)}
-                      className="text-sm text-primary font-semibold hover:underline"
-                    >
-                      {showAllAmenities ? 'Show Less' : `+${property.amenities.length - 8} More`}
-                    </button>
-                  )
-                }
-              />
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {(showAllAmenities ? property.amenities : property.amenities?.slice(0, 8))?.map((amenity, idx) => {
-                  const displayAmenity = mapAmenityName(amenity);
-                  const AmenityIcon = getAmenityIcon(displayAmenity);
-                  return (
-                    <div key={idx} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                      <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                        <AmenityIcon size={16} className="text-primary" />
-                      </div>
-                      <span className="text-sm text-gray-700 font-medium">{displayAmenity}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              {(!property.amenities || property.amenities.length === 0) && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {['24x7 Security', 'Power Backup', 'Lift', 'Parking', 'Gym', 'Swimming Pool', 'Garden', 'Club House'].map((amenity, idx) => {
-                    const AmenityIcon = getAmenityIcon(amenity);
-                    return (
-                      <div key={idx} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                        <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                          <AmenityIcon size={16} className="text-primary" />
-                        </div>
-                        <span className="text-sm text-gray-700 font-medium">{amenity}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
-
-            {/* LOCATION BENEFITS SECTION - Dynamic from Backend */}
-            <section id="location" className="SectionCard">
-              <SectionTitle icon={Navigation} title="Location Benefits & Landmarks" />
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                {(parseNearbyLandmarks(property?.nearby) || LOCATION_BENEFITS_DATA).map((item, idx) => (
-                  <LocationBenefitItem key={idx} name={item.name} distance={item.distance} icon={item.icon} />
-                ))}
-              </div>
-              
-              {/* Map */}
-              <div className="rounded-xl overflow-hidden border border-gray-200 h-[300px]">
-                <iframe
-                  title="Property Location"
-                  src={`https://www.google.com/maps?q=${encodeURIComponent(property.location)}&output=embed`}
-                  className="w-full h-full border-0"
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                ></iframe>
-              </div>
-              
-              {/* Social Infrastructure - Dynamic Counts from Backend */}
-              <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <div className="p-3 bg-gray-50 rounded-lg text-center">
-                  <School className="mx-auto mb-1 text-primary" size={18} />
-                  <p className="text-xs text-gray-500">Schools</p>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {countNearbyByType(property?.nearby, 'school') || 5}+ Nearby
-                  </p>
-                </div>
-                <div className="p-3 bg-gray-50 rounded-lg text-center">
-                  <Hospital className="mx-auto mb-1 text-primary" size={18} />
-                  <p className="text-xs text-gray-500">Hospitals</p>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {countNearbyByType(property?.nearby, 'hospital') || 3}+ Nearby
-                  </p>
-                </div>
-                <div className="p-3 bg-gray-50 rounded-lg text-center">
-                  <ShoppingBag className="mx-auto mb-1 text-primary" size={18} />
-                  <p className="text-xs text-gray-500">Malls</p>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {countNearbyByType(property?.nearby, 'mall') || countNearbyByType(property?.nearby, 'shopping') || 4}+ Nearby
-                  </p>
-                </div>
-                <div className="p-3 bg-gray-50 rounded-lg text-center">
-                  <Briefcase className="mx-auto mb-1 text-primary" size={18} />
-                  <p className="text-xs text-gray-500">IT Parks</p>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {countNearbyByType(property?.nearby, 'it park') || countNearbyByType(property?.nearby, 'office') || countNearbyByType(property?.nearby, 'commercial') || 6}+ Nearby
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            {/* SIMILAR PROPERTIES SECTION */}
-            <section className="SectionCard">
-              <SectionTitle icon={Building2} title="Similar Properties in the Area" />
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {SIMILAR_PROPERTIES_DATA.map((prop) => (
-                  <SimilarPropertyCard key={prop.id} property={prop} />
-                ))}
-              </div>
-            </section>
-
-            {/* TOP EXPERTS SECTION - Backend Ready */}
-            <section id="experts" className="SectionCard">
-              <SectionTitle 
-                icon={Award} 
-                title={property?.city ? `Top Experts in ${property.city}` : "Top Experts Near You"}
-              />
-              
-              {/* Backend-ready data extraction */}
-              <ExpertsCarousel property={property} handleExpertContact={handleExpertContact} />
-            </section>
-
-            {/* REVIEWS SECTION - LAST SECTION */}
-            <section id="reviews" className="SectionCard">
-              <SectionTitle 
-                icon={Star} 
-                title={`${property.title?.split(' ').slice(0, 3).join(' ') || 'Property'} Reviews & Rating`}
-              />
-              <p className="text-sm text-gray-500 mb-6">
-                Read the reviews about {property.title?.split(' ').slice(0, 3).join(' ') || 'this property'} located at {property.location || 'prime location'} and see what residents and real estate experts have to say about the project.
+            {/* Overview Section */}
+            <section id="overview" className="bg-white rounded-2xl p-6 shadow-lg">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Overview</h2>
+              <p className="text-gray-600 leading-relaxed">
+                {property?.description || 'No description available'}
               </p>
-              
-              {/* Rating Summary */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                {/* Overall Rating */}
-                <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-6 border border-amber-100">
-                  <div className="text-center">
-                    <div className="text-5xl font-bold text-gray-900 mb-2">
-                      {(reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length || 3.8).toFixed(1)}
-                    </div>
-                    <div className="flex justify-center gap-1 mb-2">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star 
-                          key={star} 
-                          size={20} 
-                          className={star <= Math.round(reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length || 3.8) ? "text-amber-400 fill-amber-400" : "text-gray-300"}
-                        />
-                      ))}
-                    </div>
-                    <p className="text-sm text-gray-600">{reviews.length || 5} Ratings</p>
-                  </div>
-                </div>
-                
-                {/* Rating Breakdown */}
-                <div className="space-y-2">
-                  {[5, 4, 3, 2, 1].map((stars) => {
-                    const count = reviews.filter(r => r.rating === stars).length || (stars === 5 ? 1 : stars === 4 ? 2 : stars === 3 ? 2 : 0);
-                    const total = reviews.length || 5;
-                    const percentage = (count / total) * 100;
-                    return (
-                      <div key={stars} className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-gray-600 w-12">{stars} Star</span>
-                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-amber-400 rounded-full transition-all"
-                            style={{ width: `${percentage}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-semibold text-gray-900 w-6">{count}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              
-              {/* Top Reviews */}
-              <div className="space-y-4">
-                <h4 className="font-semibold text-gray-900 mb-3">Top Reviews</h4>
-                {reviews.slice(0, 3).map((review, idx) => (
-                  <div key={review.id || idx} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="font-semibold text-primary text-sm">{review.name?.[0] || 'U'}</span>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-gray-900">{review.name}</span>
-                          <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">
-                            {idx === 0 ? 'Real estate agent' : 'Owner'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1 mb-2">
-                          {[...Array(5)].map((_, i) => (
-                            <Star 
-                              key={i} 
-                              size={12} 
-                              className={i < review.rating ? "text-amber-400 fill-amber-400" : "text-gray-300"}
-                            />
-                          ))}
-                          <span className="text-xs text-gray-400 ml-1">{review.date}</span>
-                        </div>
-                        <p className="text-sm text-gray-600 leading-relaxed">{review.comment}</p>
-                      </div>
-                      {reviewToDelete === review.id ? (
-                        <div className="flex items-center gap-1">
-                          <button 
-                            onClick={() => handleDeleteReview(review.id)}
-                            className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
-                          >
-                            Yes
-                          </button>
-                          <button 
-                            onClick={() => setReviewToDelete(null)}
-                            className="px-2 py-1 bg-gray-100 text-gray-500 text-xs rounded"
-                          >
-                            No
-                          </button>
-                        </div>
-                      ) : (
-                        <button 
-                          onClick={() => setReviewToDelete(review.id)}
-                          className="p-1 text-gray-300 hover:text-red-500 flex-shrink-0"
-                          title="Delete"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              {/* Write a Review */}
-              <div className="mt-6">
-                {showReviewForm ? (
-                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                    <h4 className="font-semibold text-gray-900 mb-3">Write a review</h4>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-xs text-gray-500 block mb-2">Rating</label>
-                        <div className="flex gap-1">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <button
-                              key={star}
-                              onClick={() => {
-                                if (!isGuestView) {
-                                  setNewReview({ ...newReview, rating: star });
-                                } else {
-                                  openLoginForPropertyDetails();
-                                }
-                              }}
-                              className={`p-1 rounded transition-all ${
-                                star <= newReview.rating ? 'text-amber-400' : 'text-gray-300'
-                              }`}
-                            >
-                              <Star size={24} className={star <= newReview.rating ? "fill-current" : ""} />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500 block mb-2">Your Review</label>
-                        <textarea
-                          value={newReview.comment}
-                          onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
-                          className="w-full p-3 bg-white border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 text-sm resize-none"
-                          rows={3}
-                          placeholder="Share your experience about this property..."
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleAddReview}
-                          disabled={!newReview.comment.trim()}
-                          className="flex-1 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark transition-all disabled:opacity-50"
-                        >
-                          Post Review
-                        </button>
-                        <button
-                          onClick={() => setShowReviewForm(false)}
-                          className="px-4 py-2.5 bg-gray-100 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-200 transition-all"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <button 
-                    onClick={() => {
-                      if (!isGuestView) {
-                        setShowReviewForm(true);
-                      } else {
-                        openLoginForPropertyDetails();
-                      }
-                    }}
-                    className="w-full py-3 bg-white border-2 border-dashed border-gray-300 rounded-xl text-gray-600 font-medium hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2"
-                  >
-                    <Plus size={18} />
-                    Write a review
-                  </button>
-                )}
-              </div>
+            </section>
+
+            {/* Agents Section */}
+            <section id="agents" className="bg-white rounded-2xl p-6 shadow-lg">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                {property?.city ? `Agents in ${property.city}` : 'Property Agents'}
+              </h2>
+              <AgentsCarousel property={property} handleAgentContact={handleAgentContact} />
+            </section>
+
+            {/* Reviews Section */}
+            <section id="reviews" className="bg-white rounded-2xl p-6 shadow-lg">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Reviews</h2>
+              <p className="text-gray-500">Reviews section placeholder</p>
             </section>
           </div>
 
-          {/* Right Sidebar - New Contact Side Panel */}
+          {/* Right Sidebar */}
           <div className="space-y-4 sm:space-y-6">
             <div className="sticky top-20 sm:top-24 space-y-4 sm:space-y-6">
-              {/* New Contact Side Panel Component */}
               <ContactSidePanel
                 property={property}
                 isLoggedIn={isLoggedIn}
@@ -2383,7 +1104,6 @@ const id = extractIdFromSlug(slug);
                     openLoginForPropertyDetails();
                     return;
                   }
-                  // Show callback modal or trigger callback request
                   alert('Callback request submitted! We will contact you shortly.');
                 }}
                 onBrochureClick={() => {
@@ -2399,13 +1119,7 @@ const id = extractIdFromSlug(slug);
               {/* Calculators */}
               <div className="space-y-2">
                 <div
-                  onClick={() => {
-                    if (!isLoggedIn) {
-                      openLoginForPropertyDetails();
-                      return;
-                    }
-                    setShowEMI(true);
-                  }}
+                  onClick={() => setShowEMI(true)}
                   className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100 shadow-sm hover:shadow-md transition-all cursor-pointer"
                 >
                   <div className="w-8 h-8 bg-red-50 rounded-lg flex items-center justify-center">
@@ -2421,13 +1135,7 @@ const id = extractIdFromSlug(slug);
                 </div>
 
                 <div
-                  onClick={() => {
-                    if (!isLoggedIn) {
-                      openLoginForPropertyDetails();
-                      return;
-                    }
-                    setShowRental(true);
-                  }}
+                  onClick={() => setShowRental(true)}
                   className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100 shadow-sm hover:shadow-md transition-all cursor-pointer"
                 >
                   <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center">
@@ -2442,6 +1150,7 @@ const id = extractIdFromSlug(slug);
                   <ChevronRight size={16} className="text-gray-400" />
                 </div>
               </div>
+                
             </div>
           </div>
         </div>
@@ -2486,11 +1195,12 @@ const id = extractIdFromSlug(slug);
                         Send Enquiry
                       </button>
                       <button
-                        onClick={() => window.open(`tel:+91${property.owner?.phone || '9876543210'}`)}
+                        onClick={() => property.owner?.phone && window.open(`tel:${property.owner.phone}`)}
+                        disabled={!property.owner?.phone}
                         className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white hover:bg-gray-50 text-gray-700 font-semibold rounded-lg border-2 border-gray-300 hover:border-primary hover:text-primary transition-all"
                       >
                         <Phone size={18} />
-                        Call Owner
+                        {property.owner?.phone ? 'Call Owner' : 'Phone Not Available'}
                       </button>
                     </div>
                   </div>
@@ -2533,54 +1243,66 @@ const id = extractIdFromSlug(slug);
         onLoginClick={openLoginForPropertyDetails}
         onSubmit={async (leadData) => {
           try {
-            // Log the lead data for debugging
-            console.log('Submitting lead:', leadData);
-            
-            // Try to generate lead (may fail if not authenticated)
+            const { firstName, lastName } = splitFullName(leadData.name);
+            const enquiryMessage = buildStructuredMessage(
+              `Property enquiry for ${property.title || 'listing'}`,
+              {
+                'Listing Type': property.listingType,
+                'Property Type': property.propertyType,
+                'Location': property.location,
+              },
+              leadData.message
+            );
+
+            await generateLead(property.id, user?.id || null, {
+              listingId: property.id,
+              propertyId: property.propertyId,
+              title: property.title,
+              price: property.price,
+              location: property.location,
+              propertyType: property.propertyType,
+              bhk: property.bhk,
+              area: property.area,
+              listingType: property.listingType,
+              city: property.city,
+              state: property.state,
+              userFirstName: firstName,
+              userLastName: lastName,
+              userEmail: leadData.email,
+              userPhone: leadData.phone,
+              priority: 'high',
+              is_hot: true,
+              score: 85,
+              notes: enquiryMessage,
+              utm_content: 'enquiry_submission',
+              leadEvent: 'inquiry',
+              timestamp: leadData.timestamp
+            });
+
+            await submitPublicEnquiry({
+              name: leadData.name,
+              email: leadData.email,
+              phone: leadData.phone,
+              subject: `Property enquiry: ${property.title || 'Listing'}`,
+              message: enquiryMessage,
+              enquiryType: 'property_inquiry',
+              preferredLocation: property.location,
+              preferredPropertyTypes: property.propertyType,
+              propertyId: property.propertyId,
+              listingId: property.id,
+              sourcePage: window.location.pathname,
+            });
+
             try {
-              await generateLead(property.id, user?.id || 'guest', {
-                listingId: property.id,
-                propertyId: property.propertyId,
-                title: property.title,
-                price: property.price,
-                location: property.location,
-                propertyType: property.propertyType,
-                bhk: property.bhk,
-                area: property.area,
-                listingType: property.listingType,
-                city: property.city,
-                state: property.state,
-                userFirstName: leadData.name,
-                userEmail: leadData.email || 'guest@example.com',
-                userPhone: leadData.phone,
-                priority: 'high',
-                is_hot: true,
-                score: 85,
-                notes: `ENQUIRY: ${leadData.message}`,
-                utm_content: 'enquiry_submission_with_otp',
-                leadEvent: 'inquiry',
-                verified: true,
-                otpVerified: true,
-                timestamp: leadData.timestamp
-              });
-            } catch (leadError) {
-              console.log('Lead generation skipped or failed:', leadError);
+              await addEnquiry(property.id, enquiryMessage);
+            } catch (enquiryError) {
+              console.log('Listing enquiry API skipped or failed:', enquiryError);
             }
 
-            // Try original enquiry logic
-            try {
-              await addEnquiry(property.id, leadData.message);
-            } catch (enquiryError) {
-              console.log('Enquiry API skipped or failed:', enquiryError);
-            }
-            
-            // Always show success in demo mode
-            console.log('Enquiry submitted successfully (Demo Mode)');
             return Promise.resolve();
           } catch (error) {
             console.error('Lead submission error:', error);
-            // Still resolve to not block the UI
-            return Promise.resolve();
+            return Promise.reject(error);
           }
         }}
       />
@@ -2794,9 +1516,9 @@ const id = extractIdFromSlug(slug);
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
+   
   );
 }
 
 export default PropertyDetails;
-

@@ -2,10 +2,18 @@ import { createContext, useContext, useState, useCallback, useEffect } from 'rea
 import { useAuth } from './AuthContext';
 import { useLocation } from './LocationContext';
 import { listingApi, userApi } from '../services/api';
-
+import Logo from '../assets/Revo Homes Logo.png';
 const PropertyContext = createContext(null);
 
-const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=600';
+const DEFAULT_IMAGE = Logo;
+
+const PROPERTY_TYPE_LABELS = {
+  1: 'Apartment',
+  2: 'Villa',
+  3: 'Independent House',
+  4: 'Plot',
+  5: 'Commercial',
+};
 
 const toNumber = (value, fallback = 0) => {
   if (typeof value === 'number') return value;
@@ -35,6 +43,50 @@ const extractSingle = (response, keys = []) => {
   return preferred || response?.data || response || null;
 };
 
+const extractPagination = (response) => {
+  const pagination = response?.data?.pagination
+    || response?.pagination
+    || response?.data?.meta
+    || response?.meta
+    || null;
+
+  if (!pagination || typeof pagination !== 'object') return null;
+
+  const currentPage = Number(
+    pagination.currentPage
+    || pagination.current_page
+    || pagination.page
+    || 1
+  );
+
+  const totalPages = Number(
+    pagination.totalPages
+    || pagination.total_pages
+    || pagination.last_page
+    || 0
+  );
+
+  const totalItems = Number(
+    pagination.totalItems
+    || pagination.total_items
+    || pagination.total
+    || 0
+  );
+
+  return {
+    currentPage: Number.isFinite(currentPage) ? currentPage : 1,
+    totalPages: Number.isFinite(totalPages) ? totalPages : 0,
+    totalItems: Number.isFinite(totalItems) ? totalItems : 0,
+  };
+};
+
+const extractListingIdFromSlug = (value) => {
+  if (!value) return null;
+  const match = String(value).match(/rpid-r(\d+)$/i);
+  if (match) return match[1];
+  return null;
+};
+
 const buildPopularCities = (items) => {
   const counts = new Map();
 
@@ -50,29 +102,96 @@ const buildPopularCities = (items) => {
     .slice(0, 6);
 };
 
+const safeJsonParse = (value, fallback = null) => {
+  if (value === null || value === undefined || value === '') return fallback;
+  if (typeof value === 'object') return value;
+
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    return fallback;
+  }
+};
+
+const toArray = (value, fallback = []) => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = safeJsonParse(value, null);
+    if (Array.isArray(parsed)) return parsed;
+
+    return value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+
+  return fallback;
+};
+
+const normalizeImageUrl = (image) => {
+  if (!image) return null;
+  if (typeof image === 'string') return image;
+
+  return (
+    image.image_url ||
+    image.url ||
+    image.src ||
+    image.thumbnail_url ||
+    image.cover_image_url ||
+    null
+  );
+};
+
 const formatBHK = (bedrooms) => {
   if (!bedrooms) return '2 BHK';
-  
+
   const beds = parseInt(bedrooms);
-  
+
   // Handle RK (Room Kitchen) format first
   if (beds === 1) return '1 RK';
   if (beds === 1.5) return '1.5 RK';
   if (beds === 2) return '2 RK';
-  
+
   // Handle BHK format
   if (beds === 1) return '1 BHK';
   if (beds === 2) return '2 BHK';
   if (beds === 3) return '3 BHK';
   if (beds === 4) return '4 BHK';
   if (beds >= 5) return `${beds} BHK`;
-  
+
   return `${beds} BHK`;
 };
 
 const normalizeProperty = (item, userLocation = null) => {
   if (!item) return item;
 
+  const meta = safeJsonParse(item.meta, {});
+  const features = safeJsonParse(item.features, item.features);
+  const amenities = toArray(
+    item.amenities ||
+    features?.amenities ||
+    features?.community ||
+    features?.infrastructure ||
+    features?.security ||
+    features?.utilities,
+    []
+  );
+  const nearby = toArray(
+    item.nearby ||
+    meta?.nearby ||
+    meta?.nearby_landmarks ||
+    meta?.landmarks,
+    []
+  );
+  const imageList = toArray(item.images, [])
+    .map(normalizeImageUrl)
+    .filter(Boolean);
+  const primaryImage =
+    normalizeImageUrl(item.image) ||
+    normalizeImageUrl(item.cover_image_url) ||
+    normalizeImageUrl(item.thumbnail_url) ||
+    imageList[0] ||
+    DEFAULT_IMAGE;
   const listingId = item.listing_id || item.id || item.slug;
   const propertyId = item.property_id || item.id;
   const city = item.property_city || item.city || '';
@@ -89,23 +208,25 @@ const normalizeProperty = (item, userLocation = null) => {
   if (userLocation && userLocation.latitude && userLocation.longitude) {
     const propertyLat = parseFloat(item.latitude || item.lat);
     const propertyLng = parseFloat(item.longitude || item.lng || item.lon);
-    
+
     if (!isNaN(propertyLat) && !isNaN(propertyLng)) {
       // Use haversine formula to calculate distance
       const R = 6371; // Earth's radius in kilometers
       const dLat = (propertyLat - userLocation.latitude) * Math.PI / 180;
       const dLng = (propertyLng - userLocation.longitude) * Math.PI / 180;
-      const a = 
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(userLocation.latitude * Math.PI / 180) * Math.cos(propertyLat * Math.PI / 180) * 
-        Math.sin(dLng/2) * Math.sin(dLng/2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(userLocation.latitude * Math.PI / 180) * Math.cos(propertyLat * Math.PI / 180) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       distance = R * c;
     }
   }
 
   return {
     ...item,
+    meta,
+    features,
     id: listingId,
     listingId,
     propertyId,
@@ -114,13 +235,18 @@ const normalizeProperty = (item, userLocation = null) => {
     location,
     city,
     state,
-    bhk: item.bhk || formatBHK(item.bedrooms || item.total_bedrooms || 2),
-    bathrooms: item.bathrooms || item.total_bathrooms || 0,
-    area: toNumber(item.area || item.built_up_area || item.total_area || item.carpet_area),
-    propertyType: item.propertyType || item.property_type_name || item.type || 'Apartment',
+    bhk: item.bhk || formatBHK(item.bedrooms || item.property_bedrooms || item.unit_bedrooms || item.total_bedrooms || 2),
+    bathrooms: item.bathrooms || item.property_bathrooms || item.unit_bathrooms || item.total_bathrooms || 0,
+    area: toNumber(item.area || item.carpet_area || item.builtup_area || item.built_up_area || item.total_area),
+    propertyType:
+      item.propertyType ||
+      item.property_type_name ||
+      PROPERTY_TYPE_LABELS[item.property_type_id] ||
+      item.type ||
+      'Apartment',
     listingType: item.listingType || item.listing_type || 'sale',
-    image: item.image || item.cover_image_url || item.thumbnail_url || DEFAULT_IMAGE,
-    images: item.images || (item.image ? [item.image] : [DEFAULT_IMAGE]),
+    image: primaryImage,
+    images: imageList.length > 0 ? imageList : [primaryImage],
     description: item.description || '',
     owner_id: item.owner_id || item.created_by || item.user_id || null,
     ownerEmail: item.ownerEmail || item.owner_email || item.created_by_email || '',
@@ -129,9 +255,18 @@ const normalizeProperty = (item, userLocation = null) => {
     views: item.views_count || 0,
     inquiries_count: item.inquiries_count || 0,
     favorites_count: item.favorites_count || 0,
-    furnished: item.furnished || item.furnishing || 'Ready to Move',
-    amenities: Array.isArray(item.amenities) ? item.amenities : [],
-    nearby: Array.isArray(item.nearby) ? item.nearby : [],
+    furnished: item.furnished || item.furnished_status || item.unit_furnished_status || item.furnishing || '',
+    amenities,
+    nearby,
+    pricePerSqft: toNumber(item.price_per_sqft),
+    developer: item.developer || item.builder_name || item.organization_name || '',
+    possessionDate: item.possession_date || item.available_from || '',
+    owner: {
+      name: item.owner_name || item.organization_name || item.developer || 'Property Owner',
+      phone: item.owner_phone || item.organization_phone || '',
+      email: item.owner_email || item.organization_email || '',
+      verified: Boolean(item.is_verified || item.property_is_verified),
+    },
     distance, // Distance in kilometers from user location
     latitude: parseFloat(item.latitude || item.lat) || null,
     longitude: parseFloat(item.longitude || item.lng || item.lon) || null,
@@ -153,6 +288,9 @@ const isBackendListingPayload = (data = {}) => {
   );
 };
 
+const LISTINGS_PAGE_SIZE = 100;
+const LISTINGS_MAX_PAGES = 25;
+
 export function PropertyProvider({ children }) {
   const { isLoggedIn, user } = useAuth();
   const { location: userLocation } = useLocation();
@@ -165,353 +303,126 @@ export function PropertyProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Sample properties for demo (8+ properties)
-  const sampleProperties = [
-    {
-      id: 1,
-      title: "Modern 3BHK Apartment in Patia",
-      description: "Spacious 3BHK with modern amenities and premium finishes",
-      price: 4500000,
-      area: 1200,
-      bhk: 3,
-      propertyType: "apartment",
-      listingType: "buy",
-      location: "Patia, Bhubaneswar",
-      city: "Bhubaneswar",
-      state: "Odisha",
-      latitude: 20.2961,
-      longitude: 85.8245,
-      image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600",
-      featured: true,
-      views: 1250,
-      postedBy: "Premium Properties",
-      postedOn: "2024-03-15",
-      bedrooms: 3,
-      bathrooms: 2,
-      parking: 1,
-      furnished: "semi-furnished"
-    },
-    {
-      id: 2,
-      title: "Luxury Villa with Pool - Nayapalli",
-      description: "Beautiful villa with private pool and garden in prime location",
-      price: 8500000,
-      area: 2500,
-      bhk: 4,
-      propertyType: "villa",
-      listingType: "buy",
-      location: "Nayapalli, Bhubaneswar",
-      city: "Bhubaneswar",
-      state: "Odisha",
-      latitude: 20.3011,
-      longitude: 85.8195,
-      image: "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=600",
-      featured: true,
-      views: 890,
-      postedBy: "Elite Homes",
-      postedOn: "2024-03-18",
-      bedrooms: 4,
-      bathrooms: 3,
-      parking: 2,
-      furnished: "fully-furnished"
-    },
-    {
-      id: 3,
-      title: "Cozy 2BHK Flat - Saheed Nagar",
-      description: "Perfect for small families, well-ventilated with natural light",
-      price: 2800000,
-      area: 850,
-      bhk: 2,
-      propertyType: "apartment",
-      listingType: "buy",
-      location: "Saheed Nagar, Bhubaneswar",
-      city: "Bhubaneswar",
-      state: "Odisha",
-      latitude: 20.2921,
-      longitude: 85.8345,
-      image: "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?w=600",
-      featured: false,
-      views: 567,
-      postedBy: "City Properties",
-      postedOn: "2024-03-20",
-      bedrooms: 2,
-      bathrooms: 1,
-      parking: 1,
-      furnished: "unfurnished"
-    },
-    {
-      id: 4,
-      title: "Penthouse with City View",
-      description: "Luxury penthouse with panoramic city views and terrace",
-      price: 12000000,
-      area: 3200,
-      bhk: 5,
-      propertyType: "penthouse",
-      listingType: "buy",
-      location: "Rajmahal Square, Bhubaneswar",
-      city: "Bhubaneswar",
-      state: "Odisha",
-      latitude: 20.2911,
-      longitude: 85.8295,
-      image: "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=600",
-      featured: true,
-      views: 2100,
-      postedBy: "Luxury Realty",
-      postedOn: "2024-03-22",
-      bedrooms: 5,
-      bathrooms: 4,
-      parking: 3,
-      furnished: "fully-furnished"
-    },
-    {
-      id: 5,
-      title: "Independent House - Chandrasekharpur",
-      description: "Spacious independent house with parking and garden",
-      price: 5500000,
-      area: 1800,
-      bhk: 3,
-      propertyType: "house",
-      listingType: "buy",
-      location: "Chandrasekharpur, Bhubaneswar",
-      city: "Bhubaneswar",
-      state: "Odisha",
-      latitude: 20.3111,
-      longitude: 85.8145,
-      image: "https://images.unsplash.com/photo-1600047509807-ba8f500d2543?w=600",
-      featured: true,
-      views: 445,
-      postedBy: "Coastal Homes",
-      postedOn: "2024-03-25",
-      bedrooms: 3,
-      bathrooms: 2,
-      parking: 2,
-      furnished: "semi-furnished"
-    },
-    {
-      id: 6,
-      title: "Studio Apartment - Master Canteen",
-      description: "Compact studio perfect for singles and working professionals",
-      price: 1500000,
-      area: 450,
-      bhk: 1,
-      propertyType: "apartment",
-      listingType: "rent",
-      location: "Master Canteen, Bhubaneswar",
-      city: "Bhubaneswar",
-      state: "Odisha",
-      latitude: 20.3061,
-      longitude: 85.8245,
-      image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600",
-      featured: false,
-      views: 789,
-      postedBy: "Urban Living",
-      postedOn: "2024-03-28",
-      bedrooms: 1,
-      bathrooms: 1,
-      parking: 0,
-      furnished: "unfurnished"
-    },
-    {
-      id: 7,
-      title: "Beachside Villa - Puri",
-      description: "Stunning villa just steps from the beach with ocean views",
-      price: 15000000,
-      area: 4000,
-      bhk: 6,
-      propertyType: "villa",
-      listingType: "buy",
-      location: "Puri Beach, Puri",
-      city: "Puri",
-      state: "Odisha",
-      latitude: 19.8045,
-      longitude: 85.8412,
-      image: "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=600",
-      featured: true,
-      views: 3200,
-      postedBy: "Beachfront Realty",
-      postedOn: "2024-03-30",
-      bedrooms: 6,
-      bathrooms: 5,
-      parking: 4,
-      furnished: "fully-furnished"
-    },
-    {
-      id: 8,
-      title: "Commercial Space - Bomikhal",
-      description: "Prime commercial space in city center with high visibility",
-      price: 9800000,
-      area: 2200,
-      bhk: 0,
-      propertyType: "commercial",
-      listingType: "buy",
-      location: "Bomikhal, Bhubaneswar",
-      city: "Bhubaneswar",
-      state: "Odisha",
-      latitude: 20.2861,
-      longitude: 85.8195,
-      image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=600",
-      featured: true,
-      views: 234,
-      postedBy: "Business Properties",
-      postedOn: "2024-04-01",
-      bedrooms: 0,
-      bathrooms: 2,
-      parking: 10,
-      furnished: "unfurnished"
-    },
-    {
-      id: 9,
-      title: "3BHK Duplex - Acharya Vihar",
-      description: "Modern duplex with contemporary design and premium amenities",
-      price: 6200000,
-      area: 1600,
-      bhk: 3,
-      propertyType: "duplex",
-      listingType: "buy",
-      location: "Acharya Vihar, Bhubaneswar",
-      city: "Bhubaneswar",
-      state: "Odisha",
-      latitude: 20.3211,
-      longitude: 85.8095,
-      image: "https://images.unsplash.com/photo-1560448204-e5f5a83d47d2?w=600",
-      featured: true,
-      views: 678,
-      postedBy: "Modern Homes",
-      postedOn: "2024-04-03",
-      bedrooms: 3,
-      bathrooms: 2,
-      parking: 2,
-      furnished: "semi-furnished"
-    },
-    {
-      id: 10,
-      title: "2BHK Flat - Rasulgarh",
-      description: "Affordable 2BHK in good locality with easy access to amenities",
-      price: 3200000,
-      area: 950,
-      bhk: 2,
-      propertyType: "apartment",
-      listingType: "buy",
-      location: "Rasulgarh, Bhubaneswar",
-      city: "Bhubaneswar",
-      state: "Odisha",
-      latitude: 20.2761,
-      longitude: 85.8395,
-      image: "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=600",
-      featured: false,
-      views: 345,
-      postedBy: "Budget Homes",
-      postedOn: "2024-04-05",
-      bedrooms: 2,
-      bathrooms: 1,
-      parking: 1,
-      furnished: "unfurnished"
-    }
-  ];
 
-  // Initialize properties and fetch from backend
+  const fetchAllListingsFromBackend = useCallback(async (params = {}) => {
+    const collected = [];
+    const seenIds = new Set();
+    let currentPage = 1;
+    let totalPages = 1;
+
+    do {
+      const response = await listingApi.search({
+        ...params,
+        organization_id: 1, // Restrict to Revo Homes organization
+        status: params.status || 'active', // Only show active properties by default
+        page: currentPage,
+        limit: params.limit || LISTINGS_PAGE_SIZE,
+        page_size: params.page_size || LISTINGS_PAGE_SIZE,
+        per_page: params.per_page || LISTINGS_PAGE_SIZE,
+      });
+
+      const rawItems = extractCollection(response, ['listings']);
+      const pagination = extractPagination(response);
+      let newItemsCount = 0;
+
+      rawItems.forEach((item) => {
+        const itemKey = item?.listing_id || item?.id || item?.slug || `${currentPage}-${collected.length}`;
+        if (seenIds.has(itemKey)) return;
+        seenIds.add(itemKey);
+        collected.push(normalizeProperty(item, userLocation));
+        newItemsCount += 1;
+      });
+
+      if (pagination?.totalPages > 0) {
+        totalPages = pagination.totalPages;
+      } else if (!rawItems.length || newItemsCount === 0) {
+        totalPages = currentPage;
+      } else if (rawItems.length < LISTINGS_PAGE_SIZE) {
+        totalPages = currentPage;
+      } else {
+        totalPages = Math.min(currentPage + 1, LISTINGS_MAX_PAGES);
+      }
+
+      currentPage += 1;
+    } while (currentPage <= totalPages && currentPage <= LISTINGS_MAX_PAGES);
+
+    return collected;
+  }, [userLocation]);
+
+  const applyPropertyCatalog = useCallback((catalogItems, featuredItems = null) => {
+    const nextProperties = catalogItems || [];
+
+    const nextFeatured = Array.isArray(featuredItems) && featuredItems.length > 0
+      ? featuredItems
+      : (() => {
+        const featuredProperties = nextProperties.filter((item) => item.featured);
+        if (featuredProperties.length >= 8) {
+          return featuredProperties.slice(0, 8);
+        }
+
+        return [
+          ...featuredProperties,
+          ...nextProperties
+            .filter((item) => !item.featured)
+            .slice(0, Math.max(0, 8 - featuredProperties.length))
+            .map((item) => ({ ...item, featured: true })),
+        ];
+      })();
+
+    setListings(nextProperties);
+    setProperties(nextProperties);
+    setFeatured(nextFeatured);
+    setPopularCities(buildPopularCities(nextProperties));
+  }, [userLocation]);
+
   useEffect(() => {
     const initializeProperties = async () => {
       setLoading(true);
+      setError(null);
+
       try {
-        // Fetch listings from backend
-        console.log('PropertyContext: Fetching listings from backend...');
-        const listingsResponse = await listingApi.search({ limit: 100 });
-        
-        const listings = extractCollection(listingsResponse, ['listings']).map(item => normalizeProperty(item, userLocation));
-        
-        // Debug: Log raw data structure
-        console.log('PropertyContext: Raw listings data:', extractCollection(listingsResponse, ['listings'])[0]);
-        console.log('PropertyContext: Sample normalized listing:', listings[0]);
-        
-        // For Revo Homes: Use listings only
-        setListings(listings);
-        
-        // Use listings as properties for admin pages
-        const backendProperties = listings;
-        
-        console.log('PropertyContext: Raw listings response:', listingsResponse);
-        console.log('PropertyContext: Normalized listings count:', listings.length);
-        console.log('PropertyContext: Total combined properties:', backendProperties.length);
-        
-        if (backendProperties.length > 0) {
-          console.log(`PropertyContext: Found ${backendProperties.length} properties from backend`);
-          setProperties(backendProperties);
-          
-          // Ensure we have at least 8 featured properties
-          const featuredProperties = backendProperties.filter(p => p.featured);
-          if (featuredProperties.length < 8) {
-            // Add more properties as featured if needed
-            const additionalFeatured = backendProperties
-              .filter(p => !p.featured)
-              .slice(0, 8 - featuredProperties.length)
-              .map(p => ({ ...p, featured: true }));
-            setFeatured([...featuredProperties, ...additionalFeatured]);
-          } else {
-            setFeatured(featuredProperties.slice(0, 8));
-          }
-        } else {
-          // Fallback to sample properties if backend is empty
-          console.log('PropertyContext: Backend empty, using sample properties');
-          const normalizedProperties = sampleProperties.map(item => normalizeProperty(item, userLocation));
-          setProperties(normalizedProperties);
-          setFeatured(normalizedProperties.filter(p => p.featured).slice(0, 8));
+        console.log('PropertyContext: Fetching full listings catalog from backend...');
+        const [catalogItems, featuredResponse] = await Promise.all([
+          fetchAllListingsFromBackend(),
+          listingApi.getFeatured().catch(() => null),
+        ]);
+
+        const featuredItems = extractCollection(featuredResponse, ['listings'])
+          .map(item => normalizeProperty(item, userLocation));
+
+        console.log('PropertyContext: Total normalized listings:', catalogItems.length);
+        applyPropertyCatalog(catalogItems, featuredItems);
+      } catch (fetchError) {
+        console.error('PropertyContext: Backend fetch failed:', fetchError);
+        applyPropertyCatalog([]);
+        if (fetchError?.status !== 401) {
+          setError(fetchError?.message || 'Failed to load properties');
         }
-      } catch (error) {
-        console.error('PropertyContext: Backend fetch failed, using sample properties:', error);
-        // Fallback to sample properties on error
-        const normalizedProperties = sampleProperties.map(item => normalizeProperty(item, userLocation));
-        setProperties(normalizedProperties);
-        setFeatured(normalizedProperties.filter(p => p.featured).slice(0, 8));
       } finally {
         setLoading(false);
       }
     };
 
     initializeProperties();
-  }, [userLocation]);
+  }, [applyPropertyCatalog, fetchAllListingsFromBackend, userLocation]);
 
   // Refresh properties function
   const refreshProperties = useCallback(async () => {
     setLoading(true);
     try {
-      console.log('PropertyContext: Refreshing listings from backend...');
-      const listingsResponse = await listingApi.search({ limit: 100 });
-      
-      const listings = extractCollection(listingsResponse, ['listings']).map(item => normalizeProperty(item, userLocation));
-      
-      // Set listings for Revo Homes
-      setListings(listings);
-      
-      // Use listings as properties for admin pages
-      const backendProperties = listings;
-      
-      console.log('PropertyContext: Refresh - Raw listings response:', listingsResponse);
-      console.log('PropertyContext: Refresh - Normalized listings count:', listings.length);
-      console.log('PropertyContext: Refresh - Total combined properties:', backendProperties.length);
-      
-      if (backendProperties.length > 0) {
-        console.log(`PropertyContext: Refreshed ${backendProperties.length} properties from backend`);
-        setProperties(backendProperties);
-        
-        // Ensure we have at least 8 featured properties
-        const featuredProperties = backendProperties.filter(p => p.featured);
-        if (featuredProperties.length < 8) {
-          const additionalFeatured = backendProperties
-            .filter(p => !p.featured)
-            .slice(0, 8 - featuredProperties.length)
-            .map(p => ({ ...p, featured: true }));
-          setFeatured([...featuredProperties, ...additionalFeatured]);
-        } else {
-          setFeatured(featuredProperties.slice(0, 8));
-        }
-      }
+      const [catalogItems, featuredResponse] = await Promise.all([
+        fetchAllListingsFromBackend(),
+        listingApi.getFeatured().catch(() => null),
+      ]);
+      const featuredItems = extractCollection(featuredResponse, ['listings'])
+        .map(item => normalizeProperty(item, userLocation));
+      applyPropertyCatalog(catalogItems, featuredItems);
     } catch (error) {
       console.error('PropertyContext: Refresh failed:', error);
     } finally {
       setLoading(false);
     }
-  }, [userLocation]);
+  }, [applyPropertyCatalog, fetchAllListingsFromBackend, userLocation]);
 
   const loadSavedAndEnquiries = useCallback(async () => {
     if (!isLoggedIn || !user) return;
@@ -540,20 +451,20 @@ export function PropertyProvider({ children }) {
     }
 
     try {
-      const response = await listingApi.search({ 
+      const response = await listingApi.search({
         limit: 20,
         // Note: Backend would need to support location-based filtering
         // For now, we'll fetch all properties and filter client-side
       });
-      
+
       const allProperties = extractCollection(response, ['listings']).map(item => normalizeProperty(item, userLocation));
-      
+
       // Filter properties within radius and have valid coordinates
       const nearby = allProperties.filter(property => {
         if (!property.distance || property.distance > radiusKm) return false;
         return property.latitude && property.longitude;
       }).sort((a, b) => (a.distance || 0) - (b.distance || 0));
-      
+
       return nearby;
     } catch (err) {
       console.error('Failed to fetch nearby properties:', err);
@@ -564,51 +475,17 @@ export function PropertyProvider({ children }) {
   // Fetch properties by city name
   const fetchPropertiesByCity = useCallback(async (cityName) => {
     try {
-      const response = await listingApi.search({ 
+      const response = await listingApi.search({
         city: cityName,
-        limit: 20 
+        limit: 20
       });
-      
+
       return extractCollection(response, ['listings']).map(item => normalizeProperty(item, userLocation));
     } catch (err) {
       console.error('Failed to fetch properties by city:', err);
       return [];
     }
   }, [userLocation]);
-
-  const loadCatalog = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const [listingsResponse, featuredResponse] = await Promise.all([
-        listingApi.search({ limit: 50 }),
-        listingApi.getFeatured(),
-      ]);
-
-      const listingItems = extractCollection(listingsResponse, ['listings']).map(item => normalizeProperty(item, userLocation));
-      const featuredItems = extractCollection(featuredResponse, ['listings']).map(item => normalizeProperty(item, userLocation));
-
-      setProperties(listingItems);
-      setFeatured(featuredItems);
-      setPopularCities(buildPopularCities(listingItems));
-    } catch (err) {
-      console.error('PropertyContext: Catalog load failed:', err);
-      setProperties([]);
-      setFeatured([]);
-      setPopularCities([]);
-
-      if (err.status !== 401) {
-        setError(err.message || 'Failed to load properties');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadCatalog();
-  }, [loadCatalog]);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -634,11 +511,11 @@ export function PropertyProvider({ children }) {
       return list;
     }
 
-    const response = await listingApi.search({ limit: 50 });
-    const list = buildPopularCities(extractCollection(response, ['listings']).map(item => normalizeProperty(item, userLocation)));
+    const fetchedListings = await fetchAllListingsFromBackend();
+    const list = buildPopularCities(fetchedListings);
     setPopularCities(list);
     return list;
-  }, [properties]);
+  }, [fetchAllListingsFromBackend, properties]);
 
   const fetchProperties = useCallback(async (params = {}) => {
     try {
@@ -702,11 +579,11 @@ export function PropertyProvider({ children }) {
       name: title,
       slug: slug,
       description: data.description || '',
-      
+
       // RERA Details
       rera_number: data.rera_number || '',
       rera_expiry_date: data.rera_expiry_date || '',
-      
+
       // Location Details
       address_line1: data.address_line1 || data.address || '',
       address_line2: data.address_line2 || '',
@@ -718,7 +595,7 @@ export function PropertyProvider({ children }) {
       landmark: data.landmark || '',
       latitude: data.latitude ? parseFloat(data.latitude) : null,
       longitude: data.longitude ? parseFloat(data.longitude) : null,
-      
+
       // Property Specifications
       total_units: parseInt(data.total_units) || 0,
       total_floors: parseInt(data.total_floors) || 0,
@@ -730,13 +607,13 @@ export function PropertyProvider({ children }) {
       possession_date: data.possession_date || '',
       facing_direction: data.facing_direction || '',
       parking_spaces: parseInt(data.parking_spaces) || 0,
-      
+
       // Pricing Information
       price_min: Number(data.price_min) || Number(data.price) || 0,
       price_max: Number(data.price_max) || Number(data.price) || 0,
       price_on_request: Boolean(data.price_on_request),
       currency: data.currency || 'INR',
-      
+
       // Status and Features
       status: data.status || 'draft',
       is_featured: Boolean(data.is_featured),
@@ -744,32 +621,63 @@ export function PropertyProvider({ children }) {
       meta_title: data.meta_title || '',
       meta_description: data.meta_description || '',
       meta: data.meta || {},
-      
+
       created_by: user?.id
     };
   };
 
-  const getProperty = useCallback(async (id) => {
+  const getProperty = useCallback(async (identifier, options = {}) => {
+    const slug = options?.slug || null;
+    const id = identifier ?? extractListingIdFromSlug(slug);
+
     // Revo Homes only uses listings - fetch from listing endpoint
     try {
       const listingResponse = await listingApi.getById(id);
       const listing = extractSingle(listingResponse, ['listing']);
       if (listing) {
-        return normalizeProperty(listing);
+        return normalizeProperty(listing, userLocation);
       }
     } catch (err) {
       console.error('PropertyContext: Listing fetch failed for id:', id, err);
     }
 
+    if (slug) {
+      try {
+        const listingResponse = await listingApi.getBySlug(slug);
+        const listing = extractSingle(listingResponse, ['listing']);
+        if (listing) {
+          return normalizeProperty(listing, userLocation);
+        }
+      } catch (err) {
+        console.error('PropertyContext: Listing fetch failed for slug:', slug, err);
+      }
+    }
+
+    const normalizedId = Number(id);
+    const fallbackProperty = [...properties, ...listings].find((item) => (
+      Number(item?.id) === normalizedId ||
+      Number(item?.listingId) === normalizedId ||
+      Number(item?.propertyId) === normalizedId ||
+      String(item?.slug) === String(slug) ||
+      String(item?.id) === String(id) ||
+      String(item?.listingId) === String(id) ||
+      String(item?.propertyId) === String(id)
+    ));
+
+    if (fallbackProperty) {
+      console.warn('PropertyContext: Using cached property fallback for identifier:', id || slug);
+      return fallbackProperty;
+    }
+
     return null;
-  }, []);
+  }, [listings, properties, userLocation]);
 
   const createProperty = useCallback(async (data) => {
     try {
       console.log('PropertyContext: Creating listing with data:', data);
       const payload = isBackendListingPayload(data) ? data : transformToBackendPayload(data);
       console.log('PropertyContext: Transformed payload:', payload);
-      
+
       // Revo Homes only uses listings - create via listing API
       const response = await listingApi.create(payload);
       console.log('PropertyContext: Listing API response:', response);
@@ -849,46 +757,42 @@ export function PropertyProvider({ children }) {
 
     try {
       // Revo Homes only uses listings - fetch from listing API
-      const listingsResponse = await listingApi.search({ limit: 100 });
-      
-      const listings = extractCollection(listingsResponse, ['listings']).map(normalizeProperty);
-      
+      const listings = await fetchAllListingsFromBackend();
+
       // Filter by current user
       const owned = listings.filter((item) => {
         const createdBy = item.audit?.created_by || item.created_by || item.creatorId;
         return createdBy === user?.id;
       });
-      
+
       console.log('fetchMyProperties: Found listings:', listings.length, 'owned:', owned.length);
-      
+
       return owned.length > 0 ? owned : listings;
     } catch (err) {
       console.error('Failed to fetch my listings:', err);
       return [];
     }
-  }, [isLoggedIn, user]);
+  }, [fetchAllListingsFromBackend, isLoggedIn, user]);
 
   const getUserProperties = useCallback(async () => {
     if (!isLoggedIn) return [];
 
     try {
       // Revo Homes only uses listings - fetch from listing API
-      const listingsResponse = await listingApi.search({ limit: 100 });
-      
-      const listings = extractCollection(listingsResponse, ['listings']).map(normalizeProperty);
-      
+      const listings = await fetchAllListingsFromBackend();
+
       // Filter by current user
       const owned = listings.filter((item) => {
         const createdBy = item.audit?.created_by || item.created_by || item.creatorId;
         return createdBy === user?.id;
       });
-      
+
       return owned;
     } catch (err) {
       console.error('Failed to fetch user listings:', err);
       return [];
     }
-  }, [isLoggedIn, user]);
+  }, [fetchAllListingsFromBackend, isLoggedIn, user]);
 
   const addEnquiry = useCallback(async (listingId, message) => {
     try {

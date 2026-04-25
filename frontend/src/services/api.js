@@ -61,6 +61,7 @@ const request = (method, path, body = null, opts = {}) => {
   const config = {
     method,
     headers,
+    credentials: 'include', // Enable cookies for cross-origin requests
   };
   
   if (body && method !== 'GET') {
@@ -78,12 +79,11 @@ const request = (method, path, body = null, opts = {}) => {
   return fetch(url, config).then(handleResponse);
 };
 
-const get = (path, params) => request('GET', path, null, { params });
-
-const post = (path, body) => request('POST', path, body);
-const put = (path, body) => request('PUT', path, body);
-const patch = (path, body) => request('PATCH', path, body);
-const del = (path) => request('DELETE', path);
+export const get = (path, params) => request('GET', path, null, { params });
+export const post = (path, body) => request('POST', path, body);
+export const put = (path, body) => request('PUT', path, body);
+export const patch = (path, body) => request('PATCH', path, body);
+export const del = (path) => request('DELETE', path);
 
 // -------------------- AUTH (Login, OTP, Signup, Social) --------------------
 export const authApi = {
@@ -123,11 +123,12 @@ export const propertyApi = {
   // Media
   getMedia: (id) => get(`/properties/${id}/media`),
   uploadImages: (id, formData) => {
-    const url = `${API_BASE}/properties/${id}/images`;
+    const url = buildUrl(`/properties/${id}/images`);
     return fetch(url, {
       method: 'POST',
       headers: getAuthHeader(),
       body: formData,
+      credentials: 'include', // Enable cookies for cross-origin requests
     }).then(handleResponse);
   },
 };
@@ -191,11 +192,12 @@ export const userApi = {
   updateMe: (id, data) => patch(`/users/${id}`, data),
   changePasswordMe: (payload) => patch('/users/me/password', payload),
   uploadAvatarMe: (formData) => {
-    const url = `${API_BASE}/users/me/avatar`;
+    const url = buildUrl('/users/me/avatar');
     return fetch(url, {
       method: 'POST',
       headers: getAuthHeader(),
       body: formData,
+      credentials: 'include', // Enable cookies for cross-origin requests
     }).then(handleResponse);
   },
 

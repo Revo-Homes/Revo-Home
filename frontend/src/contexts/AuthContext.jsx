@@ -79,6 +79,15 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const initAuth = async () => {
       try {
+        // Try cookie-based auth first (Revo Home uses cookies now)
+        const userData = await syncProfile();
+        if (userData) {
+          setIsLoggedIn(true);
+          setLoading(false);
+          return;
+        }
+        
+        // Fallback to localStorage token (for backward compatibility / CRM frontend)
         const token = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
         const savedUser = typeof window !== 'undefined' ? localStorage.getItem(USER_KEY) : null;
         
@@ -99,9 +108,6 @@ export function AuthProvider({ children }) {
           } else {
             // Always verify token/sync profile on load for real tokens
             const userData = await syncProfile();
-            // If syncProfile fails (e.g. backend down), but we have a token, 
-            // we should still keep isLoggedIn true if possible, but for safety 
-            // we follow the userData existence
             setIsLoggedIn(Boolean(userData));
           }
         }
@@ -142,12 +148,22 @@ export function AuthProvider({ children }) {
       setError(null);
       const response = await authApi.login({ email, password });
       const token = response.token || response.access_token || response.data?.access_token;
-      if (token) {
-        localStorage.setItem(TOKEN_KEY, token);
-        const userData = await syncProfile();
+      const userData = response.user || response.data?.user;
+      
+      if (userData || token) {
+        // Cookie is automatically set by backend - no need to store token in localStorage
+        // But keep backward compatibility for CRM frontend
+        if (token) {
+          localStorage.setItem(TOKEN_KEY, token);
+        }
+        
+        // Sync full profile from backend
+        const syncedUser = await syncProfile();
+        const finalUser = syncedUser || userData;
+        
         setIsLoggedIn(true);
-        dispatch(loginSuccess({ user: userData, token }));
-        return { success: true, user: userData };
+        dispatch(loginSuccess({ user: finalUser, token }));
+        return { success: true, user: finalUser };
       }
       throw new Error(response.message || 'Login failed');
     } catch (err) {
