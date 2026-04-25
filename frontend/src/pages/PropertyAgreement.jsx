@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { buildStructuredMessage, submitPublicEnquiry } from '../services/publicEnquiry';
 
 const BANKS = ["HDFC", "ICICI", "SBI", "Axis Bank", "Kotak", "PNB"];
 
@@ -25,6 +26,8 @@ function PropertyAgreement() {
   });
 
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -34,9 +37,43 @@ function PropertyAgreement() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
+    setSubmitting(true);
+    setSubmitError('');
+
+    try {
+      await submitPublicEnquiry({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        subject: 'Property Agreement Request',
+        message: buildStructuredMessage('Property agreement service request', {
+          'PAN Number': formData.pan,
+          'Aadhaar Number': formData.aadhaar,
+          'Property Type': formData.propertyType,
+          'Agreement Type': formData.agreementType,
+          'Property Value': formData.propertyValue,
+          City: formData.city,
+          'Property Address': formData.address,
+          'Loan Amount': formData.loanAmount,
+          'Annual Income': formData.income,
+          'Employment Type': formData.employment,
+          'Preferred Contact Time': formData.contactTime,
+        }),
+        enquiryType: 'property_agreement',
+        budgetMax: formData.propertyValue ? Number(formData.propertyValue) : undefined,
+        preferredLocation: formData.city,
+        preferredPropertyTypes: formData.propertyType,
+        sourcePage: '/tools/property-agreement',
+      });
+      setSubmitted(true);
+    } catch (error) {
+      console.error('Property agreement enquiry failed:', error);
+      setSubmitError(error?.message || 'Failed to submit request');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -152,7 +189,7 @@ function PropertyAgreement() {
           </div>
 
           {/* BANK */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
   {renderInput("Bank Name", "bank", formData, handleChange)}
 
@@ -162,7 +199,7 @@ function PropertyAgreement() {
 
   {renderInput("Branch Name", "branch", formData, handleChange)}
 
-</div>
+</div> */}
 
           {/* CONTACT TIME */}
           {renderSelect("Preferred Contact Time", "contactTime", formData, handleChange, [
@@ -190,10 +227,15 @@ function PropertyAgreement() {
           {/* SUBMIT */}
           <button
             type="submit"
+            disabled={submitting}
             className="w-full md:w-auto px-6 py-3 bg-primary text-white rounded-xl font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
           >
-            Submit Request
+            {submitting ? 'Submitting...' : 'Submit Request'}
           </button>
+
+          {submitError && (
+            <p className="text-sm text-red-600">{submitError}</p>
+          )}
 
         </form>
       </div>

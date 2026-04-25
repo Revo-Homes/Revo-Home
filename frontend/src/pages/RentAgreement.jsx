@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { buildStructuredMessage, submitPublicEnquiry } from '../services/publicEnquiry';
 
 function RentAgreement() {
   const [formData, setFormData] = useState({
@@ -14,6 +15,8 @@ function RentAgreement() {
   });
 
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -23,9 +26,35 @@ function RentAgreement() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
+    setSubmitting(true);
+    setSubmitError('');
+
+    try {
+      await submitPublicEnquiry({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        subject: 'Rent Agreement Request',
+        message: buildStructuredMessage('Rent agreement service request', {
+          'Monthly Rent': formData.rentAmount,
+          'Annual Income': formData.income,
+          'Employment Type': formData.employment,
+          City: formData.city,
+        }),
+        enquiryType: 'rent_agreement',
+        budgetMax: formData.rentAmount ? Number(formData.rentAmount) : undefined,
+        preferredLocation: formData.city,
+        sourcePage: '/tools/rent-agreement',
+      });
+      setSubmitted(true);
+    } catch (error) {
+      console.error('Rent agreement enquiry failed:', error);
+      setSubmitError(error?.message || 'Failed to submit request');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -195,10 +224,15 @@ function RentAgreement() {
           {/* SUBMIT */}
           <button
             type="submit"
+            disabled={submitting}
             className="w-full md:w-auto px-6 py-3 bg-primary text-white rounded-xl font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
           >
-            Submit Request
+            {submitting ? 'Submitting...' : 'Submit Request'}
           </button>
+
+          {submitError && (
+            <p className="text-sm text-red-600">{submitError}</p>
+          )}
 
         </form>
       </div>

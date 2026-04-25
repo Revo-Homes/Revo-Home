@@ -465,6 +465,20 @@ const buildPriceConfigurations = (property) => {
   }];
 };
 
+const buildSimilarProperties = (allListings, currentProperty) => {
+  if (!Array.isArray(allListings) || !currentProperty) return [];
+
+  return allListings
+    .filter((item) => item?.id !== currentProperty?.id)
+    .filter((item) => {
+      const sameCity = item?.city && currentProperty?.city && item.city === currentProperty.city;
+      const sameType = item?.propertyType && currentProperty?.propertyType && item.propertyType === currentProperty.propertyType;
+      const sameLocality = item?.locality && currentProperty?.locality && item.locality === currentProperty.locality;
+      return sameCity || sameType || sameLocality;
+    })
+    .slice(0, 3);
+};
+
 const normalizeBhkLabel = (value) => {
   if (!value && value !== 0) return 'N/A';
   const text = String(value).trim();
@@ -487,19 +501,6 @@ const formatDateLabel = (value) => {
     month: 'short',
     year: 'numeric',
   });
-};
-
-const buildSimilarProperties = (allListings, currentProperty) => {
-  if (!Array.isArray(allListings) || !currentProperty) return [];
-
-  return allListings
-    .filter((item) => item?.id !== currentProperty?.id)
-    .filter((item) => {
-      const sameCity = item?.city && currentProperty?.city && item.city === currentProperty.city;
-      const sameType = item?.propertyType && currentProperty?.propertyType && item.propertyType === currentProperty.propertyType;
-      return sameCity || sameType;
-    })
-    .slice(0, 3);
 };
 
 const renderFieldValue = (key, value) => {

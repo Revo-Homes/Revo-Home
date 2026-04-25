@@ -1,80 +1,79 @@
-/**
- * Public Enquiry Service
- * Handles lead generation and public enquiry submissions
- */
+import { publicEnquiryApi } from './api';
 
-import { listingApi } from './api';
+const compactObject = (value) => Object.fromEntries(
+  Object.entries(value).filter(([, entry]) => {
+    if (entry === undefined || entry === null) return false;
+    if (typeof entry === 'string' && entry.trim() === '') return false;
+    if (Array.isArray(entry) && entry.length === 0) return false;
+    return true;
+  })
+);
 
-/**
- * Build a structured message for enquiries
- */
-export const buildStructuredMessage = (subject, details, customMessage = '') => {
-  const detailLines = Object.entries(details)
-    .filter(([_, value]) => value !== undefined && value !== null && value !== '')
-    .map(([key, value]) => `${key}: ${value}`)
-    .join('\n');
+export const buildStructuredMessage = (title, fields = {}, freeText = '') => {
+  const lines = [title];
 
-  return `${subject}\n\n${detailLines}${customMessage ? `\n\nAdditional Message:\n${customMessage}` : ''}`;
+  Object.entries(fields).forEach(([label, value]) => {
+    if (value === undefined || value === null || value === '') return;
+    lines.push(`${label}: ${value}`);
+  });
+
+  if (freeText) {
+    lines.push('');
+    lines.push(freeText);
+  }
+
+  return lines.join('\n');
 };
 
-/**
- * Split full name into first and last name
- */
-export const splitFullName = (fullName) => {
-  if (!fullName || typeof fullName !== 'string') {
-    return { firstName: '', lastName: '' };
+export const splitFullName = (fullName = '') => {
+  const normalized = String(fullName).trim().replace(/\s+/g, ' ');
+  if (!normalized) {
+    return { firstName: 'Website', lastName: 'Visitor' };
   }
 
-  const parts = fullName.trim().split(/\s+/);
-  if (parts.length === 1) {
-    return { firstName: parts[0], lastName: '' };
-  }
-
+  const [firstName, ...rest] = normalized.split(' ');
   return {
-    firstName: parts[0],
-    lastName: parts.slice(1).join(' ')
+    firstName,
+    lastName: rest.join(' ') || 'Visitor',
   };
 };
 
-/**
- * Submit a public enquiry
- */
-export const submitPublicEnquiry = async (enquiryData) => {
-  try {
-    // For now, simulate API call - replace with actual endpoint when available
-    console.log('Submitting public enquiry:', enquiryData);
-    
-    // You can uncomment and modify this when you have the actual API endpoint
-    // const response = await listingApi.submitEnquiry(enquiryData);
-    // return response;
-    
-    return { success: true, message: 'Enquiry submitted successfully' };
-  } catch (error) {
-    console.error('Failed to submit enquiry:', error);
-    throw error;
-  }
-};
+export const submitPublicEnquiry = async ({
+  name,
+  email,
+  phone,
+  subject,
+  message,
+  enquiryType = 'general',
+  budgetMin,
+  budgetMax,
+  preferredLocation,
+  preferredPropertyTypes,
+  propertyId,
+  listingId,
+  sourcePage,
+  utmSource,
+  utmMedium,
+  utmCampaign,
+}) => {
+  const payload = compactObject({
+    name,
+    email,
+    phone,
+    subject,
+    message,
+    enquiry_type: enquiryType,
+    budget_min: budgetMin,
+    budget_max: budgetMax,
+    preferred_location: preferredLocation,
+    preferred_property_types: preferredPropertyTypes,
+    property_id: propertyId,
+    listing_id: listingId,
+    source_page: sourcePage || window.location.pathname,
+    utm_source: utmSource,
+    utm_medium: utmMedium,
+    utm_campaign: utmCampaign,
+  });
 
-/**
- * Generate a lead from property enquiry
- */
-export const generateLead = async (propertyId, userId, leadData) => {
-  try {
-    console.log('Generating lead:', { propertyId, userId, ...leadData });
-    
-    // Track the lead generation event
-    // This can be integrated with your analytics or CRM system
-    
-    return { success: true, leadId: `lead_${Date.now()}` };
-  } catch (error) {
-    console.error('Failed to generate lead:', error);
-    throw error;
-  }
-};
-
-export default {
-  buildStructuredMessage,
-  splitFullName,
-  submitPublicEnquiry,
-  generateLead
+  return publicEnquiryApi.submit(payload);
 };

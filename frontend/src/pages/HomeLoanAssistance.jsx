@@ -199,6 +199,7 @@
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { buildStructuredMessage, submitPublicEnquiry } from '../services/publicEnquiry';
 
 const BANKS = ['HDFC', 'ICICI', 'SBI', 'Axis Bank', 'Kotak', 'PNB'];
 
@@ -215,6 +216,8 @@ function HomeLoanAssistance() {
     agree: false,
   });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -224,9 +227,36 @@ function HomeLoanAssistance() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
+    setSubmitting(true);
+    setSubmitError('');
+
+    try {
+      await submitPublicEnquiry({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        subject: 'Home Loan Assistance Request',
+        message: buildStructuredMessage('Home loan assistance enquiry', {
+          'Loan Amount': formData.loanAmount,
+          'Annual Income': formData.income,
+          'Employment Type': formData.employment,
+          City: formData.city,
+          'Preferred Bank': formData.bank,
+        }),
+        enquiryType: 'loan_assistance',
+        budgetMax: formData.loanAmount ? Number(formData.loanAmount) : undefined,
+        preferredLocation: formData.city,
+        sourcePage: '/tools/home-loan',
+      });
+      setSubmitted(true);
+    } catch (error) {
+      console.error('Home loan enquiry failed:', error);
+      setSubmitError(error?.message || 'Failed to submit request');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -386,10 +416,15 @@ function HomeLoanAssistance() {
 
         <button
           type="submit"
+          disabled={submitting}
           className="w-full md:w-auto px-6 py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90"
         >
-          Submit Request
+          {submitting ? 'Submitting...' : 'Submit Request'}
         </button>
+
+        {submitError && (
+          <p className="text-sm text-red-600">{submitError}</p>
+        )}
 
       </form>
     </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Home, ArrowRight, Compass, Sparkles, Building2, Sun } from 'lucide-react';
+import { buildStructuredMessage, submitPublicEnquiry } from '../services/publicEnquiry';
 
 export default function VastuConsultancy() {
   const [formData, setFormData] = useState({
@@ -11,6 +12,9 @@ export default function VastuConsultancy() {
     service: 'home-vastu',
     message: ''
   });
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const services = [
     {
@@ -43,9 +47,34 @@ export default function VastuConsultancy() {
     }
   ];
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Vastu consultancy form submitted:', formData);
+    setSubmitting(true);
+    setSubmitError('');
+
+    try {
+      await submitPublicEnquiry({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        subject: 'Vastu Consultancy Request',
+        message: buildStructuredMessage('Vastu consultation enquiry', {
+          'Property Type': formData.propertyType,
+          Service: formData.service,
+          Address: formData.address,
+        }, formData.message),
+        enquiryType: 'vastu_consultancy',
+        preferredLocation: formData.address,
+        preferredPropertyTypes: formData.propertyType,
+        sourcePage: '/services/vastu-consultancy',
+      });
+      setSubmitted(true);
+    } catch (error) {
+      console.error('Vastu consultancy enquiry failed:', error);
+      setSubmitError(error?.message || 'Failed to submit request');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -72,6 +101,11 @@ export default function VastuConsultancy() {
         <h3 className="text-lg font-semibold text-slate-900 mb-4">
           Book Vastu Consultation
         </h3>
+        {submitted && (
+          <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+            Your vastu consultation request has been submitted successfully.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
 
@@ -185,11 +219,16 @@ export default function VastuConsultancy() {
           {/* Submit */}
           <button
             type="submit"
+            disabled={submitting}
             className="w-full md:w-auto px-6 py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 flex items-center justify-center gap-2"
           >
-            Book Consultation
+            {submitting ? 'Submitting...' : 'Book Consultation'}
             <ArrowRight className="h-4 w-4" />
           </button>
+
+          {submitError && (
+            <p className="text-sm text-red-600">{submitError}</p>
+          )}
 
         </form>
       </div>

@@ -185,6 +185,7 @@
 
 import { useState } from 'react';
 import { Home, ArrowRight } from 'lucide-react';
+import { buildStructuredMessage, submitPublicEnquiry } from '../services/publicEnquiry';
 
 export default function PropertyManagement() {
   const [formData, setFormData] = useState({
@@ -204,10 +205,47 @@ export default function PropertyManagement() {
     agreementDuration: '',
     maintenanceBudget: '',
   });
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Property management form submitted:', formData);
+    setSubmitting(true);
+    setSubmitError('');
+
+    try {
+      await submitPublicEnquiry({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        subject: 'Property Management Request',
+        message: buildStructuredMessage('Property management enquiry', {
+          'Owner Type': formData.ownerType,
+          'Property Type': formData.propertyType,
+          'Occupancy Status': formData.occupancyStatus,
+          'Property Value': formData.propertyValue,
+          'Expected Monthly Rent': formData.expectedRent,
+          'Property Address': formData.propertyAddress,
+          City: formData.city,
+          'Service Required': formData.service,
+          'Maintenance Budget': formData.maintenanceBudget,
+          'Agreement Duration': formData.agreementDuration,
+        }, formData.message),
+        enquiryType: 'property_management',
+        budgetMin: formData.maintenanceBudget ? Number(formData.maintenanceBudget) : undefined,
+        budgetMax: formData.propertyValue ? Number(formData.propertyValue) : undefined,
+        preferredLocation: formData.city,
+        preferredPropertyTypes: formData.propertyType,
+        sourcePage: '/services/property-management',
+      });
+      setSubmitted(true);
+    } catch (error) {
+      console.error('Property management enquiry failed:', error);
+      setSubmitError(error?.message || 'Failed to submit request');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -228,6 +266,11 @@ export default function PropertyManagement() {
         <h3 className="text-lg font-medium text-slate-900 mb-4">
           Fill Property Management Details
         </h3>
+        {submitted && (
+          <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+            Your property management request has been submitted successfully.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
 
@@ -305,11 +348,16 @@ export default function PropertyManagement() {
           {/* SUBMIT */}
           <button
             type="submit"
+            disabled={submitting}
             className="w-full md:w-auto px-6 py-3 bg-primary text-white rounded-xl font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
           >
-            Submit Property Management Request
+            {submitting ? 'Submitting...' : 'Submit Property Management Request'}
             <ArrowRight className="h-4 w-4" />
           </button>
+
+          {submitError && (
+            <p className="text-sm text-red-600">{submitError}</p>
+          )}
 
         </form>
       </div>

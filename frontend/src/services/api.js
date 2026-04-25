@@ -4,18 +4,23 @@
  * All endpoints align with frontend pages: Login, OTP, Signup, Properties, Sell, Dashboard, Tools, Admin
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_CORE_API_URL ||
+  '/api/v1';
 
 const getAuthHeader = () => {
   const token = localStorage.getItem('authToken');
-  const headers = { Authorization: `Bearer ${token}` };
-  
-  // Add Revo Homes organization headers (Organization ID: 1)
-  headers['X-Organization-ID'] = '1';
-  headers['X-Organization-Name'] = 'Revo Homes';
-  
+  const headers = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
   return headers;
 };
+
+const getOrganizationHeaders = () => ({
+  'X-Organization-ID': '1',
+});
 
 const buildUrl = (path, params) => {
   // If API_BASE is an absolute URL, use it directly, otherwise use relative path
@@ -52,16 +57,15 @@ const handleResponse = async (res) => {
 
 const request = (method, path, body = null, opts = {}) => {
   const url = buildUrl(path, opts.params);
-  const headers = { 
-    'Content-Type': 'application/json', 
-    ...getAuthHeader(), 
-    ...opts.headers 
+  const headers = {
+    ...getAuthHeader(),
+    ...getOrganizationHeaders(),
+    ...opts.headers
   };
 
   const config = {
     method,
     headers,
-    credentials: 'include', // Enable cookies for cross-origin requests
   };
   
   if (body && method !== 'GET') {
@@ -72,8 +76,12 @@ const request = (method, path, body = null, opts = {}) => {
         organization_id: 1  // Always Revo Homes (ID: 1)
       };
     }
-    config.body = body instanceof FormData ? body : JSON.stringify(body);
-    if (body instanceof FormData) delete config.headers['Content-Type'];
+    if (body instanceof FormData) {
+      config.body = body;
+    } else {
+      config.headers['Content-Type'] = 'application/json';
+      config.body = JSON.stringify(body);
+    }
   }
 
   return fetch(url, config).then(handleResponse);
@@ -158,6 +166,11 @@ export const publicLeadApi = {
   createListingInquiryLead: (listingId, data) => post(`/leads/public/listing-inquiry/${listingId}`, data),
   createPropertyVisitLead: (propertyId, data) => post(`/leads/public/property-visit/${propertyId}`, data),
   createPropertyInquiryLead: (propertyId, data) => post(`/leads/public/inquiry/${propertyId}`, data),
+};
+
+export const publicEnquiryApi = {
+  submit: (data) => post('/enquiries/public', data),
+  checkStatus: (referenceNo, phone) => get(`/enquiries/public/${referenceNo}/status`, { phone }),
 };
 
 // -------------------- ORGANIZATIONS --------------------
@@ -254,6 +267,7 @@ export default {
   property: propertyApi,
   listing: listingApi,
   publicLead: publicLeadApi,
+  publicEnquiry: publicEnquiryApi,
   organization: organizationApi,
   user: userApi,
   enquiry: enquiryApi,
