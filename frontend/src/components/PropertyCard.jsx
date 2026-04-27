@@ -18,12 +18,25 @@ const buildPropertyUrl = (id, title, location) => {
   return `/properties/${titleSlug}-${citySlug}-rpid-r${id}`; // rpid-r hides the number
 };
 
-const BADGE_CONFIG = {
-  verified: { label: '✓ Verified', classes: 'bg-green-500 text-white' },
-  new: { label: 'New', classes: 'bg-blue-500 text-white' },
-  premium: { label: '⭐ Premium', classes: 'bg-yellow-500 text-white' },
-  featured: { label: '🔥 Featured', classes: 'bg-orange-500 text-white' },
+// Label configuration with colors and icons
+const LABEL_CONFIG = {
+  featured: { text: '🔥 Featured', classes: 'bg-orange-500 text-white' },
+  top_selling: { text: '📈 Top Selling', classes: 'bg-blue-500 text-white' },
+  exclusive: { text: '⭐ Exclusive', classes: 'bg-purple-500 text-white' },
+  hot_sale: { text: '🔥 Hot Sale', classes: 'bg-red-500 text-white' },
+  sold_out: { text: '🚫 Sold Out', classes: 'bg-gray-500 text-white' },
+  few_units_left: { text: '⏰ Few Units Left', classes: 'bg-yellow-500 text-white' },
 };
+
+// Priority order for labels (higher index = lower priority)
+const LABEL_PRIORITY = [
+  'sold_out',      // Highest priority - overrides all
+  'few_units_left',
+  'hot_sale',
+  'featured',
+  'top_selling',
+  'exclusive',
+];
 
 function PropertyCard({
   id: rawId,
@@ -38,7 +51,8 @@ function PropertyCard({
   area,
   propertyType = 'Apartment',
   isFavorite: initialFavorite = false,
-  badge, 
+  badge, // Legacy prop - kept for backward compatibility
+  labels = [], // New prop: array of label slugs from property tags
   listingType = 'buy',
   showFavorite = true,
   footerActions,
@@ -59,7 +73,24 @@ function PropertyCard({
   const normalizedFavoriteId = favoriteId ? (isNaN(Number(favoriteId)) ? favoriteId : Number(favoriteId)) : null;
 
   const [localFavorite, setLocalFavorite] = useState(false);
-  const badgeConfig = badge ? BADGE_CONFIG[badge] : null;
+  
+  // Process labels with priority: sold_out overrides everything
+  const processedLabels = (() => {
+    const labelSlugs = labels || [];
+    
+    // If sold_out is present, only show that
+    if (labelSlugs.includes('sold_out')) {
+      return ['sold_out'];
+    }
+    
+    // Sort by priority and take max 2
+    return labelSlugs
+      .sort((a, b) => LABEL_PRIORITY.indexOf(a) - LABEL_PRIORITY.indexOf(b))
+      .slice(0, 2);
+  })();
+  
+  // Legacy badge support (for backward compatibility)
+  const badgeConfig = badge ? LABEL_CONFIG[badge] : null;
 
   useEffect(() => {
     if (normalizedFavoriteId) {
@@ -160,9 +191,23 @@ function PropertyCard({
           {!showVerifiedImage && (
             <>
               {customBadge}
-              {badgeConfig && (
+              {/* New labels system */}
+              {processedLabels.map((labelSlug) => {
+                const config = LABEL_CONFIG[labelSlug];
+                if (!config) return null;
+                return (
+                  <span
+                    key={labelSlug}
+                    className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg backdrop-blur-md ${config.classes}`}
+                  >
+                    {config.text}
+                  </span>
+                );
+              })}
+              {/* Legacy badge support (only show if no new labels) */}
+              {badgeConfig && processedLabels.length === 0 && (
                 <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg backdrop-blur-md ${badgeConfig.classes}`}>
-                  {badgeConfig.label}
+                  {badgeConfig.text}
                 </span>
               )}
             </>

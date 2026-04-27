@@ -139,6 +139,9 @@ export const propertyApi = {
       credentials: 'include', // Enable cookies for cross-origin requests
     }).then(handleResponse);
   },
+  
+  // Form Options (property types, categories, etc.)
+  getFormOptions: () => get('/properties/form-options'),
 };
 
 // -------------------- LISTINGS --------------------

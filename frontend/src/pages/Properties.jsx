@@ -6,69 +6,92 @@ import { useProperty } from '../contexts/PropertyContext';
 
 function Properties() {
   const [searchParams] = useSearchParams();
-  const { listings = [], loading: propertyLoading, error } = useProperty();
+  const { listings = [], loading: propertyLoading, error, fetchPropertiesWithFilters } = useProperty();
   const [filteredProperties, setFilteredProperties] = useState([]);
   const [filters, setFilters] = useState({});
+  const [isFiltering, setIsFiltering] = useState(false);
 
-  const handleFilterChange = React.useCallback((newFilters) => {
+  // Server-side filtering with backend API
+  const handleFilterChange = React.useCallback(async (newFilters) => {
     setFilters(newFilters);
-    if (!listings || listings.length === 0) return;
-    
-    let filtered = (listings || []).filter(p => !p.disabled);
-    
-    if (newFilters.location) {
-      filtered = filtered.filter((p) =>
-        p.location?.toLowerCase().includes(newFilters.location.toLowerCase()) ||
-        p.title?.toLowerCase().includes(newFilters.location.toLowerCase())
-      );
+    setIsFiltering(true);
+
+    // Check if any filters are active
+    const hasActiveFilters = Object.values(newFilters).some(value => {
+      if (Array.isArray(value)) return value.length > 0;
+      return value && value !== '' && value !== 'all';
+    });
+
+    if (!hasActiveFilters) {
+      // No filters - show all listings
+      setFilteredProperties((listings || []).filter((item) => !item.disabled));
+      setIsFiltering(false);
+      return;
     }
-    // ... rest of filters
-    if (newFilters.listingType && newFilters.listingType !== 'all') {
-      filtered = filtered.filter((p) => p.listingType === newFilters.listingType);
-    }
-    if (newFilters.bhk?.length > 0) {
-      filtered = filtered.filter((p) => {
-        const bhkValue = Number.parseInt(String(p.bhk), 10);
-        return newFilters.bhk.some((selected) => {
-          if (selected === '5+') return bhkValue >= 5;
-          return String(bhkValue) === String(selected);
+
+    try {
+      // Call server-side filter function
+      const results = await fetchPropertiesWithFilters(newFilters);
+      setFilteredProperties(results);
+    } catch (err) {
+      console.error('Server-side filtering failed:', err);
+      // Fallback to client-side filtering on all listings
+      let filtered = (listings || []).filter(p => !p.disabled);
+      
+      if (newFilters.location) {
+        filtered = filtered.filter((p) =>
+          p.location?.toLowerCase().includes(newFilters.location.toLowerCase()) ||
+          p.title?.toLowerCase().includes(newFilters.location.toLowerCase())
+        );
+      }
+      if (newFilters.listingType && newFilters.listingType !== 'all') {
+        filtered = filtered.filter((p) => p.listingType === newFilters.listingType);
+      }
+      if (newFilters.bhk?.length > 0) {
+        filtered = filtered.filter((p) => {
+          const bhkValue = Number.parseInt(String(p.bhk), 10);
+          return newFilters.bhk.some((selected) => {
+            if (selected === '5+') return bhkValue >= 5;
+            return String(bhkValue) === String(selected);
+          });
         });
-      });
-    }
-    if (newFilters.budgetMin) {
-      filtered = filtered.filter((p) => Number(p.price) >= Number(newFilters.budgetMin));
-    }
-    if (newFilters.budgetMax) {
-      filtered = filtered.filter((p) => Number(p.price) <= Number(newFilters.budgetMax));
-    }
-    if (newFilters.propertyType?.length > 0) {
-      filtered = filtered.filter((p) =>
-        newFilters.propertyType.some((type) => type.toLowerCase() === String(p.propertyType).toLowerCase())
-      );
-    }
-    if (newFilters.furnishing?.length > 0) {
-      filtered = filtered.filter((p) =>
-        newFilters.furnishing.some((item) => item.toLowerCase() === String(p.furnished).toLowerCase())
-      );
-    }
-    if (newFilters.areaMin) {
-      filtered = filtered.filter((p) => Number(p.area) >= Number(newFilters.areaMin));
-    }
-    if (newFilters.areaMax) {
-      filtered = filtered.filter((p) => Number(p.area) <= Number(newFilters.areaMax));
-    }
-    if (newFilters.amenities?.length > 0) {
-      filtered = filtered.filter((p) =>
-        newFilters.amenities.every((selectedAmenity) =>
-          (p.amenities || []).some((amenity) =>
-            String(amenity).toLowerCase().includes(selectedAmenity.toLowerCase())
+      }
+      if (newFilters.budgetMin) {
+        filtered = filtered.filter((p) => Number(p.price) >= Number(newFilters.budgetMin));
+      }
+      if (newFilters.budgetMax) {
+        filtered = filtered.filter((p) => Number(p.price) <= Number(newFilters.budgetMax));
+      }
+      if (newFilters.propertyType?.length > 0) {
+        filtered = filtered.filter((p) =>
+          newFilters.propertyType.some((type) => type.toLowerCase() === String(p.propertyType).toLowerCase())
+        );
+      }
+      if (newFilters.furnishing?.length > 0) {
+        filtered = filtered.filter((p) =>
+          newFilters.furnishing.some((item) => item.toLowerCase() === String(p.furnished).toLowerCase())
+        );
+      }
+      if (newFilters.areaMin) {
+        filtered = filtered.filter((p) => Number(p.area) >= Number(newFilters.areaMin));
+      }
+      if (newFilters.areaMax) {
+        filtered = filtered.filter((p) => Number(p.area) <= Number(newFilters.areaMax));
+      }
+      if (newFilters.amenities?.length > 0) {
+        filtered = filtered.filter((p) =>
+          newFilters.amenities.every((selectedAmenity) =>
+            (p.amenities || []).some((amenity) =>
+              String(amenity).toLowerCase().includes(selectedAmenity.toLowerCase())
+            )
           )
-        )
-      );
+        );
+      }
+      setFilteredProperties(filtered);
+    } finally {
+      setIsFiltering(false);
     }
-    
-    setFilteredProperties(filtered);
-  }, [listings]);
+  }, [listings, fetchPropertiesWithFilters]);
 
   useEffect(() => {
     // Sync all search parameters from URL
@@ -82,8 +105,7 @@ function Properties() {
     }
     
     handleFilterChange(urlFilters);
-  }, [searchParams, handleFilterChange]); 
-  // Removed duplicated lines
+  }, [searchParams, handleFilterChange]);
 
   const handleReset = () => {
     setFilters({});
@@ -139,7 +161,7 @@ function Properties() {
           onReset={handleReset}
         />
         <div className="flex-1 min-w-0">
-          {propertyLoading && filteredProperties.length === 0 ? (
+          {(propertyLoading || isFiltering) && filteredProperties.length === 0 ? (
             <div className="flex items-center justify-center py-20">
                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
@@ -154,7 +176,7 @@ function Properties() {
             </div>
           )}
           
-          {filteredProperties.length === 0 && !propertyLoading && (
+          {filteredProperties.length === 0 && !propertyLoading && !isFiltering && (
             <div className="bg-gray-50 rounded-[32px] p-20 text-center border-2 border-dashed border-gray-200">
                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg mx-auto mb-6">
                   <svg className="w-10 h-10 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/></svg>

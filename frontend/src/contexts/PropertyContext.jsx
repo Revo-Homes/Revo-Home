@@ -1,8 +1,9 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { useLocation } from './LocationContext';
-import { listingApi, userApi } from '../services/api';
+import { listingApi, userApi, propertyApi } from '../services/api';
 import Logo from '../assets/Revo Homes Logo.png';
+
 const PropertyContext = createContext(null);
 
 const DEFAULT_IMAGE = Logo;
@@ -255,6 +256,7 @@ const normalizeProperty = (item, userLocation = null) => {
     owner_id: item.owner_id || item.created_by || item.user_id || null,
     ownerEmail: item.ownerEmail || item.owner_email || item.created_by_email || '',
     disabled: item.disabled || item.status === 'inactive' || item.status === 'withdrawn',
+    labels: item.labels || item.tags?.map(t => t.slug || t.tag_slug).filter(Boolean) || [],
     badge: item.is_featured ? 'featured' : item.is_verified ? 'verified' : undefined,
     views: item.views_count || 0,
     inquiries_count: item.inquiries_count || 0,
@@ -306,7 +308,29 @@ export function PropertyProvider({ children }) {
   const [enquiries, setEnquiries] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [propertyTypes, setPropertyTypes] = useState({}); // { id: name } mapping
 
+  // Fetch property types from database
+  useEffect(() => {
+    const fetchPropertyTypes = async () => {
+      try {
+        const response = await propertyApi.getFormOptions();
+        const data = response?.data || response;
+        
+        // Transform property_types to object { id: name }
+        const typesMap = {};
+        (data.property_types || []).forEach(t => {
+          typesMap[t.id] = t.name || t.label || t.title;
+        });
+        setPropertyTypes(typesMap);
+      } catch (error) {
+        console.error('Failed to fetch property types:', error);
+        // Fallback to hardcoded values
+        setPropertyTypes({ 1: 'Apartment', 2: 'Villa', 3: 'Independent House', 4: 'Plot', 5: 'Commercial', 6: 'PG', 7: 'Coworking' });
+      }
+    };
+    fetchPropertyTypes();
+  }, []);
 
   const fetchAllListingsFromBackend = useCallback(async (params = {}) => {
     const collected = [];
@@ -530,6 +554,143 @@ export function PropertyProvider({ children }) {
       return [];
     }
   }, [userLocation]);
+
+  // Server-side filtering with backend API
+  const fetchPropertiesWithFilters = useCallback(async (filters = {}) => {
+    try {
+      setLoading(true);
+      
+      // DEBUG: Log incoming filters
+      console.log('DEBUG: fetchPropertiesWithFilters called with:', JSON.stringify(filters, null, 2));
+      
+      // Map frontend filter keys to backend API parameters
+      const apiParams = {
+        organization_id: 1, // Revo Homes organization
+        status: 'active',
+        limit: 100,
+      };
+
+      // Location text search
+      if (filters.location && filters.location.trim()) {
+        apiParams.search_query = filters.location.trim();
+        apiParams.city = filters.location.trim();
+      }
+
+      // Budget/Price range
+      if (filters.budgetMin && !isNaN(Number(filters.budgetMin))) {
+        apiParams.min_price = Number(filters.budgetMin);
+      }
+      if (filters.budgetMax && !isNaN(Number(filters.budgetMax))) {
+        apiParams.max_price = Number(filters.budgetMax);
+      }
+
+      // BHK (bedrooms) - handle array of BHK values
+      if (filters.bhk && filters.bhk.length > 0) {
+        // Convert BHK array to bedroom numbers (e.g., ['1', '2', '5+'] -> [1, 2, 5])
+        const bedroomValues = filters.bhk.map(b => {
+          if (b === '5+') return 5; // Backend will need to handle >= 5
+          return parseInt(b, 10);
+        }).filter(n => !isNaN(n));
+        
+        if (bedroomValues.length > 0) {
+          // Send as comma-separated for multiple values
+          apiParams.bedrooms = bedroomValues.join(',');
+        }
+      }
+
+      // Property Type - map to backend numeric IDs using dynamic propertyTypes from database
+      if (filters.propertyType && filters.propertyType.length > 0) {
+        // Create reverse mapping from name to ID using dynamic propertyTypes
+        const typeMapping = {};
+        Object.entries(propertyTypes).forEach(([id, name]) => {
+          typeMapping[name] = parseInt(id);
+        });
+        
+        const backendTypeIds = filters.propertyType
+          .map(t => typeMapping[t])
+          .filter(id => id !== undefined && !isNaN(id));
+        if (backendTypeIds.length > 0) {
+          // Support multiple property types - send as comma-separated
+          apiParams.property_type = backendTypeIds.join(',');
+        }
+      }
+
+      // Listing Type (sale/rent/lease)
+      if (filters.listingType && filters.listingType !== 'all') {
+        apiParams.listing_type = filters.listingType;
+      }
+
+      // Furnishing - send to backend for server-side filtering
+      if (filters.furnishing && filters.furnishing.length > 0) {
+        const furnishingMapping = {
+          'Fully Furnished': 'fully_furnished',
+          'Semi Furnished': 'semi_furnished',
+          'Unfurnished': 'unfurnished'
+        };
+        const backendFurnishingValues = filters.furnishing
+          .map(f => furnishingMapping[f] || f.toLowerCase().replace(' ', '_'))
+          .filter(f => f);
+        if (backendFurnishingValues.length > 0) {
+          apiParams.furnishing = backendFurnishingValues.join(',');
+        }
+      }
+
+      // DEBUG: Log API params being sent
+      console.log('DEBUG: API params sent to backend:', apiParams);
+      
+      const response = await listingApi.search(apiParams);
+      
+      // DEBUG: Log raw response count
+      console.log('DEBUG: Raw response listings count:', response?.data?.listings?.length || response?.listings?.length || 0);
+      
+      const results = extractCollection(response, ['listings']).map(item => normalizeProperty(item, userLocation));
+      
+      // Apply client-side filtering for fields not supported by backend
+      let filtered = results;
+      
+      // Furnishing filter (client-side)
+      // Map UI values to database values
+      const furnishingMapping = {
+        'Fully Furnished': 'fully_furnished',
+        'Semi Furnished': 'semi_furnished', 
+        'Unfurnished': 'unfurnished'
+      };
+      
+      if (filters.furnishing && filters.furnishing.length > 0) {
+        const normalizedFilterValues = filters.furnishing.map(f => furnishingMapping[f] || f.toLowerCase().replace(' ', '_'));
+        filtered = filtered.filter((p) => {
+          const propFurnishing = String(p.furnished || p.furnishing || p.furnishing_status || '').toLowerCase();
+          return normalizedFilterValues.some(filterVal => propFurnishing.includes(filterVal));
+        });
+      }
+
+      // Area range filter (client-side fallback)
+      if (filters.areaMin && !isNaN(Number(filters.areaMin))) {
+        filtered = filtered.filter((p) => Number(p.area || p.carpet_area || 0) >= Number(filters.areaMin));
+      }
+      if (filters.areaMax && !isNaN(Number(filters.areaMax))) {
+        filtered = filtered.filter((p) => Number(p.area || p.carpet_area || 0) <= Number(filters.areaMax));
+      }
+
+      // Amenities filter (client-side)
+      if (filters.amenities && filters.amenities.length > 0) {
+        filtered = filtered.filter((p) =>
+          filters.amenities.every((selectedAmenity) =>
+            (p.amenities || []).some((amenity) =>
+              String(amenity).toLowerCase().includes(selectedAmenity.toLowerCase())
+            )
+          )
+        );
+      }
+      
+      setLoading(false);
+      return filtered;
+    } catch (err) {
+      console.error('Failed to fetch filtered properties:', err);
+      setLoading(false);
+      return [];
+    }
+  }, [userLocation, propertyTypes]);
 
   const toggleFavorite = useCallback(async (itemId, shouldSave) => {
     try {
@@ -836,6 +997,7 @@ export function PropertyProvider({ children }) {
         error,
         enquiries,
         fetchProperties,
+        fetchPropertiesWithFilters,
         fetchFeatured,
         fetchPopularCities,
         fetchNearbyProperties,

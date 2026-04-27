@@ -19,6 +19,8 @@ import { useProperty } from '../contexts/PropertyContext';
 
 import { useAuth } from '../contexts/AuthContext';
 
+import { propertyApi } from '../services/api';
+
 import PropertySubscriptionGuard from '../guards/PropertySubscriptionGuard';
 
 import PropertyMediaForm from '../components/PropertyMediaForm';
@@ -69,334 +71,6 @@ const STEPS = [
 
 ];
 
-
-
-// Enhanced property types based on schema
-
-const PROPERTY_TYPES = {
-
-  1: 'Residential',
-
-  2: 'Commercial',
-
-  3: 'Land',
-
-  4: 'Industrial',
-
-  5: 'Hospitality'
-
-};
-
-
-
-// Property sub-types based on schema
-
-const PROPERTY_SUBTYPES = {
-
-  Residential: [
-
-    'Apartment', 'Villa', 'Independent House', 'Gated Community Villa',
-
-    'Studio', 'Penthouse', 'Duplex', 'Triplex', 'Townhouse', 'Condo'
-
-  ],
-
-  Commercial: [
-
-    'Office Space', 'Retail Shop', 'Showroom', 'Business Center',
-
-    'Coworking Space', 'Warehouse', 'Godown', 'Commercial Complex'
-
-  ],
-
-  Land: [
-
-    'Residential Plot', 'Commercial Plot', 'Agricultural Land',
-
-    'Industrial Land', 'Farm House Plot', 'Plot'
-
-  ],
-
-  Industrial: [
-
-    'Factory', 'Manufacturing Unit', 'Industrial Shed', 'Workshop',
-
-    'Cold Storage', 'Processing Unit'
-
-  ],
-
-  Hospitality: [
-
-    'Hotel', 'Resort', 'Guest House', 'Service Apartment',
-
-    'Hostel', 'PG Accommodation'
-
-  ]
-
-};
-
-
-
-// Property categories based on schema
-
-const PROPERTY_CATEGORIES = {
-
-  1: 'Residential',
-
-  2: 'Commercial',
-
-  3: 'Industrial',
-
-  4: 'Land',
-
-  5: 'Mixed Use'
-
-};
-
-const PROPERTY_TYPE_ID_MAP = {
-  Residential: 1,
-  Commercial: 2,
-  Land: 3,
-  Industrial: 4,
-  Hospitality: 5,
-};
-
-const PROPERTY_CATEGORY_ID_MAP = {
-  Residential: 1,
-  Commercial: 2,
-  Industrial: 3,
-  Land: 4,
-  Hospitality: 5,
-};
-
-
-
-// Listing types based on schema
-
-const LISTING_TYPES = ['sale', 'rent', 'lease', 'auction'];
-
-
-
-// Transaction types based on schema
-
-const TRANSACTION_TYPES = ['new_booking', 'resale', 'redevelopment'];
-
-
-
-// BHK options
-
-const BHK_OPTIONS = ['1 RK', '1 BHK', '1.5 BHK', '2 BHK', '2.5 BHK', '3 BHK', '3.5 BHK', '4 BHK', '4.5 BHK', '5 BHK', '5.5 BHK', '6 BHK+'];
-
-// Property Age options
-
-const PROPERTY_AGE = ['New', '0-1 years', '1-5 years', '5-10 years', '10-20 years', '20+ years'];
-
-
-
-// Area units with additional Indian land measurement units
-
-const AREA_UNITS = [
-
-  'sqft', 'sqm', 'sqyd', 'acre', 'hectare', 'cents', 'grounds',
-
-  'bigha', 'katha', 'decimal', 'guntha'
-
-];
-
-
-
-// Currency options
-
-const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD'];
-
-
-
-// Property statuses based on schema
-
-const PROPERTY_STATUSES = ['draft', 'active', 'inactive', 'sold', 'rented', 'under_construction', 'pending_approval'];
-
-
-
-// Ownership types
-
-const OWNERSHIP_TYPES = ['Freehold', 'Leasehold'];
-
-
-
-// Property status options
-
-const PROPERTY_STATUS_OPTIONS = ['Draft', 'Published', 'Sold', 'Rented', 'Under Construction'];
-
-
-
-// Possession status
-
-const POSSESSION_STATUS = ['Ready', 'Under Construction'];
-
-
-
-// Facing directions
-
-const FACING_DIRECTIONS = ['North', 'South', 'East', 'West', 'Northeast', 'Northwest', 'Southeast', 'Southwest'];
-
-
-
-// Furnishing status
-
-const FURNISHING_OPTIONS = ['Furnished', 'Semi Furnished', 'Unfurnished'];
-
-
-
-// Furnishing status for compatibility
-
-const FURNISHING_STATUS = ['unfurnished', 'semi_furnished', 'fully_furnished', 'luxury_furnished'];
-
-
-
-// Age of property
-
-const PROPERTY_AGE_OPTIONS = ['New', '0-1 years', '1-5 years', '5-10 years', '10-20 years', '20+ years'];
-
-
-
-// Water source based on schema
-
-const WATER_SOURCES = ['municipal', 'borewell', 'tanker', 'well', 'both'];
-
-
-
-// Construction quality based on schema
-
-const CONSTRUCTION_QUALITY = ['low', 'medium', 'high', 'premium', 'luxury'];
-
-
-
-// Parking types based on schema
-
-const PARKING_TYPES = ['open', 'covered', 'both', 'street_parking'];
-
-
-
-// Connectivity options
-
-const CONNECTIVITY_OPTIONS = ['Highway Access', 'Metro Connected', 'Good Road Network'];
-
-
-
-// Security features
-
-const SECURITY_FEATURES = [
-
-  'CCTV Coverage', 'Gated Community', 'Fire Safety System',
-
-  'Earthquake Resistant Structure', 'Intercom Facility', 'Smart Locks / Digital Security'
-
-];
-
-
-
-// Utilities
-
-const UTILITIES = [
-
-  'Electricity Backup (Full/Partial)', 'Water Availability (24x7 / Limited)',
-
-  'Sewage System', 'Internet Providers Available', 'Gas Connection (Pipeline / Cylinder)'
-
-];
-
-
-
-// Sustainability features
-
-const SUSTAINABILITY_FEATURES = [
-
-  'Solar Panels', 'Rainwater Harvesting', 'Waste Management System',
-
-  'Energy Efficiency Rating', 'Green Building Certification'
-
-];
-
-
-
-// Room features
-
-const ROOM_FEATURES = [
-
-  'Servant Room', 'Study Room', 'Store Room', 'Puja Room'
-
-];
-
-
-
-// Community amenities
-
-const COMMUNITY_AMENITIES = [
-
-  'Garden / Park', 'Gym', 'Swimming Pool', 'Clubhouse',
-
-  'Children Play Area', 'Jogging Track', 'Community Hall'
-
-];
-
-
-
-// Infrastructure
-
-const INFRASTRUCTURE_FEATURES = [
-
-  'Lift', 'Power Backup', 'Water Supply', 'Security (24x7 / CCTV)',
-
-  'Internet / WiFi', 'Gas Pipeline', 'Intercom'
-
-];
-
-
-
-// Legal status
-
-const LEGAL_STATUS = ['Title Clear', 'Loan Approved'];
-
-
-
-// Special tags
-
-const SPECIAL_TAGS = ['New', 'Hot Deal', 'Premium', 'Exclusive'];
-
-
-
-// Enhanced property options
-
-const PROPERTY_CONDITIONS = ['New', 'Resale', 'Renovated'];
-
-const OCCUPANCY_STATUSES = ['Vacant', 'Rented', 'Owner-occupied'];
-
-const SALE_URGENCY = ['Urgent', 'Normal'];
-
-const PET_POLICIES = ['Allowed', 'Not Allowed'];
-
-const LISTING_VISIBILITIES = ['Public', 'Private'];
-
-const PROPERTY_VIEWS = ['Park', 'Road', 'Sea'];
-
-const POWER_BACKUP_TYPES = ['Full', 'Partial'];
-
-const FLOORING_TYPES = ['Tiles', 'Marble', 'Wood', 'Carpet', 'Vinyl'];
-
-const WALL_FINISH_TYPES = ['Paint', 'Texture', 'Wallpaper', 'Tiles'];
-
-const KITCHEN_TYPES = ['Modular', 'Normal', 'Semi-Modular'];
-
-const AREA_TYPES = ['Residential', 'Commercial', 'Mixed'];
-
-const TRAFFIC_CONDITIONS = ['Low', 'Medium', 'High'];
-
-const NOISE_LEVELS = ['Low', 'Medium', 'High'];
-
-const BATHROOM_FITTINGS_QUALITIES = ['Basic', 'Standard', 'Premium', 'Luxury'];
-
-
-
 function SellProperty() {
 
   const [step, setStep] = useState(1);
@@ -410,6 +84,36 @@ function SellProperty() {
   const { user, isLoggedIn } = useAuth();
 
   const navigate = useNavigate();
+
+  // Dynamic form options from database
+  const [formOptions, setFormOptions] = useState({});
+  const [loadingFormOptions, setLoadingFormOptions] = useState(true);
+
+  // Fetch all form options from database
+  useEffect(() => {
+    const fetchFormOptions = async () => {
+      try {
+        const response = await propertyApi.getFormOptions();
+        const data = response?.data || response;
+        setFormOptions(data);
+      } catch (error) {
+        console.error('Failed to fetch form options:', error);
+        // Fallback to hardcoded values if API fails
+        setFormOptions({
+          property_types: [{ id: 1, name: 'Residential' }, { id: 2, name: 'Commercial' }, { id: 3, name: 'Land' }, { id: 4, name: 'Industrial' }, { id: 5, name: 'Hospitality' }],
+          property_categories: [{ id: 1, name: 'Residential' }, { id: 2, name: 'Commercial' }, { id: 3, name: 'Industrial' }, { id: 4, name: 'Land' }, { id: 5, name: 'Hospitality' }],
+          bhk: [{ value: '1 RK', label: '1 RK' }, { value: '1 BHK', label: '1 BHK' }, { value: '2 BHK', label: '2 BHK' }, { value: '3 BHK', label: '3 BHK' }],
+          furnishing: [{ value: 'fully_furnished', label: 'Fully Furnished' }, { value: 'semi_furnished', label: 'Semi Furnished' }, { value: 'unfurnished', label: 'Unfurnished' }],
+          area_units: [{ value: 'sqft', label: 'sqft' }, { value: 'sqm', label: 'sqm' }, { value: 'sqyd', label: 'sqyd' }],
+          facing_direction: [{ value: 'North', label: 'North' }, { value: 'South', label: 'South' }, { value: 'East', label: 'East' }, { value: 'West', label: 'West' }],
+          amenities: []
+        });
+      } finally {
+        setLoadingFormOptions(false);
+      }
+    };
+    fetchFormOptions();
+  }, []);
 
 
 
@@ -1556,26 +1260,33 @@ function SellProperty() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Property Type <span className="text-red-500">*</span></label>
-                  <select
-                    name="propertyType"
-                    value={formData.propertyType}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const id = Object.keys(PROPERTY_TYPES).find(key => PROPERTY_TYPES[key] === val);
-                      setFormData(prev => ({
-                        ...prev,
-                        propertyType: val,
-                        property_type_id: id || '',
+                  {loadingFormOptions ? (
+                    <div className="text-sm text-gray-500">Loading...</div>
+                  ) : (
+                    <select
+                      name="propertyType"
+                      value={formData.propertyType}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const id = Object.keys(propertyTypes).find(key => propertyTypes[key] === val);
+                        setFormData(prev => ({
+                          ...prev,
+                          propertyType: val,
+                          property_type_id: id || '',
                         propertySubType: '',
                       }));
                     }}
                     className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
                   >
                     <option value="">Select Type</option>
-                    {Object.values(PROPERTY_TYPES).map((type) => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
+                    {(formOptions.property_types || []).map((type) => {
+                      const typeName = type.name || type.label || type;
+                      return (
+                        <option key={type.id || type.value || typeName} value={typeName}>{typeName}</option>
+                      );
+                    })}
                   </select>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Property Sub-type</label>
@@ -1587,8 +1298,8 @@ function SellProperty() {
                     className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all disabled:opacity-50 disabled:bg-gray-50 disabled:cursor-not-allowed shadow-sm"
                   >
                     <option value="">Select Sub-type</option>
-                    {formData.propertyType && PROPERTY_SUBTYPES[formData.propertyType]?.map((subtype) => (
-                      <option key={subtype} value={subtype}>{subtype}</option>
+                    {formData.propertyType && (formOptions.property_subtypes || []).map((subtype) => (
+                      <option key={subtype.value || subtype.label || subtype} value={subtype.value || subtype.label || subtype}>{subtype.label || subtype.value || subtype}</option>
                     ))}
                   </select>
                 </div>
@@ -1628,9 +1339,13 @@ function SellProperty() {
                     onChange={handleChange}
                     className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
                   >
-                    {PROPERTY_CONDITIONS.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
+                    {(formOptions.property_condition || []).map((c) => {
+                      const cValue = c.value || c.label || c;
+                      const cLabel = c.label || c.value || c;
+                      return (
+                        <option key={cValue} value={cValue}>{cLabel}</option>
+                      );
+                    })}
                   </select>
                 </div>
               </div>
@@ -1677,9 +1392,13 @@ function SellProperty() {
                     onChange={handleChange}
                     className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
                   >
-                    {SALE_URGENCY.map((u) => (
-                      <option key={u} value={u}>{u}</option>
-                    ))}
+                    {(formOptions.sale_urgency || []).map((u) => {
+                      const uValue = u.value || u.label || u;
+                      const uLabel = u.label || u.value || u;
+                      return (
+                        <option key={uValue} value={uValue}>{uLabel}</option>
+                      );
+                    })}
                   </select>
                 </div>
               </div>
@@ -1736,9 +1455,13 @@ function SellProperty() {
                         onChange={handleChange}
                         className="w-full px-2 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
                       >
-                        {AREA_UNITS.map((unit) => (
-                          <option key={unit} value={unit}>{unit.toUpperCase()}</option>
-                        ))}
+                        {(formOptions.area_units || []).map((unit) => {
+                          const unitValue = unit.value || unit.label || unit;
+                          const unitLabel = unit.label || unit.value || unit;
+                          return (
+                            <option key={unitValue} value={unitValue}>{unitLabel.toUpperCase()}</option>
+                          );
+                        })}
                       </select>
                     </div>
                   </div>
@@ -1769,24 +1492,26 @@ function SellProperty() {
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-2 ml-1">BHK Configuration (Select Multiple) <span className="text-red-500">*</span></label>
                     <div className="flex flex-wrap gap-2">
-                      {BHK_OPTIONS.map((b) => {
-                        const isSelected = formData.bhk.includes(b);
+                      {(formOptions.bhk || []).map((b) => {
+                        const bhkValue = b.value || b.label || b;
+                        const bhkLabel = b.label || b.value || b;
+                        const isSelected = formData.bhk.includes(bhkValue);
                         return (
                           <button
-                            key={b}
+                            key={bhkValue}
                             type="button"
                             onClick={() => {
                               let updatedSelected = [...formData.bhk];
                               let updatedDetails = [...formData.bhkDetails];
 
                               if (isSelected) {
-                                updatedSelected = updatedSelected.filter(item => item !== b);
-                                updatedDetails = updatedDetails.filter(d => d.type !== b);
+                                updatedSelected = updatedSelected.filter(item => item !== bhkValue);
+                                updatedDetails = updatedDetails.filter(d => d.type !== bhkValue);
                               } else {
-                                updatedSelected.push(b);
-                                const bedrooms = parseInt(b) || 1;
+                                updatedSelected.push(bhkValue);
+                                const bedrooms = parseInt(bhkValue) || 1;
                                 updatedDetails.push({
-                                  type: b,
+                                  type: bhkValue,
                                   bedrooms: bedrooms,
                                   bathrooms: '',
                                   kitchens: '',
@@ -1804,7 +1529,7 @@ function SellProperty() {
                               }`}
                           >
                             <Home size={16} />
-                            {b}
+                            {bhkLabel}
                           </button>
                         );
                       })}
@@ -2051,9 +1776,13 @@ function SellProperty() {
                         onChange={handleChange}
                         className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
                       >
-                        {PROPERTY_AGE.map((age) => (
-                          <option key={age} value={age}>{age}</option>
-                        ))}
+                        {(formOptions.property_age || []).map((age) => {
+                          const ageValue = age.value || age.label || age;
+                          const ageLabel = age.label || age.value || age;
+                          return (
+                            <option key={ageValue} value={ageValue}>{ageLabel}</option>
+                          );
+                        })}
                       </select>
                     </div>
                   </div>
@@ -2097,9 +1826,13 @@ function SellProperty() {
                           className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
                         >
                           <option value="">Select Direction</option>
-                          {FACING_DIRECTIONS.map((dir) => (
-                            <option key={dir} value={dir}>{dir.charAt(0).toUpperCase() + dir.slice(1)}</option>
-                          ))}
+                          {(formOptions.facing_direction || []).map((dir) => {
+                            const dirValue = dir.value || dir.label || dir;
+                            const dirLabel = dir.label || dir.value || dir;
+                            return (
+                              <option key={dirValue} value={dirValue}>{dirLabel.charAt(0).toUpperCase() + dirLabel.slice(1)}</option>
+                            );
+                          })}
                         </select>
                       </div>
                     </div>
@@ -2132,9 +1865,13 @@ function SellProperty() {
                         onChange={handleChange}
                         className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
                       >
-                        {PROPERTY_AGE.map((age) => (
-                          <option key={age} value={age}>{age}</option>
-                        ))}
+                        {(formOptions.property_age || []).map((age) => {
+                          const ageValue = age.value || age.label || age;
+                          const ageLabel = age.label || age.value || age;
+                          return (
+                            <option key={ageValue} value={ageValue}>{ageLabel}</option>
+                          );
+                        })}
                       </select>
                     </div>
                     <div>
@@ -2263,9 +2000,13 @@ function SellProperty() {
                             onChange={handleChange}
                             className="w-full px-2 py-4 bg-gray-100 border-none rounded-2xl focus:ring-2 focus:outline-none focus:ring-primary font-bold appearance-none transition-all text-center tracking-tight"
                           >
-                            {AREA_UNITS.map((unit) => (
-                              <option key={unit} value={unit}>{unit.toUpperCase()}</option>
-                            ))}
+                            {(formOptions.area_units || []).map((unit) => {
+                              const unitValue = unit.value || unit.label || unit;
+                              const unitLabel = unit.label || unit.value || unit;
+                              return (
+                                <option key={unitValue} value={unitValue}>{unitLabel.toUpperCase()}</option>
+                              );
+                            })}
                           </select>
                         </div>
                       </div>
@@ -2279,9 +2020,13 @@ function SellProperty() {
                         className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
                       >
                         <option value="">Select Direction</option>
-                        {FACING_DIRECTIONS.map((dir) => (
-                          <option key={dir} value={dir}>{dir.charAt(0).toUpperCase() + dir.slice(1)}</option>
-                        ))}
+                        {(formOptions.facing_direction || []).map((dir) => {
+                          const dirValue = dir.value || dir.label || dir;
+                          const dirLabel = dir.label || dir.value || dir;
+                          return (
+                            <option key={dirValue} value={dirValue}>{dirLabel.charAt(0).toUpperCase() + dirLabel.slice(1)}</option>
+                          );
+                        })}
                       </select>
                     </div>
                   </div>
@@ -2602,11 +2347,15 @@ function SellProperty() {
                         onChange={handleChange}
                         className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
                       >
-                        {FURNISHING_STATUS.map((status) => (
-                          <option key={status} value={status}>
-                            {status.replace(/_/g, ' ').charAt(0).toUpperCase() + status.replace(/_/g, ' ').slice(1)}
-                          </option>
-                        ))}
+                        {(formOptions.furnishing || []).map((status) => {
+                          const statusValue = status.value || status.label || status;
+                          const statusLabel = status.label || status.value || status;
+                          return (
+                            <option key={statusValue} value={statusValue}>
+                              {statusLabel.replace(/_/g, ' ').charAt(0).toUpperCase() + statusLabel.replace(/_/g, ' ').slice(1)}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                   </div>
@@ -2619,11 +2368,15 @@ function SellProperty() {
                       onChange={handleChange}
                       className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
                     >
-                      {WATER_SOURCES.map((source) => (
-                        <option key={source} value={source}>
-                          {source.charAt(0).toUpperCase() + source.slice(1)}
-                        </option>
-                      ))}
+                      {(formOptions.water_source || []).map((source) => {
+                        const sourceValue = source.value || source.label || source;
+                        const sourceLabel = source.label || source.value || source;
+                        return (
+                          <option key={sourceValue} value={sourceValue}>
+                            {sourceLabel.charAt(0).toUpperCase() + sourceLabel.slice(1)}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
@@ -2638,11 +2391,15 @@ function SellProperty() {
                           onChange={handleChange}
                           className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
                         >
-                          {PARKING_TYPES.map((type) => (
-                            <option key={type} value={type}>
-                              {type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')}
-                            </option>
-                          ))}
+                          {(formOptions.parking_type || []).map((type) => {
+                            const typeValue = type.value || type.label || type;
+                            const typeLabel = type.label || type.value || type;
+                            return (
+                              <option key={typeValue} value={typeValue}>
+                                {typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1).replace('_', ' ')}
+                              </option>
+                            );
+                          })}
                         </select>
                       </div>
                       <div>
