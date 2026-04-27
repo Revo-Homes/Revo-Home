@@ -186,8 +186,12 @@ const normalizeProperty = (item, userLocation = null) => {
   const imageList = toArray(item.images, [])
     .map(normalizeImageUrl)
     .filter(Boolean);
+  // Add secondary images from backend if available
+  if (item.secondary_image_url_1) imageList.push(normalizeImageUrl(item.secondary_image_url_1));
+  if (item.secondary_image_url_2) imageList.push(normalizeImageUrl(item.secondary_image_url_2));
   const primaryImage =
     normalizeImageUrl(item.image) ||
+    normalizeImageUrl(item.primary_image_url) ||
     normalizeImageUrl(item.cover_image_url) ||
     normalizeImageUrl(item.thumbnail_url) ||
     imageList[0] ||
@@ -759,15 +763,16 @@ export function PropertyProvider({ children }) {
       // Revo Homes only uses listings - fetch from listing API
       const listings = await fetchAllListingsFromBackend();
 
-      // Filter by current user
+      // Filter by current user OR include organization-owned listings (created_by = null)
       const owned = listings.filter((item) => {
         const createdBy = item.audit?.created_by || item.created_by || item.creatorId;
-        return createdBy === user?.id;
+        // Include if created by current user OR if created_by is null (organization-owned)
+        return createdBy === user?.id || createdBy === null || createdBy === undefined;
       });
 
       console.log('fetchMyProperties: Found listings:', listings.length, 'owned:', owned.length);
 
-      return owned.length > 0 ? owned : listings;
+      return owned;
     } catch (err) {
       console.error('Failed to fetch my listings:', err);
       return [];
