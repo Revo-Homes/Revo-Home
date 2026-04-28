@@ -256,7 +256,39 @@ const normalizeProperty = (item, userLocation = null) => {
     owner_id: item.owner_id || item.created_by || item.user_id || null,
     ownerEmail: item.ownerEmail || item.owner_email || item.created_by_email || '',
     disabled: item.disabled || item.status === 'inactive' || item.status === 'withdrawn',
-    labels: item.labels || item.tags?.map(t => t.slug || t.tag_slug).filter(Boolean) || [],
+    labels: (() => {
+      // Handle labels already provided
+      if (item.labels && Array.isArray(item.labels)) return item.labels;
+
+      // Parse tags if it's a JSON string from backend
+      let tags = item.tags;
+      if (typeof tags === 'string') {
+        try {
+          tags = JSON.parse(tags);
+        } catch {
+          tags = null;
+        }
+      }
+
+      // Extract slugs from tags array
+      if (Array.isArray(tags)) {
+        const slugs = tags
+          .filter(t => t !== null)
+          .map(t => t.slug || t.tag_slug)
+          .filter(Boolean);
+
+        // Priority: sold_out overrides everything
+        if (slugs.includes('sold_out')) return ['sold_out'];
+
+        // Sort by priority and take max 2
+        const priority = ['sold_out', 'few_units_left', 'hot_sale', 'featured', 'top_selling', 'exclusive'];
+        return slugs
+          .sort((a, b) => priority.indexOf(a) - priority.indexOf(b))
+          .slice(0, 2);
+      }
+
+      return [];
+    })(),
     badge: item.is_featured ? 'featured' : item.is_verified ? 'verified' : undefined,
     views: item.views_count || 0,
     inquiries_count: item.inquiries_count || 0,
