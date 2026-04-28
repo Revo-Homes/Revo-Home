@@ -959,11 +959,11 @@ export function PropertyProvider({ children }) {
       // Revo Homes only uses listings - fetch from listing API
       const listings = await fetchAllListingsFromBackend();
 
-      // Filter by current user OR include organization-owned listings (created_by = null)
+      // Filter by current user only - show only properties created by the logged-in user
       const owned = listings.filter((item) => {
         const createdBy = item.audit?.created_by || item.created_by || item.creatorId;
-        // Include if created by current user OR if created_by is null (organization-owned)
-        return createdBy === user?.id || createdBy === null || createdBy === undefined;
+        // Only include if created by current user
+        return createdBy === user?.id;
       });
 
       console.log('fetchMyProperties: Found listings:', listings.length, 'owned:', owned.length);
