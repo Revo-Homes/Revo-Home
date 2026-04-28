@@ -144,23 +144,25 @@ const normalizeImageUrl = (image) => {
 };
 
 const formatBHK = (bedrooms) => {
-  if (!bedrooms) return '2 BHK';
-
+  if (!bedrooms) return '';
   const beds = parseInt(bedrooms);
-
-  // Handle RK (Room Kitchen) format first
-  if (beds === 1) return '1 RK';
-  if (beds === 1.5) return '1.5 RK';
-  if (beds === 2) return '2 RK';
-
-  // Handle BHK format
-  if (beds === 1) return '1 BHK';
-  if (beds === 2) return '2 BHK';
-  if (beds === 3) return '3 BHK';
-  if (beds === 4) return '4 BHK';
-  if (beds >= 5) return `${beds} BHK`;
-
+  if (!beds || beds < 1) return '';
   return `${beds} BHK`;
+};
+
+const normalizeListingType = (type) => {
+  if (!type) return 'buy';
+  const normalized = String(type).trim().toLowerCase();
+
+  if (['sale', 'buy', 'sell', 'resale', 'purchase', 'owned'].includes(normalized)) return 'buy';
+  if (['rent', 'lease', 'rental'].includes(normalized)) return 'rent';
+  if (['commercial_rent', 'commercial rent', 'commercial-rent'].includes(normalized)) return 'commercial_rent';
+  if (['commercial'].includes(normalized)) return 'commercial';
+  if (['plot', 'plots'].includes(normalized)) return 'plots';
+  if (['pg', 'paying guest'].includes(normalized)) return 'pg';
+  if (['coworking', 'co-working', 'co working'].includes(normalized)) return 'coworking';
+
+  return normalized;
 };
 
 const normalizeProperty = (item, userLocation = null) => {
@@ -249,7 +251,7 @@ const normalizeProperty = (item, userLocation = null) => {
       PROPERTY_TYPE_LABELS[item.property_type_id] ||
       item.type ||
       'Apartment',
-    listingType: item.listingType || item.listing_type || 'sale',
+    listingType: normalizeListingType(item.listingType || item.listing_type || 'sale'),
     image: primaryImage,
     images: imageList.length > 0 ? imageList : [primaryImage],
     description: item.description || '',
@@ -299,6 +301,7 @@ const normalizeProperty = (item, userLocation = null) => {
     pricePerSqft: toNumber(item.price_per_sqft),
     developer: item.developer || item.builder_name || item.organization_name || '',
     possessionDate: item.possession_date || item.available_from || '',
+    rera_number: item.rera_number || item.rera || '',
     owner: {
       name: item.owner_name || item.organization_name || item.developer || 'Property Owner',
       phone: item.owner_phone || item.organization_phone || '',

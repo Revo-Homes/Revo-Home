@@ -61,6 +61,11 @@ function PropertyCard({
   viewsAtBottomRight = false,
   disabled = false,
   distance = null, // Distance from user location in kilometers
+  views = 0,
+  owner = {},
+  developer = '',
+  rera_number = '',
+  furnished = '',
   onPropertyClick, // New callback for lead tracking
 }) {
   const { toggleFavorite, isSaved } = useProperty();
@@ -220,7 +225,7 @@ function PropertyCard({
         {viewsAtBottomRight && (
           <span className="absolute bottom-3 right-3 px-2 py-1 bg-black/50 backdrop-blur-sm text-white rounded-lg text-[10px] font-bold tracking-tight flex items-center gap-1 shadow-md pointer-events-none z-10 border border-white/10">
             <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-            {(normalizedId * 13) + 42} Views
+            {views > 0 ? `${views.toLocaleString()} Views` : 'New'}
           </span>
         )}
 
@@ -254,12 +259,12 @@ function PropertyCard({
           </div>
 
           {/* ✅ VERIFIED BADGE HERE */}
-          {showVerifiedImage && (
-            <img 
-              src="/src/assets/verifiedImage.jpeg" 
-              alt="Verified" 
-              className="w-8 h-8 object-contain rounded-full shadow-md border border-gray-200 bg-white"
-            />
+          {(showVerifiedImage || owner?.verified) && (
+            <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center shadow-md border-2 border-white">
+              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+              </svg>
+            </div>
           )}
         </div>
 
@@ -282,25 +287,56 @@ function PropertyCard({
         </p>
 
         <div className="mt-auto flex items-center gap-x-6 gap-y-3 border-t border-gray-100 pt-5 text-left flex-wrap">
-          {Number(bhk) > 0 && (
+         {bhk && String(bhk).trim() && (
             <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Beds</span>
-              <span className="text-sm font-black text-gray-900">{bhk} BHK</span>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Config</span>
+              <span className="text-sm font-black text-gray-900">
+                {String(bhk).includes('BHK') || String(bhk).includes('RK') ? bhk : `${bhk} BHK`}
+              </span>
             </div>
-          )}
-          {Number(bathrooms) > 0 && (
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Baths</span>
-              <span className="text-sm font-black text-gray-900">{bathrooms}</span>
-            </div>
-          )}
+          )} 
+
           {Number(area) > 0 && (
             <div className="flex flex-col">
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Area</span>
               <span className="text-sm font-black text-gray-900">{area} sqft</span>
             </div>
           )}
+           {furnished && (
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Furnished</span>
+              <span className="text-sm font-black text-gray-900 capitalize">{furnished}</span>
+            </div>
+          )}
         </div>
+        {/* Owner + RERA Strip — like MagicBricks/99acres */}
+        {(owner?.verified || rera_number || (owner?.name && owner.name !== 'Property Owner')) && (
+        <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <svg className="w-3.5 h-3.5 text-primary" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 12c2.66 0 4.8-2.14 4.8-4.8S14.66 2.4 12 2.4 7.2 4.54 7.2 7.2 9.34 12 12 12zm0 2.4c-3.2 0-9.6 1.61-9.6 4.8v2.4h19.2v-2.4c0-3.19-6.4-4.8-9.6-4.8z"/>
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">
+                {developer ? 'Builder' : 'Posted by'}
+              </span>
+              <span className="text-xs font-black text-gray-700 truncate block">
+                {developer || (owner?.name && owner.name !== 'Property Owner' ? owner.name : 'Owner')}
+              </span>
+            </div>
+          </div>
+          {(owner?.verified || rera_number) && (
+            <span className="flex items-center gap-1 px-2.5 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-black uppercase tracking-wide flex-shrink-0 border border-green-100">
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+              </svg>
+              RERA Verified
+            </span>
+          )}
+        </div>
+        )}
         
         {footerActions && (
           <div className="mt-5 pt-5 border-t border-gray-100">

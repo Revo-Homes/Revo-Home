@@ -3,13 +3,16 @@ import { useSearchParams } from 'react-router-dom';
 import PropertyCard from '../components/PropertyCard';
 import FilterSidebar from '../components/FilterSidebar';
 import { useProperty } from '../contexts/PropertyContext';
+import { useLocation } from '../contexts/LocationContext';
 
 function Properties() {
   const [searchParams] = useSearchParams();
-  const { listings = [], loading: propertyLoading, error, fetchPropertiesWithFilters } = useProperty();
+  const { listings = [], featured = [], loading: propertyLoading, error, fetchPropertiesWithFilters } = useProperty();
+  const { calculateDistance } = useLocation();
   const [filteredProperties, setFilteredProperties] = useState([]);
   const [filters, setFilters] = useState({});
   const [isFiltering, setIsFiltering] = useState(false);
+  const [sortBy, setSortBy] = useState('default');
 
   // Server-side filtering with backend API
   const handleFilterChange = React.useCallback(async (newFilters) => {
@@ -112,11 +115,86 @@ function Properties() {
     setFilteredProperties((listings || []).filter((item) => !item.disabled));
     window.history.replaceState(null, '', '/properties');
   };
+   const getSortedProperties = (properties, sort) => {
+    const sorted = [...properties];
+
+    // Build featured ID set from the separately fetched featured list
+    // Normalize IDs to strings to handle type mismatches (string vs number)
+    // This fixes the case where /listings endpoint doesn't return is_featured
+    const featuredIds = new Set(
+      featured
+        .map(f => {
+          const id = f.id || f.listingId;
+          return id ? String(id) : null;
+        })
+        .filter(Boolean)
+    );
+
+    const isFeatured = (p) => {
+      const id = String(p.id || p.listingId);
+      return (
+        featuredIds.has(id) ||
+        p.badge === 'featured' ||
+        Boolean(p.is_featured)
+      );
+    };
+
+    // Live distance calculator — fixes the case where location was granted
+    // after properties were already fetched (distance would be null on all)
+    // Also handles missing latitude/longitude and null calculateDistance returns
+    const getDistance = (p) => {
+      if (p.distance !== null && p.distance !== undefined && p.distance !== Infinity) {
+        return p.distance;
+      }
+      if (p.latitude && p.longitude) {
+        const distance = calculateDistance(p.latitude, p.longitude);
+        if (distance !== null && distance !== undefined) {
+          return distance;
+        }
+      }
+      return Infinity; // Properties without coordinates sort last
+    };
+
+    switch (sort) {
+      case 'price_asc':
+        return sorted.sort((a, b) => Number(a.price) - Number(b.price));
+      case 'price_desc':
+        return sorted.sort((a, b) => Number(b.price) - Number(a.price));
+      case 'area_asc':
+        return sorted.sort((a, b) => Number(a.area) - Number(b.area));
+      case 'area_desc':
+        return sorted.sort((a, b) => Number(b.area) - Number(a.area));
+      case 'newest':
+        return sorted.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      case 'featured':
+        return sorted.sort((a, b) => (isFeatured(b) ? 1 : 0) - (isFeatured(a) ? 1 : 0));
+      case 'verified':
+        return sorted.sort((a, b) => {
+          const aV = a.owner?.verified || Boolean(a.is_verified) ? 1 : 0;
+          const bV = b.owner?.verified || Boolean(b.is_verified) ? 1 : 0;
+          return bV - aV;
+        });
+      case 'most_viewed':
+        return sorted.sort((a, b) => Number(b.views || 0) - Number(a.views || 0));
+      case 'most_enquired':
+        return sorted.sort((a, b) => Number(b.inquiries_count || 0) - Number(a.inquiries_count || 0));
+      case 'most_saved':
+        return sorted.sort((a, b) => Number(b.favorites_count || 0) - Number(a.favorites_count || 0));
+      case 'nearest':
+        return sorted.sort((a, b) => getDistance(a) - getDistance(b));
+      case 'top_rated':
+  return sorted.sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
+      default:
+        return sorted;
+    }
+  };
+
 
   const activeFilterCount = Object.values(filters).reduce((count, value) => {
     if (Array.isArray(value)) return count + value.length;
     return value ? count + 1 : count;
   }, 0);
+  const displayProperties = getSortedProperties(filteredProperties, sortBy);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 lg:py-8">
@@ -161,13 +239,34 @@ function Properties() {
           onReset={handleReset}
         />
         <div className="flex-1 min-w-0">
+          <div className="flex justify-end mb-4">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="default">Default</option>
+              <option value="price_asc">Price: Low to High</option>
+              <option value="price_desc">Price: High to Low</option>
+              <option value="area_asc">Area: Low to High</option>
+              <option value="area_desc">Area: High to Low</option>
+              <option value="newest">Newest First</option>
+              <option value="verified">Verified First</option>
+              <option value="most_viewed">Most Viewed</option>
+              <option value="most_enquired">Most Enquired</option>
+              <option value="featured">Featured First</option>
+              <option value="top_rated">Top Rated</option>
+              <option value="most_saved">Most Saved</option>
+              <option value="nearest">Nearest First</option>
+            </select>
+          </div>
           {(propertyLoading || isFiltering) && filteredProperties.length === 0 ? (
             <div className="flex items-center justify-center py-20">
                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-              {filteredProperties.map((prop) => (
+              {displayProperties.map((prop) => (
                 <PropertyCard
                   key={prop.id}
                   {...prop}
@@ -176,7 +275,7 @@ function Properties() {
             </div>
           )}
           
-          {filteredProperties.length === 0 && !propertyLoading && !isFiltering && (
+          {displayProperties.length === 0 && !propertyLoading && !isFiltering && (
             <div className="bg-gray-50 rounded-[32px] p-20 text-center border-2 border-dashed border-gray-200">
                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg mx-auto mb-6">
                   <svg className="w-10 h-10 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/></svg>
