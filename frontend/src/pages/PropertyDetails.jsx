@@ -430,7 +430,10 @@ const formatShortPrice = (value) => {
 
 const buildPriceConfigurations = (property) => {
   const unitSources = toArray(
-    property?.unitConfigurations || property?.units || property?.pricing || property?.price_configurations,
+    property?.unitConfigurations ||
+    property?.units ||
+    property?.pricing ||
+    property?.price_configurations,
     []
   );
 
@@ -438,18 +441,18 @@ const buildPriceConfigurations = (property) => {
     .map((unit, index) => {
       if (typeof unit !== 'object' || unit === null) return null;
       const bhk = unit.bhk || unit.configuration || unit.unit_type || property?.bhk || 'N/A';
-      const areaMin = unit.area_min || unit.areaMin || unit.carpet_area || unit.area || property?.area;
-      const areaMax = unit.area_max || unit.areaMax || unit.super_builtup_area || areaMin;
-      const priceMin = unit.price_min || unit.priceMin || unit.price || property?.price_min || property?.price;
-      const priceMax = unit.price_max || unit.priceMax || unit.price || property?.price_max || property?.price;
+      const areaMin = unit.area || unit.carpet_area || unit.area_min || property?.area;
+      const priceMin = unit.price_min || unit.price || property?.price_min || property?.price;
+      const priceMax = unit.price_max || unit.price || property?.price_max || property?.price;
 
       return {
         id: unit.id || `${bhk}-${index}`,
-        bhk: String(bhk).replace(/[^0-9A-Za-z.+ -]/g, '').trim() || 'N/A',
-        area: areaMin && areaMax && String(areaMin) !== String(areaMax) ? `${areaMin}-${areaMax}` : `${areaMin || areaMax || 'N/A'}`,
-        priceLabel: priceMin && priceMax && Number(priceMin) !== Number(priceMax)
-          ? `${formatShortPrice(priceMin)} - ${formatShortPrice(priceMax)}`
-          : formatShortPrice(priceMin || priceMax),
+        bhk: String(bhk).trim() || 'N/A',
+        area: areaMin ? `${areaMin}` : 'N/A',
+        priceLabel:
+          priceMin && priceMax && Number(priceMin) !== Number(priceMax)
+            ? `${formatShortPrice(priceMin)} - ${formatShortPrice(priceMax)}`
+            : formatShortPrice(priceMin || priceMax),
       };
     })
     .filter(Boolean);
@@ -457,10 +460,14 @@ const buildPriceConfigurations = (property) => {
   if (normalizedUnits.length > 0) return normalizedUnits;
 
   return [{
-    id: property?.id || 'current-property',
+    id: property?.id || 'current',
     bhk: property?.bhk || 'N/A',
     area: property?.area ? `${property.area}` : 'N/A',
-    priceLabel: formatShortPrice(property?.price || property?.price_min || property?.price_max),
+    priceLabel:
+      property?.price_min && property?.price_max &&
+      property.price_min !== property.price_max
+        ? `${formatShortPrice(property.price_min)} - ${formatShortPrice(property.price_max)}`
+        : formatShortPrice(property?.price || property?.price_min),
   }];
 };
 
@@ -1332,68 +1339,11 @@ function PropertyDetails() {
       setLoading(true);
       const data = await getProperty(listingIdentifier, { slug });
       if (data) {
-        // Extract images from media array or fallback to image URL fields
-        let galleryImages = [];
-        
-        // Priority 1: media array from property_media table
-        if (data.media && Array.isArray(data.media) && data.media.length > 0) {
-          galleryImages = data.media
-            .filter(m => m.url && (m.media_type === 'image' || m.media_type === 'photo' || !m.media_type))
-            .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
-            .map(m => m.url);
-        }
-        
-        // Priority 2: flat image URL fields
-        if (galleryImages.length === 0) {
-          if (data.primary_image_url) galleryImages.push(data.primary_image_url);
-          if (data.secondary_image_url_1) galleryImages.push(data.secondary_image_url_1);
-          if (data.secondary_image_url_2) galleryImages.push(data.secondary_image_url_2);
-        }
-        
-        // Priority 3: legacy images/image fields
-        if (galleryImages.length === 0 && data.images && Array.isArray(data.images) && data.images.length > 0) {
-          galleryImages = data.images;
-        }
-        if (galleryImages.length === 0 && data.image) {
-          galleryImages = [data.image];
-        }
-        
-        // Fallback to default image
-        if (galleryImages.length === 0) {
-          galleryImages = ['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200'];
-        }
-          
-        const dynamicData = {
+        setProperty({
           ...data,
-          images: galleryImages,
-          image: galleryImages[0],
-          amenities: toArray(data.amenities || data.features?.amenities || data.features, []),
-          nearby: toArray(
-            data.nearby || data.meta?.nearby || data.meta?.nearby_landmarks || data.meta?.landmarks,
-            []
-          ),
-          listingType: data.listing_type || data.listingType || 'sale',
-          propertyType: data.propertyType || data.property_name || data.type || 'Property',
-          developer: data.developer || data.organization_name || '',
           possessionDate: data.possessionDate || data.possession_date || data.available_from || '',
           pricePerSqft: data.pricePerSqft || data.price_per_sqft || null,
-          owner: {
-            name: data.owner?.name || data.organization_name || 'Property Owner',
-            phone: data.owner?.phone || data.organization_phone || '',
-            email: data.owner?.email || data.organization_email || '',
-            verified: Boolean(
-              data.owner?.verified ||
-              data.is_verified ||
-              data.property_is_verified ||
-              data.verification_status === 'verified'
-            ),
-          },
-        };
-        
-        // Log all available fields for debugging
-        console.log('Property Data Fields:', Object.keys(dynamicData).sort());
-        
-        setProperty(dynamicData);
+        });
       } else {
         setProperty(null);
       }
@@ -1539,7 +1489,7 @@ function PropertyDetails() {
             <span className="px-3 py-1.5 bg-white/95 backdrop-blur-lg text-gray-900 rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg border border-white/50">
               {property.propertyType}
             </span>
-            {property.is_featured && (
+            {!!property.is_featured && (
               <span className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg flex items-center gap-1">
                 <Star size={10} className="fill-current" />
                 Featured
@@ -1641,7 +1591,7 @@ function PropertyDetails() {
                     <span className="px-2 py-1 bg-primary/10 text-primary text-xs font-bold rounded-md uppercase">
                       {property.propertyType}
                     </span>
-                    {property.is_featured && (
+                    {!!property.is_featured && (
                       <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-md uppercase flex items-center gap-1">
                         <Star size={10} className="fill-current" /> Featured
                       </span>
@@ -1981,47 +1931,66 @@ function PropertyDetails() {
               </p>
               
               {/* Rating Summary */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                {/* Overall Rating */}
-                <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-6 border border-amber-100">
-                  <div className="text-center">
-                    <div className="text-5xl font-bold text-gray-900 mb-2">
-                      {(reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length || 3.8).toFixed(1)}
-                    </div>
-                    <div className="flex justify-center gap-1 mb-2">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star 
-                          key={star} 
-                          size={20} 
-                          className={star <= Math.round(reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length || 3.8) ? "text-amber-400 fill-amber-400" : "text-gray-300"}
-                        />
-                      ))}
-                    </div>
-                    <p className="text-sm text-gray-600">{reviews.length || 5} Ratings</p>
-                  </div>
-                </div>
-                
-                {/* Rating Breakdown */}
-                <div className="space-y-2">
-                  {[5, 4, 3, 2, 1].map((stars) => {
-                    const count = reviews.filter(r => r.rating === stars).length || (stars === 5 ? 1 : stars === 4 ? 2 : stars === 3 ? 2 : 0);
-                    const total = reviews.length || 5;
-                    const percentage = (count / total) * 100;
-                    return (
-                      <div key={stars} className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-gray-600 w-12">{stars} Star</span>
-                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-amber-400 rounded-full transition-all"
-                            style={{ width: `${percentage}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-semibold text-gray-900 w-6">{count}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              {/* Rating Summary */}
+{reviews.length === 0 ? (
+  <div className="flex flex-col items-center justify-center py-10 px-6 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-100 mb-6">
+    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-md mb-4">
+      <Star size={28} className="text-amber-300" />
+    </div>
+    <h4 className="text-lg font-bold text-gray-900 mb-1">No reviews yet</h4>
+    <p className="text-sm text-gray-500 text-center max-w-xs mb-4">
+      Be the first to share your experience about this property. Your review helps others make better decisions.
+    </p>
+    <div className="flex gap-1 mb-2">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Star key={star} size={24} className="text-gray-200" />
+      ))}
+    </div>
+    <p className="text-xs text-gray-400">0 Ratings · 0 Reviews</p>
+  </div>
+) : (
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+    {/* Overall Rating */}
+    <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-6 border border-amber-100">
+      <div className="text-center">
+        <div className="text-5xl font-bold text-gray-900 mb-2">
+          {(reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1)}
+        </div>
+        <div className="flex justify-center gap-1 mb-2">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <Star
+              key={star}
+              size={20}
+              className={star <= Math.round(reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length) ? "text-amber-400 fill-amber-400" : "text-gray-300"}
+            />
+          ))}
+        </div>
+        <p className="text-sm text-gray-600">{reviews.length} Ratings</p>
+      </div>
+    </div>
+
+    {/* Rating Breakdown */}
+    <div className="space-y-2">
+      {[5, 4, 3, 2, 1].map((stars) => {
+        const count = reviews.filter(r => r.rating === stars).length;
+        const total = reviews.length || 1;
+        const percentage = (count / total) * 100;
+        return (
+          <div key={stars} className="flex items-center gap-3">
+            <span className="text-sm font-medium text-gray-600 w-12">{stars} Star</span>
+            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-amber-400 rounded-full transition-all"
+                style={{ width: `${percentage}%` }}
+              />
+            </div>
+            <span className="text-sm font-semibold text-gray-900 w-6">{count}</span>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+)}
               
               {/* Top Reviews */}
               <div className="space-y-4">
@@ -2581,4 +2550,3 @@ function PropertyDetails() {
 }
 
 export default PropertyDetails;
-                

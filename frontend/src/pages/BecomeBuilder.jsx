@@ -62,6 +62,7 @@ function BecomeBuilder() {
     
     // Step 2: Legal Documents
     reraNumber: '',
+    governmentIdName: '',
     governmentId: null,
     governmentIdPreview: null
   });
@@ -103,6 +104,7 @@ function BecomeBuilder() {
       experience: formData.experience,
       agencyName: formData.agencyName,
       reraNumber: formData.reraNumber,
+      governmentIdName: formData.governmentIdName,
       governmentIdPreview: formData.governmentIdPreview
     };
     localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(dataToSave));
@@ -182,6 +184,11 @@ function BecomeBuilder() {
 
   const validateStep2 = () => {
     const newErrors = {};
+    
+    // Government ID Name is required
+    if (!formData.governmentIdName || !formData.governmentIdName.trim()) {
+      newErrors.governmentIdName = 'Government ID name is required';
+    }
     
     // Government ID is required
     if (!formData.governmentId && !formData.governmentIdPreview) {
@@ -612,6 +619,29 @@ function BecomeBuilder() {
                   </p>
                 </div>
 
+                {/* Government ID Name */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">
+                    Name of Government ID <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <input
+                      type="text"
+                      name="governmentIdName"
+                      value={formData.governmentIdName || ''}
+                      onChange={handleChange}
+                      placeholder="e.g., Aadhaar, PAN, Passport"
+                      className={`w-full pl-9 pr-4 py-2.5 bg-white border rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm ${
+                        errors.governmentIdName ? 'border-red-500' : 'border-gray-200'
+                      }`}
+                    />
+                  </div>
+                  {errors.governmentIdName && (
+                    <p className="text-xs text-red-500 mt-1 ml-1">{errors.governmentIdName}</p>
+                  )}
+                </div>
+
                 {/* Government ID Upload */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-3 ml-1">
@@ -630,9 +660,13 @@ function BecomeBuilder() {
                         <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
                           <Upload className="w-8 h-8 text-primary" />
                         </div>
-                        <h4 className="font-bold text-gray-900 mb-2">Upload Government ID</h4>
+                        <h4 className="font-bold text-gray-900 mb-2">
+                          Upload {formData.governmentIdName || 'Government ID'}
+                        </h4>
                         <p className="text-xs text-gray-500 mb-4 max-w-xs mx-auto">
-                          Please upload a valid government-issued ID (Aadhaar, PAN, Passport, or Driver's License)
+                          {formData.governmentIdName 
+                            ? `Please upload your valid ${formData.governmentIdName}` 
+                            : "Please upload a valid government-issued ID (Aadhaar, PAN, Passport, or Driver's License)"}
                         </p>
                         <div className="relative inline-block">
                           <button

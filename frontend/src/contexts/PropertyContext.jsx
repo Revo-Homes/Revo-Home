@@ -114,6 +114,41 @@ const safeJsonParse = (value, fallback = null) => {
   }
 };
 
+const fixCorruptMeta = (meta) => {
+  if (!meta || typeof meta !== 'object') return meta;
+  const keys = Object.keys(meta);
+  if (keys.length > 2 && keys[0] === '0' && keys[1] === '1' && keys[2] === '2') {
+    const str = keys
+      .sort((a, b) => Number(a) - Number(b))
+      .map(k => meta[k])
+      .join('');
+    try { return JSON.parse(str); } catch { return {}; }
+  }
+  return meta;
+};
+
+const NEARBY_LABEL_MAP = {
+  near_metro:    'Metro Station',
+  near_busstand: 'Bus Stand',
+  near_railway:  'Railway Station',
+  near_airport:  'Airport',
+  near_highway:  'Highway',
+  near_hospital: 'Hospital',
+  near_school:   'School',
+  near_market:   'Market',
+};
+
+const parseNearbyFromLocationInsights = (locationInsights) => {
+  if (!locationInsights) return [];
+  const distances = locationInsights.distance_from_key_locations || locationInsights || {};
+  return Object.entries(distances)
+    .filter(([, val]) => val !== null && val !== undefined && String(val) !== 'custom')
+    .map(([key, val]) => ({
+      name: NEARBY_LABEL_MAP[key] || key.replace('near_', '').replace(/_/g, ' '),
+      distance: `${val} km`,
+    }));
+};
+
 const toArray = (value, fallback = []) => {
   if (Array.isArray(value)) return value;
   if (typeof value === 'string') {
@@ -168,147 +203,186 @@ const normalizeListingType = (type) => {
 const normalizeProperty = (item, userLocation = null) => {
   if (!item) return item;
 
-  const meta = safeJsonParse(item.meta, {});
-  const features = safeJsonParse(item.features, item.features);
-  const amenities = toArray(
-    item.amenities ||
-    features?.amenities ||
-    features?.community ||
-    features?.infrastructure ||
-    features?.security ||
-    features?.utilities,
-    []
+ // Parse meta FIRST — fix corrupt character-indexed meta before using it
+const metaRaw = safeJsonParse(item.meta, {});
+const meta = fixCorruptMeta(metaRaw) || {};
+
+// Parse features — can be array string OR object string
+const featuresRaw = safeJsonParse(item.features, null);
+let amenities = [];
+if (Array.isArray(featuresRaw)) {
+  amenities = featuresRaw;
+} else if (featuresRaw && typeof featuresRaw === 'object') {
+  amenities = toArray(featuresRaw.amenities, []);
+}
+// Also check direct amenities field from backend
+if (amenities.length === 0) {
+  const directAmenities = toArray(item.amenities || meta?.amenities || item.facilities || [], []);
+  if (directAmenities.length > 0) amenities = directAmenities;
+}
+
+  // BHK — from meta.bhk_details first, then property/unit bedrooms
+  const bhkDetails = Array.isArray(meta.bhk_details) ? meta.bhk_details : [];
+  const bhkFromMeta = meta.bhk
+  ? String(meta.bhk)
+  : bhkDetails[0]?.type
+    ? bhkDetails[0].type.toUpperCase().replace('BHK', ' BHK')
+    : null;
+const bhk = bhkFromMeta
+  || (item.bhk ? String(item.bhk) : null)
+  || formatBHK(item.property_bedrooms || item.unit_bedrooms || item.bedrooms || item.unit_bedrooms_count)
+  || '';
+
+
+  // Unit configurations from meta.bhk_details (for price config table)
+  const unitConfigurations = bhkDetails.map((d, i) => ({
+    id: `bhk-${i}`,
+    bhk: d.type ? d.type.toUpperCase().replace('BHK', ' BHK') : `${d.bedrooms || '?'} BHK`,
+    area: d.carpet_area || d.builtup_area || null,
+    price_min: d.price || item.price_min || item.price,
+    price_max: d.price || item.price_max || item.price,
+  }));
+
+  // Area — carpet_area > total_area > builtup_area > unit_super_builtup_area > meta dimensions
+  const area = toNumber(
+    item.carpet_area ||
+    item.total_area ||
+    item.builtup_area ||
+    item.unit_super_builtup_area ||
+    meta?.dimensions?.carpet_area ||
+    meta?.dimensions?.super_builtup_area
   );
-  const nearby = toArray(
+
+  // Images — primary_image_url is the only image source in this backend
+  const primaryImageUrl = item.primary_image_url || item.secondary_image_url_1 || null;
+  const imageList = [
+    primaryImageUrl,
+    item.secondary_image_url_1,
+    item.secondary_image_url_2,
+  ].filter(Boolean);
+  const primaryImage = primaryImageUrl || DEFAULT_IMAGE;
+
+  // Nearby — parse from meta.location_insights
+  const nearby = (() => {
+  const explicit = toArray(
     item.nearby ||
+    item.nearby_landmarks ||
+    item.nearby_places ||
     meta?.nearby ||
     meta?.nearby_landmarks ||
-    meta?.landmarks,
-    []
+    meta?.nearby_places,
+    null
   );
-  const imageList = toArray(item.images, [])
-    .map(normalizeImageUrl)
-    .filter(Boolean);
-  // Add secondary images from backend if available
-  if (item.secondary_image_url_1) imageList.push(normalizeImageUrl(item.secondary_image_url_1));
-  if (item.secondary_image_url_2) imageList.push(normalizeImageUrl(item.secondary_image_url_2));
-  const primaryImage =
-    normalizeImageUrl(item.image) ||
-    normalizeImageUrl(item.primary_image_url) ||
-    normalizeImageUrl(item.cover_image_url) ||
-    normalizeImageUrl(item.thumbnail_url) ||
-    imageList[0] ||
-    DEFAULT_IMAGE;
-  const listingId = item.listing_id || item.id || item.slug;
+  if (explicit && explicit.length > 0) return explicit;
+  // Try location_insights from meta or direct field
+  return parseNearbyFromLocationInsights(
+    meta?.location_insights || item.location_insights
+  );
+})();
+
+  // Location string
+  const city = item.city || item.property_city || '';
+  const state = item.state || item.property_state || '';
+  const location =
+    item.location ||
+    [item.address_line1, item.locality, city, state].filter(Boolean).join(', ') ||
+    '';
+
+  // Furnished status
+  const furnished =
+    item.unit_furnished_status ||
+    item.furnished_status ||
+    item.furnished ||
+    meta?.furnishing_status ||
+    '';
+
+  const listingId = item.listing_id || item.id;
   const propertyId = item.property_id || item.id;
-  const city = item.property_city || item.city || '';
-  const state = item.property_state || item.state || '';
-  const location = item.location
-    || [city, state].filter(Boolean).join(', ')
-    || item.property_address
-    || item.address_line1
-    || item.locality
-    || '';
 
-  // Calculate distance if user location is available and property has coordinates
+  // Distance calculation
   let distance = null;
-  if (userLocation && userLocation.latitude && userLocation.longitude) {
-    const propertyLat = parseFloat(item.latitude || item.lat);
-    const propertyLng = parseFloat(item.longitude || item.lng || item.lon);
-
-    if (!isNaN(propertyLat) && !isNaN(propertyLng)) {
-      // Use haversine formula to calculate distance
-      const R = 6371; // Earth's radius in kilometers
-      const dLat = (propertyLat - userLocation.latitude) * Math.PI / 180;
-      const dLng = (propertyLng - userLocation.longitude) * Math.PI / 180;
+  if (userLocation?.latitude && userLocation?.longitude) {
+    const lat = parseFloat(item.latitude || item.lat);
+    const lng = parseFloat(item.longitude || item.lng || item.lon);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      const R = 6371;
+      const dLat = (lat - userLocation.latitude) * Math.PI / 180;
+      const dLng = (lng - userLocation.longitude) * Math.PI / 180;
       const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(userLocation.latitude * Math.PI / 180) * Math.cos(propertyLat * Math.PI / 180) *
-        Math.sin(dLng / 2) * Math.sin(dLng / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      distance = R * c;
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(userLocation.latitude * Math.PI / 180) *
+        Math.cos(lat * Math.PI / 180) *
+        Math.sin(dLng / 2) ** 2;
+      distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
   }
 
   return {
     ...item,
     meta,
-    features,
+    features: featuresRaw,
     id: listingId,
     listingId,
     propertyId,
-    title: item.title || item.name || item.property_title || 'Property',
+    title: item.title || item.property_name || item.name || 'Property',
     price: toNumber(item.price || item.price_min || item.price_max),
+    price_min: toNumber(item.price_min || item.price),
+    price_max: toNumber(item.price_max || item.price),
     location,
     city,
     state,
-    bhk: item.bhk || formatBHK(item.bedrooms || item.property_bedrooms || item.unit_bedrooms || item.total_bedrooms || 2),
-    bathrooms: item.bathrooms || item.property_bathrooms || item.unit_bathrooms || item.total_bathrooms || 0,
-    area: toNumber(item.area || item.carpet_area || item.builtup_area || item.built_up_area || item.total_area),
+    bhk,
+    bhkDetails,
+    unitConfigurations,
+    bathrooms: item.unit_bathrooms || item.property_bathrooms || 0,
+    area,
+    furnished,
     propertyType:
       item.propertyType ||
       item.property_type_name ||
       PROPERTY_TYPE_LABELS[item.property_type_id] ||
-      item.type ||
-      'Apartment',
-    listingType: normalizeListingType(item.listingType || item.listing_type || 'sale'),
+      'Property',
+    listingType: normalizeListingType(item.listing_type || item.listingType || 'sale'),
     image: primaryImage,
     images: imageList.length > 0 ? imageList : [primaryImage],
     description: item.description || '',
-    owner_id: item.owner_id || item.created_by || item.user_id || null,
-    ownerEmail: item.ownerEmail || item.owner_email || item.created_by_email || '',
-    disabled: item.disabled || item.status === 'inactive' || item.status === 'withdrawn',
+    amenities,
+    nearby,
+    pricePerSqft: toNumber(item.price_per_sqft),
+    developer: item.developer || item.organization_name || '',
+    possessionDate: item.possession_date || item.available_from || '',
+    rera_number: item.rera_number || '',
+    floorNumber: item.unit_floor_number || meta?.floor_number || null,
+    totalFloors: item.total_floors || meta?.dimensions?.total_floors || null,
+    constructionQuality: item.unit_construction_quality || meta?.construction?.construction_quality || '',
+    owner: {
+      name: item.owner_name || item.organization_name || 'Property Owner',
+      phone: item.owner_phone || item.organization_phone || '',
+      email: item.owner_email || item.organization_email || '',
+      verified: Boolean(item.is_verified || item.property_is_verified),
+    },
+    owner_id: item.owner_id || item.created_by || null,
+    disabled: item.status === 'inactive' || item.status === 'withdrawn',
     labels: (() => {
-      // Handle labels already provided
-      if (item.labels && Array.isArray(item.labels)) return item.labels;
-
-      // Parse tags if it's a JSON string from backend
       let tags = item.tags;
       if (typeof tags === 'string') {
-        try {
-          tags = JSON.parse(tags);
-        } catch {
-          tags = null;
-        }
+        try { tags = JSON.parse(tags); } catch { tags = null; }
       }
-
-      // Extract slugs from tags array
       if (Array.isArray(tags)) {
-        const slugs = tags
-          .filter(t => t !== null)
-          .map(t => t.slug || t.tag_slug)
-          .filter(Boolean);
-
-        // Priority: sold_out overrides everything
+        const slugs = tags.filter(Boolean).map(t => t?.slug || t?.tag_slug || t).filter(s => typeof s === 'string');
         if (slugs.includes('sold_out')) return ['sold_out'];
-
-        // Sort by priority and take max 2
         const priority = ['sold_out', 'few_units_left', 'hot_sale', 'featured', 'top_selling', 'exclusive'];
-        return slugs
-          .sort((a, b) => priority.indexOf(a) - priority.indexOf(b))
-          .slice(0, 2);
+        return slugs.sort((a, b) => priority.indexOf(a) - priority.indexOf(b)).slice(0, 2);
       }
-
+      if (typeof item.tags === 'string' && item.tags.trim()) {
+        return [item.tags.trim().toLowerCase().replace(/\s+/g, '_')];
+      }
       return [];
     })(),
     badge: item.is_featured ? 'featured' : item.is_verified ? 'verified' : undefined,
     views: item.views_count || 0,
     inquiries_count: item.inquiries_count || 0,
-    favorites_count: item.favorites_count || 0,
-    furnished: item.furnished || item.furnished_status || item.unit_furnished_status || item.furnishing || '',
-    amenities,
-    nearby,
-    pricePerSqft: toNumber(item.price_per_sqft),
-    developer: item.developer || item.builder_name || item.organization_name || '',
-    possessionDate: item.possession_date || item.available_from || '',
-    rera_number: item.rera_number || item.rera || '',
-    owner: {
-      name: item.owner_name || item.organization_name || item.developer || 'Property Owner',
-      phone: item.owner_phone || item.organization_phone || '',
-      email: item.owner_email || item.organization_email || '',
-      verified: Boolean(item.is_verified || item.property_is_verified),
-    },
-    distance, // Distance in kilometers from user location
+    distance,
     latitude: parseFloat(item.latitude || item.lat) || null,
     longitude: parseFloat(item.longitude || item.lng || item.lon) || null,
   };
@@ -832,14 +906,29 @@ export function PropertyProvider({ children }) {
 
     // Revo Homes only uses listings - fetch from listing endpoint
     try {
-      const listingResponse = await listingApi.getById(id);
-      const listing = extractSingle(listingResponse, ['listing']);
-      if (listing) {
-        return normalizeProperty(listing, userLocation);
+  const listingResponse = await listingApi.getById(id);
+  const listing = extractSingle(listingResponse, ['listing']);
+  if (listing) {
+    const normalized = normalizeProperty(listing, userLocation);
+
+    // Single listing API doesn't return image fields like the list API does
+    // So fall back to cached listing data which was fetched from the list API
+    if (!normalized.images?.filter(Boolean).length || normalized.image === DEFAULT_IMAGE) {
+      const cached = [...properties, ...listings].find(item =>
+        Number(item?.id) === Number(id) ||
+        Number(item?.listingId) === Number(id)
+      );
+      if (cached?.image && cached.image !== DEFAULT_IMAGE) {
+        normalized.image = cached.image;
+        normalized.images = cached.images;
       }
-    } catch (err) {
-      console.error('PropertyContext: Listing fetch failed for id:', id, err);
     }
+
+    return normalized;
+  }
+} catch (err) {
+  console.error('PropertyContext: Listing fetch failed for id:', id, err);
+}
 
     if (slug) {
       try {

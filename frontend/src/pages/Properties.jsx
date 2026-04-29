@@ -245,7 +245,7 @@ function Properties() {
               onChange={(e) => setSortBy(e.target.value)}
               className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
-              <option value="default">Default</option>
+              <option value="default">Sort-by</option>
               <option value="price_asc">Price: Low to High</option>
               <option value="price_desc">Price: High to Low</option>
               <option value="area_asc">Area: Low to High</option>

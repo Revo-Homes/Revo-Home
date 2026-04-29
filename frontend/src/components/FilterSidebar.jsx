@@ -139,7 +139,11 @@ function FilterSidebar({ onFilterChange, onReset }) {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">BHK</label>
           <div className="flex flex-wrap gap-2">
-            {(formOptions.bhk || []).map((bhk) => {
+            {(
+              Array.isArray(formOptions.bhk) && formOptions.bhk.length > 0
+                ? formOptions.bhk
+                : [{ value: '1', label: '1' }, { value: '2', label: '2' }, { value: '3', label: '3' }, { value: '4', label: '4' }, { value: '5+', label: '5+' }]
+            ).map((bhk) => {
               const bhkValue = bhk.value || bhk.label || bhk;
               const bhkLabel = bhk.label || bhk.value || bhk;
               return (
