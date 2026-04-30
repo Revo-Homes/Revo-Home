@@ -219,7 +219,24 @@ function Home() {
     return results;
   }, [filters, listings]);
 
-  const [isPaused, setIsPaused] = useState(false);
+  const nearbyListings = useMemo(() => {
+  if (!location || !listings || listings.length === 0) return [];
+
+  const byDistance = listings
+    .filter(p => p.distance !== null && p.distance !== undefined && p.distance <= 50)
+    .sort((a, b) => a.distance - b.distance);
+
+  if (byDistance.length > 0) return byDistance;
+
+  const cityName = formatLocation().split(',')[0].trim().toLowerCase();
+  if (!cityName) return [];
+
+  return listings.filter(p =>
+    (p.city || p.location || '').toLowerCase().includes(cityName)
+  );
+}, [listings, location, formatLocation]);
+
+const [isPaused, setIsPaused] = useState(false);
 
   useEffect(() => {
     const heroTimer = setInterval(() => {
@@ -350,7 +367,7 @@ function Home() {
               <div>
                 <h2 className="text-3xl font-bold text-gray-900 mb-2">Results for You</h2>
                 <p className="text-gray-500">
-                  Found {listings && listings.length > 0 ? listings.length : 0} listings near {formatLocation()}
+                  Found {nearbyListings.length} listings near {formatLocation()}
                 </p>
               </div>
               <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -361,7 +378,7 @@ function Home() {
             
             {listings && listings.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {listings.slice(0, 8).map((prop) => (
+                {nearbyListings.slice(0, 8).map((prop) => (
                   <PropertyCard 
                     key={prop.id} 
                     {...prop} 
@@ -381,13 +398,13 @@ function Home() {
               </div>
             )}
             
-            {listings && listings.length > 8 && (
+            {nearbyListings.length > 8 && (
               <div className="text-center mt-12">
                 <Link
                   to="/properties"
                   className="inline-flex items-center gap-2 px-8 py-3 bg-primary text-white font-bold rounded-lg hover:bg-primary-dark transition-all shadow-lg hover:shadow-primary/20"
                 >
-                  View All {listings.length} Listings
+                  View All {nearbyListings.length} Listings
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                   </svg>

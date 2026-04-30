@@ -22,7 +22,7 @@ import PropertyManagement from './PropertyManagement';
 import InteriorDesign from './InteriorDesign';
 import RentAgreement from './RentAgreement';
 import VastuConsultancy from './VastuConsultancy';  
-import HomeConstruction from './HomeConstruction';
+import HomeConstruction from './Homeconstruction';
 
 const SERVICES = [
   {

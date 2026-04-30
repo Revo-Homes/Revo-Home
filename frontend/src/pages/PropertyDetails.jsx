@@ -563,11 +563,28 @@ const SectionTitle = ({ icon: Icon, title, action }) => (
 );
 
 const InfoBadge = ({ icon: Icon, label, value, highlight = false }) => (
-  <div className={`flex items-center gap-2 rounded-lg px-3 py-2 ${highlight ? 'bg-primary/5 border border-primary/10' : 'bg-gray-50'}`}>
-    {Icon && <Icon size={16} className={highlight ? 'text-primary' : 'text-gray-500'} />}
-    <div>
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className={`text-sm font-semibold ${highlight ? 'text-primary' : 'text-gray-900'}`}>{value}</p>
+  <div className={`flex flex-col items-center text-center gap-2 rounded-xl px-2 py-3 min-w-0 ${
+    highlight ? 'bg-primary/5 border border-primary/10' : 'bg-gray-50'
+  }`}>
+    {Icon && (
+      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+        highlight ? 'bg-primary/15' : 'bg-white shadow-sm border border-gray-100'
+      }`}>
+        <Icon size={18} className={highlight ? 'text-primary' : 'text-gray-500'} />
+      </div>
+    )}
+    <div className="w-full min-w-0">
+      <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide leading-tight mb-0.5">
+        {label}
+      </p>
+      <p
+        className={`text-xs font-bold leading-tight truncate w-full ${
+          highlight ? 'text-primary' : 'text-gray-900'
+        }`}
+        title={value}
+      >
+        {value}
+      </p>
     </div>
   </div>
 );
@@ -1484,21 +1501,33 @@ function PropertyDetails() {
 
         {/* Premium HERO SECTION - Immersive Image with Gallery */}
         <div className="mb-6 lg:mb-8 relative">
-          {/* Overlay Badges */}
-          <div className="absolute top-3 sm:top-4 left-3 sm:left-4 z-20 flex flex-col gap-1.5 pointer-events-none">
-            <span className="px-3 py-1.5 bg-white/95 backdrop-blur-lg text-gray-900 rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg border border-white/50">
-              {property.propertyType}
-            </span>
-            {!!property.is_featured && (
-              <span className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg flex items-center gap-1">
-                <Star size={10} className="fill-current" />
-                Featured
-              </span>
-            )}
-          </div>
-
           {isGuestView ? (
             <div className="relative h-[280px] sm:h-[360px] lg:h-[420px] rounded-2xl overflow-hidden shadow-xl shadow-black/10">
+              <div className="absolute top-3 left-3 z-20 flex flex-col gap-1.5 pointer-events-none">
+                <span className="px-3 py-1.5 bg-white/95 backdrop-blur-lg text-gray-900 rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg border border-white/50">
+                  {property.propertyType}
+                </span>
+                {(!!property.is_featured || (property.labels || []).includes('featured')) && (
+                  <span className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg flex items-center gap-1">
+                    <Star size={10} className="fill-current" /> Featured
+                  </span>
+                )}
+                {(!!property.is_exclusive || (property.labels || []).includes('exclusive')) && (
+                  <span className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg flex items-center gap-1">
+                    <Award size={10} /> Exclusive
+                  </span>
+                )}
+                {(property.labels || []).includes('hot_sale') && (
+                  <span className="px-3 py-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg flex items-center gap-1">
+                    <Flame size={10} /> Hot Sale
+                  </span>
+                )}
+                {(property.labels || []).includes('few_units_left') && (
+                  <span className="px-3 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg">
+                    Few Units Left
+                  </span>
+                )}
+              </div>
               <img 
                 src={property.images?.[0] || property.image || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200'} 
                 alt={property.title}
@@ -1506,7 +1535,7 @@ function PropertyDetails() {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
               
-             {/* Thumbnail Gallery Preview */}
+              {/* Thumbnail Gallery Preview */}
               <div className="absolute bottom-3 left-3 right-3 flex gap-1.5">
                 {property.images?.slice(0, 4).map((img, idx) => (
                   <div key={idx} className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg overflow-hidden shadow-md border-2 border-white/50">
@@ -1534,7 +1563,32 @@ function PropertyDetails() {
               </div>
             </div>
           ) : (
-            <div className="rounded-2xl overflow-hidden shadow-xl shadow-black/10">
+            <div className="relative rounded-2xl overflow-hidden shadow-xl shadow-black/10">
+              <div className="absolute top-3 left-3 z-20 flex flex-col gap-1.5 pointer-events-none">
+                <span className="px-3 py-1.5 bg-white/95 backdrop-blur-lg text-gray-900 rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg border border-white/50">
+                  {property.propertyType}
+                </span>
+                {(!!property.is_featured || (property.labels || []).includes('featured')) && (
+                  <span className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg flex items-center gap-1">
+                    <Star size={10} className="fill-current" /> Featured
+                  </span>
+                )}
+                {(!!property.is_exclusive || (property.labels || []).includes('exclusive')) && (
+                  <span className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg flex items-center gap-1">
+                    <Award size={10} /> Exclusive
+                  </span>
+                )}
+                {(property.labels || []).includes('hot_sale') && (
+                  <span className="px-3 py-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg flex items-center gap-1">
+                    <Flame size={10} /> Hot Sale
+                  </span>
+                )}
+                {(property.labels || []).includes('few_units_left') && (
+                  <span className="px-3 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg">
+                    Few Units Left
+                  </span>
+                )}
+              </div>
               <ImageGallery images={property.images} title={property.title} />
             </div>
           )}
@@ -1557,7 +1611,7 @@ function PropertyDetails() {
         </div>
         {/* SQUAREYARDS-STYLE STICKY NAVIGATION */}
         {!isGuestView && (
-        <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-200 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 mb-6 hidden lg:block">
+        <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-gray-200 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 mb-6 hidden lg:block">
           <div className="flex items-center gap-1 overflow-x-auto py-3 no-scrollbar">
             {NAV_ITEMS.map((item) => (
               <button
@@ -1583,7 +1637,7 @@ function PropertyDetails() {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6 lg:space-y-8">
             {/* OVERVIEW SECTION */}
-            <section id="overview" className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8 shadow-lg shadow-gray-200/20 border border-gray-100/50">
+            <section id="overview" className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8 shadow-lg shadow-gray-200/20 border border-gray-100/50 scroll-mt-32">
               {/* Property Title and Location */}
               <div className="flex flex-col lg:flex-row justify-between items-start gap-4 lg:gap-6 mb-6">
                 <div className="flex-1">
@@ -1600,10 +1654,18 @@ function PropertyDetails() {
                   <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 leading-tight mb-2">
                     {property.title}
                   </h1>
-                  <div className="flex items-center gap-2 text-gray-600 text-base">
-                    <MapPin className="text-primary flex-shrink-0" size={18} />
-                    <span className="font-medium">{property.location}</span>
-                  </div>
+                  <div className="flex items-center gap-2 text-gray-600 text-base flex-wrap">
+  <MapPin className="text-primary flex-shrink-0" size={18} />
+  <span className="font-medium">{property.location}</span>
+  {property.distance !== null && property.distance !== undefined &&  (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">
+      <Navigation size={11} />
+      {property.distance < 1
+        ? `${(property.distance * 1000).toFixed(0)}m from you`
+        : `${property.distance.toFixed(1)}km from you`}
+    </span>
+  )}
+</div>
                 </div>
                 <div className="flex items-center gap-3 lg:flex-col lg:items-end">
                   <button
@@ -1632,12 +1694,18 @@ function PropertyDetails() {
               </div>
 
               {/* Key Highlights Row */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-6">
+              <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-6">
                 <InfoBadge icon={BedDouble} label="Configuration" value={normalizeBhkLabel(property.bhk)} highlight />
                 <InfoBadge icon={Maximize} label="Carpet Area" value={property.area ? `${property.area} sq.ft` : 'N/A'} />
                 <InfoBadge icon={Home} label="Furnishing" value={property.furnished || 'N/A'} />
                 <InfoBadge icon={Building2} label="Developer" value={property.developer || 'N/A'} />
                 <InfoBadge icon={Calendar} label="Possession" value={formatDateLabel(property.possessionDate) || 'N/A'} />
+                <InfoBadge
+                  icon={ShieldCheck}
+                  label="RERA No."
+                  value={property.rera_number || 'N/A'}
+                  highlight={!!property.rera_number}
+                />
               </div>
 
               <div className="space-y-6">
@@ -1682,7 +1750,7 @@ function PropertyDetails() {
             {!isGuestView && (
             <>
             {/* PRICE CONFIGURATION SECTION */}
-            <section id="floor-plans" className="SectionCard">
+            <section id="floor-plans" className="SectionCard scroll-mt-32">
               <SectionTitle 
                 icon={IndianRupee} 
                 title="Price List & Configuration" 
@@ -1759,7 +1827,7 @@ function PropertyDetails() {
             </section>
 
             {/* ENHANCED AMENITIES SECTION */}
-            <section id="amenities" className="SectionCard">
+            <section id="amenities" className="SectionCard scroll-mt-32">
               <SectionTitle 
                 icon={Sparkles} 
                 title="Amenities & Features"
@@ -1796,7 +1864,7 @@ function PropertyDetails() {
             </section>
 
             {/* LOCATION BENEFITS SECTION - Dynamic from Backend */}
-            <section id="location" className="SectionCard">
+            <section id="location" className="SectionCard scroll-mt-32">
               <SectionTitle icon={Navigation} title="Location Benefits & Landmarks" />
               {parseNearbyLandmarks(property?.nearby)?.length ? (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
@@ -1910,7 +1978,7 @@ function PropertyDetails() {
             </section>
 
             {/* TOP EXPERTS SECTION - Backend Ready */}
-            <section id="experts" className="SectionCard">
+            <section id="experts" className="SectionCard scroll-mt-32">
               <SectionTitle 
                 icon={Award} 
                 title={property?.city ? `Top Experts in ${property.city}` : "Top Experts Near You"}
@@ -1921,7 +1989,7 @@ function PropertyDetails() {
             </section>
 
             {/* REVIEWS SECTION - LAST SECTION */}
-            <section id="reviews" className="SectionCard">
+            <section id="reviews" className="SectionCard scroll-mt-32">
               <SectionTitle 
                 icon={Star} 
                 title={`${property.title?.split(' ').slice(0, 3).join(' ') || 'Property'} Reviews & Rating`}

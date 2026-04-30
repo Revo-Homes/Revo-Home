@@ -351,7 +351,7 @@ const bhk = bhkFromMeta
     pricePerSqft: toNumber(item.price_per_sqft),
     developer: item.developer || item.organization_name || '',
     possessionDate: item.possession_date || item.available_from || '',
-    rera_number: item.rera_number || '',
+    rera_number: item.rera_number || item.rera_no || item.rera || meta?.rera_number || meta?.rera_no || '',
     floorNumber: item.unit_floor_number || meta?.floor_number || null,
     totalFloors: item.total_floors || meta?.dimensions?.total_floors || null,
     constructionQuality: item.unit_construction_quality || meta?.construction?.construction_quality || '',
@@ -913,18 +913,37 @@ export function PropertyProvider({ children }) {
 
     // Single listing API doesn't return image fields like the list API does
     // So fall back to cached listing data which was fetched from the list API
-    if (!normalized.images?.filter(Boolean).length || normalized.image === DEFAULT_IMAGE) {
-      const cached = [...properties, ...listings].find(item =>
-        Number(item?.id) === Number(id) ||
-        Number(item?.listingId) === Number(id)
-      );
-      if (cached?.image && cached.image !== DEFAULT_IMAGE) {
-        normalized.image = cached.image;
-        normalized.images = cached.images;
-      }
-    }
+   const cached = [...properties, ...listings].find(item =>
+  Number(item?.id) === Number(id) ||
+  Number(item?.listingId) === Number(id)
+);
 
-    return normalized;
+if (cached) {
+  // Images
+  if (!normalized.images?.filter(Boolean).length || normalized.image === DEFAULT_IMAGE) {
+    if (cached.image && cached.image !== DEFAULT_IMAGE) {
+      normalized.image = cached.image;
+      normalized.images = cached.images;
+    }
+  }
+  // Labels
+  if (!normalized.labels?.length && cached.labels?.length) {
+    normalized.labels = cached.labels;
+  }
+  // RERA number — single API strips this, take from list-API cache
+  if (!normalized.rera_number && cached.rera_number) {
+    normalized.rera_number = cached.rera_number;
+  }
+  // Featured / Exclusive flags
+  if (!normalized.is_featured && cached.is_featured) {
+    normalized.is_featured = cached.is_featured;
+  }
+  if (!normalized.is_exclusive && cached.is_exclusive) {
+    normalized.is_exclusive = cached.is_exclusive;
+  }
+}
+
+return normalized;
   }
 } catch (err) {
   console.error('PropertyContext: Listing fetch failed for id:', id, err);

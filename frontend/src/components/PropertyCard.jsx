@@ -279,11 +279,11 @@ function PropertyCard({
             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
           </svg>
           {location}
-          {distance !== null && distance !== undefined && (
+          {/* {distance !== null && distance !== undefined && (
             <span className="ml-auto text-primary font-bold text-xs bg-primary/5 px-2 py-1 rounded-full">
               {distance < 1 ? `${(distance * 1000).toFixed(0)}m away` : `${distance.toFixed(1)}km away`}
             </span>
-          )}
+          )} */}
         </p>
 
         <div className="mt-auto flex items-center gap-x-6 gap-y-3 border-t border-gray-100 pt-5 text-left flex-wrap">
@@ -298,13 +298,11 @@ function PropertyCard({
 
           {Number(area) > 0 && (
             <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Area</span>
               <span className="text-sm font-black text-gray-900">{area} sqft</span>
             </div>
           )}
-           {furnished && (
+          {furnished && (
             <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Furnished</span>
               <span className="text-sm font-black text-gray-900 capitalize">{furnished}</span>
             </div>
           )}
@@ -327,14 +325,21 @@ function PropertyCard({
               </span>
             </div>
           </div>
-          {(owner?.verified || rera_number) && (
-            <span className="flex items-center gap-1 px-2.5 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-black uppercase tracking-wide flex-shrink-0 border border-green-100">
-              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-              </svg>
-              RERA Verified
-            </span>
-          )}
+{rera_number ? (
+  <span className="flex items-center gap-1 px-2.5 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-black uppercase tracking-wide flex-shrink-0 border border-green-100">
+    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+    </svg>
+    RERA Verified
+  </span>
+) : owner?.verified ? (
+  <span className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-black uppercase tracking-wide flex-shrink-0 border border-blue-100">
+    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+    </svg>
+    Verified
+  </span>
+) : null}
         </div>
         )}
         
