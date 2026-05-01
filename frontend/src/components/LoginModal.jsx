@@ -56,8 +56,6 @@ function LoginModal({ isOpen, onClose }) {
       const result = await verifyOtp(phone, otpValue, 'sms');
       if (result.success) {
         onClose();
-        // Use the established handlePhoneVerified to ensure session persistence and dashboard visibility
-        handlePhoneVerified(phone);
       } else {
         setError(result.message || 'Invalid OTP. Please try again.');
       }

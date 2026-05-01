@@ -4,7 +4,7 @@ import { X, Smartphone, User, Mail, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 function SignupModal({ isOpen, onClose, onLoginClick }) {
-  const { handlePhoneVerified } = useAuth();
+  const { sendOtp, verifyOtp } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -26,7 +26,7 @@ function SignupModal({ isOpen, onClose, onLoginClick }) {
     if (error) setError('');
   };
 
-  const handleSendOTP = (e) => {
+  const handleSendOTP = async (e) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.phone.trim()) {
       setError('Name and Mobile Number are required');
@@ -38,15 +38,31 @@ function SignupModal({ isOpen, onClose, onLoginClick }) {
     }
 
     setLoading(true);
-    // Mock API call
-    setTimeout(() => {
-      console.log('Signup OTP sent to:', formData.phone);
-      setStep('otp');
+    try {
+      sessionStorage.setItem('signup_data', JSON.stringify({
+        first_name: formData.name.trim().split(' ')[0],
+        last_name: formData.name.trim().split(' ').slice(1).join(' '),
+        email: formData.email.trim() || undefined,
+        phone: formData.phone
+      }));
+
+      const result = await sendOtp(formData.phone, 'sms');
+      if (result.success) {
+        setStep('otp');
+      } else {
+        setError(result.message || 'Failed to send OTP. Please try again.');
+        sessionStorage.removeItem('signup_data');
+      }
+    } catch (err) {
+      console.error('Signup OTP error:', err);
+      setError('Something went wrong. Please try again.');
+      sessionStorage.removeItem('signup_data');
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
-  const handleVerifyOTP = (e) => {
+  const handleVerifyOTP = async (e) => {
     e.preventDefault();
     if (otp.join('').length !== 6) {
       setError('Please enter the 6-digit OTP');
@@ -54,18 +70,22 @@ function SignupModal({ isOpen, onClose, onLoginClick }) {
     }
 
     setLoading(true);
-    // Mock API call
-    setTimeout(() => {
-      console.log('User signed up (mock):', formData);
-      setSuccess(true);
+    try {
+      const result = await verifyOtp(formData.phone, otp.join(''), 'sms');
+      if (result.success) {
+        setSuccess(true);
+        setTimeout(() => {
+          onClose();
+        }, 1000);
+      } else {
+        setError(result.message || 'Invalid OTP. Please try again.');
+      }
+    } catch (err) {
+      console.error('Signup OTP verification error:', err);
+      setError('Invalid OTP. Please try again.');
+    } finally {
       setLoading(false);
-      
-      // Perform mock login via AuthContext to make dashboard visible
-      setTimeout(() => {
-        handlePhoneVerified(formData.phone);
-        onClose();
-      }, 1500);
-    }, 1000);
+    }
   };
 
   const handleOtpChange = (index, value) => {

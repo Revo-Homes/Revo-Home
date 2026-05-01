@@ -904,7 +904,7 @@ function ContactSidePanel({
             Enquiry Now
           </motion.button>
           
-          <div className="grid grid-cols-2 gap-2">
+          <div className={`grid gap-2 ${property?.hasBrochure ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -914,15 +914,17 @@ function ContactSidePanel({
               <Phone size={14} />
               Call Back
             </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={onBrochureClick}
-              className="py-2.5 bg-blue-50 text-blue-700 font-semibold text-xs rounded-xl hover:bg-blue-100 transition-all flex items-center justify-center gap-1.5 border border-blue-100"
-            >
-              <FileDown size={14} />
-              Brochure
-            </motion.button>
+            {property?.hasBrochure && (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={onBrochureClick}
+                className="py-2.5 bg-blue-50 text-blue-700 font-semibold text-xs rounded-xl hover:bg-blue-100 transition-all flex items-center justify-center gap-1.5 border border-blue-100"
+              >
+                <FileDown size={14} />
+                Brochure
+              </motion.button>
+            )}
           </div>
         </div>
       </motion.div>
@@ -1252,7 +1254,11 @@ function PropertyDetails() {
       openLoginForPropertyDetails();
       return;
     }
-    setShowPaymentModal(true);
+    if (property?.isResale) {
+      setShowPaymentModal(true);
+    } else {
+      generateAndDownloadDocument();
+    }
   };
 
   const initiatePayment = async () => {
@@ -1651,10 +1657,16 @@ function PropertyDetails() {
                       </span>
                     )}
                   </div>
-                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 leading-tight mb-2">
-                    {property.title}
-                  </h1>
-                  <div className="flex items-center gap-2 text-gray-600 text-base flex-wrap">
+                
+<h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 leading-tight mb-2">
+  {property.title}
+</h1>
+{property.developer && (
+  <p className="text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wide">
+    By <span className="text-gray-800">{property.developer}</span>
+  </p>
+)}
+<div className="flex items-center gap-2 text-gray-600 text-base flex-wrap">
   <MapPin className="text-primary flex-shrink-0" size={18} />
   <span className="font-medium">{property.location}</span>
   {property.distance !== null && property.distance !== undefined &&  (
@@ -1665,7 +1677,14 @@ function PropertyDetails() {
         : `${property.distance.toFixed(1)}km from you`}
     </span>
   )}
+  {property.rera_number && (
+    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 border border-green-200 text-green-800 text-xs font-black rounded-full uppercase tracking-wide">
+      <ShieldCheck size={11} className="text-green-600" />
+      RERA: {property.rera_number}
+    </span>
+  )}
 </div>
+
                 </div>
                 <div className="flex items-center gap-3 lg:flex-col lg:items-end">
                   <button
@@ -1694,18 +1713,13 @@ function PropertyDetails() {
               </div>
 
               {/* Key Highlights Row */}
-              <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-6">
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 mb-6">
                 <InfoBadge icon={BedDouble} label="Configuration" value={normalizeBhkLabel(property.bhk)} highlight />
                 <InfoBadge icon={Maximize} label="Carpet Area" value={property.area ? `${property.area} sq.ft` : 'N/A'} />
                 <InfoBadge icon={Home} label="Furnishing" value={property.furnished || 'N/A'} />
                 <InfoBadge icon={Building2} label="Developer" value={property.developer || 'N/A'} />
                 <InfoBadge icon={Calendar} label="Possession" value={formatDateLabel(property.possessionDate) || 'N/A'} />
-                <InfoBadge
-                  icon={ShieldCheck}
-                  label="RERA No."
-                  value={property.rera_number || 'N/A'}
-                  highlight={!!property.rera_number}
-                />
+                
               </div>
 
               <div className="space-y-6">
@@ -2303,26 +2317,28 @@ function PropertyDetails() {
                   </div>
                   
                   {/* Right - Download Documents */}
-                  <div className="lg:w-auto w-full">
-                    <div className="bg-primary/5 rounded-xl p-5 border border-primary/10">
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 bg-white rounded-lg shadow-sm flex items-center justify-center flex-shrink-0">
-                          <Download size={20} className="text-primary" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900 mb-1">Property Documents</h3>
-                          <p className="text-sm text-gray-500 mb-3">Download complete property details, legal documents & more</p>
-                          <button
-                            onClick={handleDownloadDocuments}
-                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-dark text-white text-sm font-semibold rounded-lg transition-all shadow-md hover:shadow-lg"
-                          >
-                            <IndianRupee size={14} />
-                            49 - Download Documents
-                          </button>
+                  {property?.hasBrochure && (
+                    <div className="lg:w-auto w-full">
+                      <div className="bg-primary/5 rounded-xl p-5 border border-primary/10">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 bg-white rounded-lg shadow-sm flex items-center justify-center flex-shrink-0">
+                            <Download size={20} className="text-primary" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-900 mb-1">Property Documents</h3>
+                            <p className="text-sm text-gray-500 mb-3">Download complete property details, legal documents & more</p>
+                            <button
+                              onClick={handleDownloadDocuments}
+                              className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-dark text-white text-sm font-semibold rounded-lg transition-all shadow-md hover:shadow-lg"
+                            >
+                              <IndianRupee size={14} />
+                              99 - Download Documents
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -2578,8 +2594,7 @@ function PropertyDetails() {
                     <p className="text-xs text-gray-500 mt-0.5">Instant download after payment</p>
                   </div>
                   <div className="text-right">
-                    <span className="text-2xl font-bold text-primary">₹49</span>
-                    <span className="text-gray-400 line-through text-sm ml-2">₹99</span>
+                    <span className="text-2xl font-bold text-primary">₹99</span>
                   </div>
                 </div>
                 
@@ -2600,7 +2615,7 @@ function PropertyDetails() {
                   ) : (
                     <>
                       <IndianRupee size={18} />
-                      Pay ₹49 & Download
+                      Pay ₹99 & Download
                     </>
                   )}
                 </button>

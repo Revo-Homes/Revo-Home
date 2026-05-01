@@ -343,6 +343,11 @@ const bhk = bhkFromMeta
       PROPERTY_TYPE_LABELS[item.property_type_id] ||
       'Property',
     listingType: normalizeListingType(item.listing_type || item.listingType || 'sale'),
+    isResale: ['resale', 'Resale', 'RESALE'].includes(item.listing_type || ''),
+    hasBrochure: Boolean(
+      item.brochure_url || item.brochure || item.document_url ||
+      meta?.brochure_url || meta?.document_url || meta?.brochure
+    ),
     image: primaryImage,
     images: imageList.length > 0 ? imageList : [primaryImage],
     description: item.description || '',
@@ -407,7 +412,7 @@ const LISTINGS_PAGE_SIZE = 100;
 const LISTINGS_MAX_PAGES = 25;
 
 export function PropertyProvider({ children }) {
-  const { isLoggedIn, user } = useAuth();
+  const { isLoggedIn, user, logout  } = useAuth();
   const { location: userLocation } = useLocation();
   const [properties, setProperties] = useState([]);
   const [listings, setListings] = useState([]);
@@ -818,9 +823,10 @@ export function PropertyProvider({ children }) {
       return true;
     } catch (err) {
       console.error('Failed to toggle favorite:', err);
+       if (err?.status === 401) logout();
       return false;
     }
-  }, []);
+  }, [logout]);
 
   const transformToBackendPayload = (data) => {
     const title = data.title || `${data.bhk || ''} BHK ${data.propertyType || 'Property'} in ${data.locality || ''}`.trim();
