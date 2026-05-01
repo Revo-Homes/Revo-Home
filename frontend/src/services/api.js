@@ -63,7 +63,7 @@ const handleResponse = async (res) => {
 const request = (method, path, body = null, opts = {}) => {
   const url = buildUrl(path, opts.params);
   const headers = {
-    ...getAuthHeader(),
+    ...(opts.auth === false ? {} : getAuthHeader()),
     ...getOrganizationHeaders(),
     ...opts.headers
   };
@@ -97,18 +97,19 @@ export const post = (path, body) => request('POST', path, body);
 export const put = (path, body) => request('PUT', path, body);
 export const patch = (path, body) => request('PATCH', path, body);
 export const del = (path) => request('DELETE', path);
+export const publicPost = (path, body) => request('POST', path, body, { auth: false });
 
 // -------------------- AUTH (Login, OTP, Signup, Social) --------------------
 export const authApi = {
-  login: (payload) => post('/auth/login', payload),
-  refreshToken: (payload) => post('/auth/refresh-token', payload),
-  forgotPassword: (payload) => post('/auth/forgot-password', payload),
-  resetPassword: (payload) => post('/auth/reset-password', payload),
-  verifyEmailToken: (payload) => post('/auth/verify-email', payload),
-  verify2fa: (payload) => post('/auth/2fa/verify', payload),
-  sendOtp: (payload) => post('/auth/otp/request', payload),
-  verifyOtp: (payload) => post('/auth/otp/verify', payload),
-  oauthCallback: (payload) => post('/auth/oauth/callback', payload),
+  login: (payload) => publicPost('/auth/login', payload),
+  refreshToken: (payload) => publicPost('/auth/refresh-token', payload),
+  forgotPassword: (payload) => publicPost('/auth/forgot-password', payload),
+  resetPassword: (payload) => publicPost('/auth/reset-password', payload),
+  verifyEmailToken: (payload) => publicPost('/auth/verify-email', payload),
+  verify2fa: (payload) => publicPost('/auth/2fa/verify', payload),
+  sendOtp: (payload) => publicPost('/auth/otp/request', payload),
+  verifyOtp: (payload) => publicPost('/auth/otp/verify', payload),
+  oauthCallback: (payload) => publicPost('/auth/oauth/callback', payload),
   getMe: () => get('/auth/me'),
   logout: () => post('/auth/logout', {}),
   changePassword: (payload) => post('/auth/change-password', payload),
