@@ -4,10 +4,15 @@
  * All endpoints align with frontend pages: Login, OTP, Signup, Properties, Sell, Dashboard, Tools, Admin
  */
 
-const API_BASE =
+const normalizeApiBase = (value) => {
+  const base = (value || '/api/v1').replace(/\/+$/, '');
+  return base === '/api' ? '/api/v1' : base;
+};
+
+const API_BASE = normalizeApiBase(
   import.meta.env.VITE_API_BASE_URL ||
-  import.meta.env.VITE_CORE_API_URL ||
-  '/api/v1';
+  import.meta.env.VITE_CORE_API_URL
+);
 
 const getAuthHeader = () => {
   const token = localStorage.getItem('authToken');
