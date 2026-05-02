@@ -29,7 +29,7 @@ function LoginModal({ isOpen, onClose }) {
 
     setLoading(true);
     try {
-      const result = await sendOtp(phone, 'sms');
+      const result = await sendOtp(phone, 'sms', 'login');
       if (result.success) {
         setStep('otp');
       } else {

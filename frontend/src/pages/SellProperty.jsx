@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -58,18 +58,217 @@ import {
 
 
 const STEPS = [
-
   { id: 1, title: 'Basic Information' },
-
   { id: 2, title: 'Property Details' },
-
-  { id: 3, title: 'Pricing Details' },
-
-  { id: 4, title: 'Location Details' },
-
-  { id: 5, title: 'Photos & Media' },
-
+  { id: 3, title: 'Specifications' },
+  { id: 4, title: 'Pricing Details' },
+  { id: 5, title: 'Location & Compliance' },
+  { id: 6, title: 'Media & SEO' },
 ];
+
+// Builder API helper (for builder selection feature)
+const builderApi = {
+  list: async (params = {}) => {
+    try {
+      const response = await propertyApi.getBuilders(params);
+      console.log('Builder API response:', response);
+
+      // Handle different response formats
+      let builders = [];
+      if (response?.data && Array.isArray(response.data)) {
+        builders = response.data;
+      } else if (Array.isArray(response)) {
+        builders = response;
+      } else if (response?.data?.data && Array.isArray(response.data.data)) {
+        // Handle nested data structure
+        builders = response.data.data;
+      }
+
+      // Map builders to consistent format
+      return builders.map(builder => ({
+        id: builder.id,
+        name: builder.name || builder.organization || 'Unknown Builder',
+        city: builder.city || builder.address?.city || '',
+        status: builder.status || 'active',
+        type: builder.type || 'builder'
+      }));
+    } catch (error) {
+      console.error('Builder API error:', error);
+      return [];
+    }
+  }
+};
+
+// Property category mapping for subtypes
+const PROPERTY_TYPE_ID_MAP = {
+  'Residential': 1,
+  'Commercial': 2,
+  'Land': 3,
+  'Industrial': 4,
+  'Hospitality': 5
+};
+
+const PROPERTY_CATEGORY_ID_MAP = {
+  'Residential': 1,
+  'Commercial': 2,
+  'Land': 3,
+  'Industrial': 4,
+  'Hospitality': 5
+};
+
+// Helper function to get RERA placeholder based on location
+function normalizeLocationValue(value) {
+  if (!value || typeof value !== 'string') return '';
+  return value.toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+function getReraExampleByLocation({ city, state }) {
+  const normalizedCity = normalizeLocationValue(city);
+  const normalizedState = normalizeLocationValue(state || '');
+
+  // Odisha
+  if (
+    ['bhubaneswar', 'cuttack'].includes(normalizedCity) ||
+    normalizedState === 'odisha'
+  ) {
+    return {
+      placeholder: 'ORERA/PROJECT/2024/000123',
+      hint: 'Sample: ORERA/PROJECT/2024/000123'
+    };
+  }
+
+  // Maharashtra (Mumbai, Pune, etc.)
+  if (
+    ['mumbai', 'pune', 'thane', 'nagpur', 'nashik', 'aurangabad', 'kolhapur', 'sangli'].includes(normalizedCity) ||
+    normalizedState === 'maharashtra'
+  ) {
+    return {
+      placeholder: 'P51800012345',
+      hint: 'Sample: P51800012345'
+    };
+  }
+
+  // Karnataka (Bangalore, etc.)
+  if (
+    ['bangalore', 'bengaluru', 'mysore', 'mangalore', 'hubballi'].includes(normalizedCity) ||
+    normalizedState === 'karnataka'
+  ) {
+    return {
+      placeholder: 'PRM/KA/RERA/1251/310/PR/171014/000123',
+      hint: 'Sample: PRM/KA/RERA/1251/310/PR/171014/000123'
+    };
+  }
+
+  // Telangana (Hyderabad)
+  if (normalizedCity === 'hyderabad' || normalizedState === 'telangana') {
+    return {
+      placeholder: 'P02400004567',
+      hint: 'Sample: P02400004567'
+    };
+  }
+
+  // Uttar Pradesh
+  if (
+    ['noida', 'greater noida', 'lucknow', 'kanpur', 'varanasi', 'agra', 'meerut', 'ghaziabad'].includes(normalizedCity) ||
+    normalizedState === 'uttar pradesh'
+  ) {
+    return {
+      placeholder: 'UPRERAPRJ123456',
+      hint: 'Sample: UPRERAPRJ123456'
+    };
+  }
+
+  // Delhi
+  if (normalizedCity === 'delhi' || normalizedState === 'delhi') {
+    return {
+      placeholder: 'DLRERA2024P0001',
+      hint: 'Sample: DLRERA2024P0001'
+    };
+  }
+
+  // Haryana (Gurgaon, Faridabad)
+  if (
+    ['gurgaon', 'gurugram', 'faridabad'].includes(normalizedCity) ||
+    normalizedState === 'haryana'
+  ) {
+    return {
+      placeholder: 'HARERA/PROJECT/2024/001',
+      hint: 'Sample: HARERA/PROJECT/2024/001'
+    };
+  }
+
+  // Tamil Nadu (Chennai)
+  if (
+    ['chennai', 'coimbatore', 'madurai'].includes(normalizedCity) ||
+    normalizedState === 'tamil nadu'
+  ) {
+    return {
+      placeholder: 'TN/01/Building/0001/2024',
+      hint: 'Sample: TN/01/Building/0001/2024'
+    };
+  }
+
+  // West Bengal (Kolkata)
+  if (
+    ['kolkata', 'howrah'].includes(normalizedCity) ||
+    normalizedState === 'west bengal'
+  ) {
+    return {
+      placeholder: 'WBRERA/P/2024/0001',
+      hint: 'Sample: WBRERA/P/2024/0001'
+    };
+  }
+
+  // Gujarat (Ahmedabad, Surat)
+  if (
+    ['ahmedabad', 'surat', 'vadodara', 'rajkot'].includes(normalizedCity) ||
+    normalizedState === 'gujarat'
+  ) {
+    return {
+      placeholder: 'GJ/AA/2024/0001',
+      hint: 'Sample: GJ/AA/2024/0001'
+    };
+  }
+
+  // Rajasthan (Jaipur)
+  if (
+    ['jaipur', 'jodhpur', 'udaipur'].includes(normalizedCity) ||
+    normalizedState === 'rajasthan'
+  ) {
+    return {
+      placeholder: 'RERAJ/P/2024/001',
+      hint: 'Sample: RERAJ/P/2024/001'
+    };
+  }
+
+  // Kerala (Kochi, Trivandrum)
+  if (
+    ['kochi', 'trivandrum', 'kozhikode'].includes(normalizedCity) ||
+    normalizedState === 'kerala'
+  ) {
+    return {
+      placeholder: 'KERALA-KRERA/2024/01/0001',
+      hint: 'Sample: KERALA-KRERA/2024/01/0001'
+    };
+  }
+
+  // Punjab (Chandigarh, Ludhiana)
+  if (
+    ['chandigarh', 'ludhiana', 'amritsar'].includes(normalizedCity) ||
+    normalizedState === 'punjab'
+  ) {
+    return {
+      placeholder: 'PBRERA-2024-P-001',
+      hint: 'Sample: PBRERA-2024-P-001'
+    };
+  }
+
+  // Default/Generic
+  return {
+    placeholder: 'RERA/STATE/PROJECT/2024/0001',
+    hint: 'Sample: RERA/STATE/PROJECT/2024/0001'
+  };
+}
 
 function SellProperty() {
 
@@ -95,19 +294,19 @@ function SellProperty() {
       try {
         const response = await propertyApi.getFormOptions();
         const data = response?.data || response;
-        setFormOptions(data);
-      } catch (error) {
-        console.error('Failed to fetch form options:', error);
-        // Fallback to hardcoded values if API fails
-        setFormOptions({
-          property_types: [{ id: 1, name: 'Residential' }, { id: 2, name: 'Commercial' }, { id: 3, name: 'Land' }, { id: 4, name: 'Industrial' }, { id: 5, name: 'Hospitality' }],
-          property_categories: [{ id: 1, name: 'Residential' }, { id: 2, name: 'Commercial' }, { id: 3, name: 'Industrial' }, { id: 4, name: 'Land' }, { id: 5, name: 'Hospitality' }],
-          bhk: [{ value: '1 RK', label: '1 RK' }, { value: '1 BHK', label: '1 BHK' }, { value: '2 BHK', label: '2 BHK' }, { value: '3 BHK', label: '3 BHK' }],
-          furnishing: [{ value: 'fully_furnished', label: 'Fully Furnished' }, { value: 'semi_furnished', label: 'Semi Furnished' }, { value: 'unfurnished', label: 'Unfurnished' }],
-          area_units: [{ value: 'sqft', label: 'sqft' }, { value: 'sqm', label: 'sqm' }, { value: 'sqyd', label: 'sqyd' }],
-          facing_direction: [{ value: 'North', label: 'North' }, { value: 'South', label: 'South' }, { value: 'East', label: 'East' }, { value: 'West', label: 'West' }],
-          amenities: []
-        });
+        console.log('Form options loaded:', Object.keys(data || {}));
+        console.log('Property types count:', data?.property_types?.length, data?.property_types);
+        console.log('Property categories count:', data?.property_categories?.length);
+        console.log('States count:', data?.states?.length);
+        console.log('Furnishing status count:', data?.furnishing_status?.length, data?.furnishing_status);
+        console.log('Facing direction count:', data?.facing_direction?.length);
+        console.log('Area units count:', data?.area_units?.length, data?.area_units);
+        console.log('All group keys:', Object.keys(data || {}).filter(k => Array.isArray(data[k])));
+        setFormOptions(data || {});
+      } catch (err) {
+        console.error('Failed to load form options:', err);
+        // Fallback to empty object if API fails
+        setFormOptions({});
       } finally {
         setLoadingFormOptions(false);
       }
@@ -115,237 +314,415 @@ function SellProperty() {
     fetchFormOptions();
   }, []);
 
-
-
   const [formData, setFormData] = useState({
-
+    // Identity
     property_id: "",
-
     listing_id: "",
-
-    listingType: "", // No default
-
-    propertyType: "",
-
-    propertySubType: "",
-
-
-
-    // Pricing
-
-    minPrice: "",
-
-    maxPrice: "",
-
-    monthlyRent: "",
-
-    securityDeposit: "",
-
-    maintenance: "",
-
-    negotiable: false,
-
-
-
-    // Residential
-
-    bhk: [],
-
-    bhkDetails: [], // Array of { type: "2 BHK", bedrooms: 2, bathrooms: "", kitchens: "", balconies: "0", additionalRooms: "0" }
-
-    // Commercial
-
-    commercial_type: "",
-
-    washrooms: "",
-
-    visibility: "",
-
-    footfall_tag: "",
-
-    cabin_option: "",
-
-    // Industrial
-
-    ceiling_height: "",
-
-    power_supply: "",
-
-    industrial_type: "",
-
-    loading_dock: false,
-
-    truck_access: false,
-
-    fire_safety: "",
-
-    flooring_type: "",
-
-    office_space: "",
-
-    // Hospitality
-
-    total_rooms: "",
-
-    room_types: "",
-
-    occupancy_type: "",
-
-    food_included: "",
-
-    operational_status: "",
-
-    // Land
-
-    plot_length: "",
-
-    plot_width: "",
-
-    road_access: "",
-
-    boundary_wall: false,
-
-    water_source_land: "",
-
-    electricity_availability: "",
-
-    plot_type: "",
-
-    gated_plot: false,
-
-    // Additional Residential Fields
-
-    gated_society: "",
-
-    maintenance_charges: "",
-
-    // Common Fields for All Property Types
-
-    total_area: "",
-
-    builtup_area: "",
-
-    area_unit: "sqft",
-
-    floor_number: "",
-
-    total_floors: "",
-
-    age_of_property: "",
-
-    furnished_status: "",
-
-    water_source: "",
-
-    // Common Fields for Non-Land
-
-    parking_type: "",
-
-    parking_spaces: "",
-
-    power_backup: "",
-
-    lift: "",
-
-    facing: "",
-
+    name: "",
+    property_title_tagline: "",
+    slug: "",
     description: "",
 
-    name: "", // Added name for UI
+    // Property Type & Classification
+    propertyType: "",
+    propertySubType: "",
+    property_type_id: "",
+    property_category_id: "",
+    property_subtype: "",
+    listingType: "",
+    transaction_type: "new_booking",
+    ownership_type: "individual",
 
-    property_type_id: "", // For compatibility with existing logic
+    // Builder Selection
+    is_builder_listed: false,
+    builder_id: "",
+    builder_name: "",
 
-    property_subtype: "", // For compatibility
+    // Listing Status
+    property_condition: "",
+    sale_urgency: "",
+    status: "draft",
 
+    // BHK Configuration (CRM style)
+    selectedBHKs: [],
+    bhk: [],
+    bhkDetails: [], // Array of { type, type_slug, bedrooms, bathrooms, kitchens, halls, balconies, terrace, additionalSpace, carpet_area, builtup_area, price, floor_number, furnishing_status, unit_name }
 
+    // Area & Dimensions
+    total_area: "",
+    builtup_area: "",
+    carpet_area: "",
+    super_builtup_area: "",
+    plot_length: "",
+    plot_width: "",
+    area_unit: "sqft",
+
+    // Property Structure
+    total_floors: "",
+    floor_number: "",
+    total_units: "",
+    year_built: "",
+    age_of_property: "",
+    possession_date: "",
+
+    // Facing & Direction
+    facing_direction: "",
+
+    // Furnishing & Construction
+    furnishing_status: "",
+    construction_quality: "medium",
+
+    // Utilities
+    water_source: "",
+    power_backup: "",
+    lift_available: false,
+    rainwater_harvesting: false,
+    security_24x7: false,
+
+    // Parking
+    parking_type: "",
+    parking_spaces: "",
+
+    // Features
+    is_corner_unit: false,
+    vaastu_compliance: false,
+    pet_friendly: false,
+    vegan_friendly: false,
+    smart_home_features: false,
+
+    // Commercial Fields
+    commercial_type: "",
+    washrooms: "",
+    visibility: "",
+    footfall_tag: "",
+    cabin_option: "",
+
+    // Industrial Fields
+    ceiling_height: "",
+    power_supply: "",
+    industrial_type: "",
+    loading_dock: false,
+    truck_access: false,
+    fire_safety: "",
+    flooring_type: "",
+    office_space: "",
+
+    // Hospitality Fields
+    total_rooms: "",
+    room_types: "",
+    occupancy_type: "",
+    food_included: "",
+    operational_status: "",
+
+    // Land Fields
+    road_access: "",
+    boundary_wall: false,
+    electricity_availability: "",
+    plot_type: "",
+    gated_plot: false,
 
     // Location
-
     address_line1: "",
-
     address_line2: "",
-
     city: "",
-
     state: "",
-
     country: "IN",
-
     zip_code: "",
-
     locality: "",
-
     landmark: "",
-
     latitude: "",
-
     longitude: "",
 
+    // Nearby Distances (CRM style)
+    near_metro_distance: "",
+    near_metro_distance_custom: "",
+    near_railway_distance: "",
+    near_railway_distance_custom: "",
+    near_busstand_distance: "",
+    near_busstand_distance_custom: "",
+    near_airport_distance: "",
+    near_airport_distance_custom: "",
+    near_highway_distance: "",
+    near_highway_distance_custom: "",
+    near_auto_taxi_distance: "",
+    near_auto_taxi_distance_custom: "",
+    near_hospital_distance: "",
+    near_hospital_distance_custom: "",
+    near_school_distance: "",
+    near_school_distance_custom: "",
+    near_market_distance: "",
+    near_market_distance_custom: "",
 
-
+    // Legacy distance fields (for backward compatibility)
     hospitalDistance: "",
-
     schoolDistance: "",
-
     metroDistance: "",
-
     busStandDistance: "",
-
     airportDistance: "",
-
     railwayDistance: "",
 
+    // Compliance
+    rera_number: "",
+    rera_authority_id: "",
+    rera_expiry_date: "",
+    is_verified: false,
 
+    // Resale Documents
+    resale_documents: [],
 
-    // Amenities
+    // Pricing - Sale
+    price_min: "",
+    price_max: "",
+    price_per_sqft: "",
+    price_on_request: false,
 
+    // Pricing - Rent
+    rent_amount: "",
+    rent_frequency: "monthly",
+    security_deposit: "",
+    maintenance_charges: "",
+    maintenance_charges_frequency: "monthly",
+    maintenance_deposit: "",
+
+    // Rent Specific
+    available_from: "",
+    available_until: "",
+    lock_in_period: "",
+    lease_appreciation: "",
+    brokerage: "",
+    brokerage_percent: "",
+
+    // Negotiation
+    negotiable: false,
+    price_includes: [],
+
+    // Currency
+    currency: "INR",
+
+    // Features & Amenities
+    features: [],
     amenities: [],
-
     security: [],
-
     utilities: [],
+    nearby_facilities: [],
+    accessibility_features: [],
 
+    // Media Items (CRM style)
+    media_items: [],
 
-
-    // SEO
-
-    metaTitle: "",
-
-    metaDescription: "",
-
-
-
-    // Legacy/Existing fields for compatibility
-
+    // Legacy Media (for backward compatibility)
     photos: [],
-
     floor_plan: [],
-
     master_plan: [],
-
     documents: [],
-
     virtual_tour: [],
-
     youtubeLinks: [],
 
-    currency: 'INR',
+    // SEO
+    metaTitle: "",
+    meta_description: "",
+    meta_title: "",
+    meta_text: "",
 
-    possession_date: '',
+    // Labels/Tags
+    selectedTags: [],
 
-    rera_number: '',
+    // Feature flags
+    otherFeatureEnabled: false,
+    otherFeature: "",
 
-    sale_urgency: 'Normal',
-
-    property_condition: 'New',
-
+    // Internal
+    unit_number: "",
+    unit_type: "",
+    floor_plan_url: "",
+    reference_no: "",
+    virtual_tour_url: "",
+    matterport_id: "",
+    is_exclusive: false,
+    is_featured: false,
+    is_published: false,
+    views_count: 0,
   });
 
   const [otherFeature, setOtherFeature] = useState('');
-
   const [customFeatures, setCustomFeatures] = useState([]);
-
   const [showOtherInput, setShowOtherInput] = useState(false);
+
+  // Builder state
+  const [builders, setBuilders] = useState([]);
+  const [isLoadingBuilders, setIsLoadingBuilders] = useState(false);
+
+  // Fetch builders when builder selection is enabled
+  useEffect(() => {
+    if (formData.is_builder_listed) {
+      const fetchBuilders = async () => {
+        setIsLoadingBuilders(true);
+        try {
+          // Fetch all builders without status filter to debug
+          const data = await builderApi.list({});
+          console.log('Fetched builders:', data);
+          setBuilders(data || []);
+        } catch (error) {
+          console.error('Failed to fetch builders:', error);
+          setBuilders([]);
+        } finally {
+          setIsLoadingBuilders(false);
+        }
+      };
+      fetchBuilders();
+    }
+  }, [formData.is_builder_listed]);
+
+  // ─── BHK Helper Functions ───────────────────────────────────────────────────
+
+  function getBhkFieldVisibility(selectedCategorySlug) {
+    const slug = String(selectedCategorySlug || '').toLowerCase();
+    const isOneRk = slug.includes('rk');
+    const isBhk = slug.includes('bhk');
+    const bedroomCountMatch = slug.match(/(\d+)/);
+    const bedroomCount = bedroomCountMatch ? parseInt(bedroomCountMatch[1], 10) : 0;
+    const isTwoBhkAndAbove = bedroomCount >= 2;
+
+    return {
+      showBedroomField: isBhk || isOneRk,
+      showRoomField: !isBhk && !isOneRk,
+      showHallField: isTwoBhkAndAbove,
+      showKitchenField: true,
+      showWashroomField: true,
+      showBalconyField: !isOneRk,
+      showTerraceField: isTwoBhkAndAbove,
+      showAdditionalSpaceField: true,
+      isOneBhkFamily: bedroomCount === 1 && !isOneRk,
+    };
+  }
+
+  function getBhkDefaultValues(categorySlug, formOpts) {
+    const category = formOpts?.property_categories?.find(c => c.slug === categorySlug);
+    const meta = category?.meta || {};
+
+    return {
+      bedrooms: String(meta.bedrooms || 1),
+      halls: String(meta.halls || (meta.bedrooms >= 2 ? 1 : 0)),
+      kitchens: String(meta.kitchens || 1),
+      bathrooms: String(meta.bathrooms || meta.bedrooms || 1),
+      balconies: String(meta.balconies || (meta.bedrooms >= 3 ? 2 : 1)),
+      terrace: String(meta.terrace || 0),
+      additionalSpace: String(meta.additionalSpace || (categorySlug.includes('.5') ? 1 : 0)),
+    };
+  }
+
+  function isBhkFieldUnset(value) {
+    return value === undefined || value === null || value === '';
+  }
+
+  function parseHalfBhkConfig(categorySlug) {
+    const isHalfBhk = categorySlug.includes('.5') || categorySlug.includes('_5_');
+    if (!isHalfBhk) return { isHalfBhk: false, mainBedrooms: 0, extraRoom: 0 };
+    
+    const match = categorySlug.match(/(\d+)(?:\.|_)(\d+)/);
+    if (match) {
+      return {
+        isHalfBhk: true,
+        mainBedrooms: parseInt(match[1], 10),
+        extraRoom: 1
+      };
+    }
+    return { isHalfBhk: false, mainBedrooms: 0, extraRoom: 0 };
+  }
+
+  function createBhkDetailFromType(categorySlug, formOpts, existingDetail = {}) {
+    const defaults = getBhkDefaultValues(categorySlug, formOpts);
+    const category = formOpts?.property_categories?.find(c => c.slug === categorySlug);
+    const halfBhkConfig = parseHalfBhkConfig(categorySlug);
+
+    let adjustedDefaults = { ...defaults };
+    if (halfBhkConfig.isHalfBhk) {
+      adjustedDefaults = {
+        ...defaults,
+        bedrooms: String(halfBhkConfig.mainBedrooms),
+        bathrooms: String(halfBhkConfig.mainBedrooms),
+        additionalSpace: '1'
+      };
+    }
+
+    return {
+      type: category?.label || categorySlug,
+      type_slug: categorySlug,
+      bedrooms: isBhkFieldUnset(existingDetail.bedrooms) ? adjustedDefaults.bedrooms : existingDetail.bedrooms,
+      bathrooms: isBhkFieldUnset(existingDetail.bathrooms) ? adjustedDefaults.bathrooms : existingDetail.bathrooms,
+      kitchens: isBhkFieldUnset(existingDetail.kitchens) ? adjustedDefaults.kitchens : existingDetail.kitchens,
+      halls: isBhkFieldUnset(existingDetail.halls) ? adjustedDefaults.halls : existingDetail.halls,
+      balconies: isBhkFieldUnset(existingDetail.balconies) ? adjustedDefaults.balconies : existingDetail.balconies,
+      terrace: isBhkFieldUnset(existingDetail.terrace) ? adjustedDefaults.terrace : existingDetail.terrace,
+      additionalSpace: isBhkFieldUnset(existingDetail.additionalSpace) ? adjustedDefaults.additionalSpace : existingDetail.additionalSpace,
+      carpet_area: existingDetail.carpet_area || null,
+      builtup_area: existingDetail.builtup_area || null,
+      price: existingDetail.price || null,
+      total_units: existingDetail.total_units || null,
+      floor_number: existingDetail.floor_number || null,
+      furnishing_status: existingDetail.furnishing_status || null,
+      unit_name: existingDetail.unit_name || null,
+    };
+  }
+
+  function syncBhkState(updatedSelected, updatedDetails) {
+    setFormData(prev => ({
+      ...prev,
+      selectedBHKs: updatedSelected,
+      bhkDetails: updatedDetails,
+      bhk: updatedSelected.length > 0 ? updatedSelected : [],
+      bathrooms: updatedDetails.length > 0 ? updatedDetails[0].bathrooms : '',
+    }));
+  }
+
+  const updateBhkDetails = (newSelection) => {
+    setFormData(prev => {
+      const nextDetails = newSelection.map((bhkType) => {
+        const existing = prev.bhkDetails?.find((d) => d.type === bhkType || d.type_slug === bhkType) || {};
+        return createBhkDetailFromType(bhkType, formOptions, existing);
+      });
+      return {
+        ...prev,
+        selectedBHKs: newSelection,
+        bhkDetails: nextDetails,
+        bhk: newSelection,
+      };
+    });
+  };
+
+  const toggleBHK = (bhkSlug) => {
+    setFormData(prev => {
+      let updatedSelected = [...(prev.selectedBHKs || [])];
+      if (updatedSelected.includes(bhkSlug)) {
+        updatedSelected = updatedSelected.filter((b) => b !== bhkSlug);
+      } else {
+        updatedSelected.push(bhkSlug);
+      }
+      const nextDetails = updatedSelected.map((bhkType) => {
+        const existing = prev.bhkDetails?.find((d) => d.type === bhkType || d.type_slug === bhkType) || {};
+        return createBhkDetailFromType(bhkType, formOptions, existing);
+      });
+      return {
+        ...prev,
+        selectedBHKs: updatedSelected,
+        bhkDetails: nextDetails,
+        bhk: updatedSelected,
+      };
+    });
+  };
+
+  const updateBHKDetail = (index, key, value) => {
+    setFormData(prev => {
+      const updatedDetails = (prev.bhkDetails || []).map((detail, detailIndex) =>
+        detailIndex === index ? { ...detail, [key]: value } : detail
+      );
+      return {
+        ...prev,
+        bhkDetails: updatedDetails,
+        bathrooms: updatedDetails.length > 0 ? updatedDetails[0].bathrooms : prev.bathrooms,
+      };
+    });
+  };
 
   const [mediaPreviews, setMediaPreviews] = useState({
 
@@ -362,6 +739,11 @@ function SellProperty() {
   });
 
   const [submitting, setSubmitting] = useState(false);
+
+  // RERA validation state
+  const [reraError, setReraError] = useState('');
+  const [reraChecking, setReraChecking] = useState(false);
+  const reraCheckTimeoutRef = useRef(null);
 
 
 
@@ -615,6 +997,40 @@ function SellProperty() {
 
     }));
 
+    // RERA validation with debounce
+    if (name === 'rera_number' && value.trim()) {
+      // Clear previous timeout
+      if (reraCheckTimeoutRef.current) {
+        clearTimeout(reraCheckTimeoutRef.current);
+      }
+
+      setReraError('');
+      setReraChecking(true);
+
+      // Debounce the check for 500ms
+      reraCheckTimeoutRef.current = setTimeout(async () => {
+        try {
+          const result = await propertyApi.checkReraExists(value.trim(), editId);
+          if (result && result.exists) {
+            setReraError('This RERA number is already registered. Please enter a unique RERA number.');
+          } else {
+            setReraError('');
+          }
+        } catch (error) {
+          // Silently fail on API error - don't block user
+          console.error('RERA check failed:', error);
+        } finally {
+          setReraChecking(false);
+        }
+      }, 500);
+    } else if (name === 'rera_number' && !value.trim()) {
+      setReraError('');
+      setReraChecking(false);
+      if (reraCheckTimeoutRef.current) {
+        clearTimeout(reraCheckTimeoutRef.current);
+      }
+    }
+
   };
 
 
@@ -736,7 +1152,11 @@ function SellProperty() {
 
     if (step === 1) {
       // Basic Information: Name, Property Type, and Listing Type are required
-      return isFilled(formData.name) && isFilled(formData.propertyType) && isFilled(formData.listingType);
+      // Builder validation: if builder listed is selected, builder_id is required
+      const basicValid = isFilled(formData.name) && isFilled(formData.propertyType) && isFilled(formData.listingType);
+      if (!basicValid) return false;
+      if (formData.is_builder_listed && !isFilled(formData.builder_id)) return false;
+      return true;
     }
 
     if (step === 2) { // Property Details
@@ -749,9 +1169,10 @@ function SellProperty() {
       const pType = String(formData.propertyType).trim();
 
       if (pType === 'Residential') {
-        // RESIDENTIAL: Need BHK selection and details
-        const hasBHK = formData.bhk && Array.isArray(formData.bhk) && formData.bhk.length > 0;
-        const hasDetails = formData.bhkDetails && Array.isArray(formData.bhkDetails) && formData.bhkDetails.length > 0;
+        // RESIDENTIAL: Need BHK selection and details (CRM style - use selectedBHKs)
+        const hasBHK = (formData.selectedBHKs && formData.selectedBHKs.length > 0) || 
+                       (formData.bhk && formData.bhk.length > 0);
+        const hasDetails = formData.bhkDetails && formData.bhkDetails.length > 0;
         
         if (!hasBHK || !hasDetails) {
           return false;
@@ -787,28 +1208,35 @@ function SellProperty() {
       return false;
     }
 
-    if (step === 3) { // Pricing Details
+    if (step === 3) { // Specifications - optional fields
+      return true;
+    }
+
+    if (step === 4) { // Pricing Details
       if (formData.listingType === 'Sale') {
-        // For Sale: Need at least min price, max price is optional
-        return isFilled(formData.minPrice);
+        // For Sale: Need at least min price (also check price_min as fallback)
+        return isFilled(formData.minPrice) || isFilled(formData.price_min);
       } else if (formData.listingType === 'Rent' || formData.listingType === 'Lease') {
-        // For Rent/Lease: Need monthly rent
-        return isFilled(formData.monthlyRent);
+        // For Rent/Lease: Need monthly rent (also check rent_amount as fallback)
+        return isFilled(formData.monthlyRent) || isFilled(formData.rent_amount);
       }
       // If no listing type selected, don't allow proceeding
       return false;
     }
 
-    if (step === 4) { // Location Details
+    if (step === 5) { // Location & Compliance
       // Required fields: address_line1, city, state, zip_code, locality
-      return isFilled(formData.address_line1) && 
+      const locationValid = isFilled(formData.address_line1) && 
              isFilled(formData.city) && 
              isFilled(formData.state) && 
              isFilled(formData.zip_code) && 
              isFilled(formData.locality);
+      // Check for RERA error
+      if (reraError) return false;
+      return locationValid;
     }
 
-    if (step === 5) return true; // Photos are optional
+    if (step === 6) return true; // Media & SEO are optional
 
     return false;
   };
@@ -816,14 +1244,40 @@ function SellProperty() {
 
 
   const handleSubmit = async (e) => {
-
     e.preventDefault();
 
-    if (step < 5) {
+    if (step < 6) {
+      // Check for RERA error before proceeding (only relevant for step 5+)
+      if (reraError && step >= 4) {
+        alert('Please fix the RERA number error before proceeding.');
+        return;
+      }
 
       setStep(step + 1);
-
     } else {
+
+      // Final submission validation - check for duplicate RERA
+      if (reraError) {
+        alert('Please fix the RERA number error before submitting.');
+        setSubmitting(false);
+        return;
+      }
+
+      // If RERA is entered, verify it's not duplicate before submitting
+      if (formData.rera_number && formData.rera_number.trim()) {
+        try {
+          const result = await propertyApi.checkReraExists(formData.rera_number.trim(), editId);
+          if (result && result.exists) {
+            setReraError('This RERA number is already registered. Please enter a unique RERA number.');
+            alert('This RERA number is already registered. Please enter a unique RERA number.');
+            setSubmitting(false);
+            return;
+          }
+        } catch (error) {
+          console.error('RERA check failed on submit:', error);
+          // Continue with submission if API fails
+        }
+      }
 
       setSubmitting(true);
 
@@ -1135,9 +1589,10 @@ function SellProperty() {
 
         } else {
 
-          const res = await createProperty(payload);
+          // Use propertyApi.createFromPayload for CRM-style property creation
+          const res = await propertyApi.createFromPayload(payload);
 
-          propertyId = res.id || res.propertyId;
+          propertyId = res.id || res.property_id || res.propertyId;
 
         }
 
@@ -1268,24 +1723,30 @@ function SellProperty() {
                       value={formData.propertyType}
                       onChange={(e) => {
                         const val = e.target.value;
-                        const id = Object.keys(propertyTypes).find(key => propertyTypes[key] === val);
+                        const id = PROPERTY_TYPE_ID_MAP[val] || '';
                         setFormData(prev => ({
                           ...prev,
                           propertyType: val,
-                          property_type_id: id || '',
-                        propertySubType: '',
-                      }));
-                    }}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
-                  >
-                    <option value="">Select Type</option>
-                    {(formOptions.property_types || []).map((type) => {
-                      const typeName = type.name || type.label || type;
-                      return (
-                        <option key={type.id || type.value || typeName} value={typeName}>{typeName}</option>
-                      );
-                    })}
-                  </select>
+                          property_type_id: id,
+                          propertySubType: '',
+                          property_subtype: '',
+                          selectedBHKs: [],
+                          bhkDetails: []
+                        }));
+                      }}
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
+                    >
+                      <option value="">Select Type</option>
+                      {(formOptions.property_types || []).map((type) => {
+                        const typeName = type.name || type.label || type;
+                        return (
+                          <option key={type.id || type.value || typeName} value={typeName}>{typeName}</option>
+                        );
+                      })}
+                    </select>
+                  )}
+                  {!loadingFormOptions && (!formOptions.property_types || formOptions.property_types.length === 0) && (
+                    <p className="text-xs text-red-500 mt-1">No property types available. Please check database configuration.</p>
                   )}
                 </div>
                 <div>
@@ -1293,16 +1754,96 @@ function SellProperty() {
                   <select
                     name="propertySubType"
                     value={formData.propertySubType}
-                    onChange={handleChange}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        propertySubType: e.target.value,
+                        property_subtype: e.target.value
+                      }));
+                    }}
                     disabled={!formData.propertyType}
                     className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all disabled:opacity-50 disabled:bg-gray-50 disabled:cursor-not-allowed shadow-sm"
                   >
                     <option value="">Select Sub-type</option>
-                    {formData.propertyType && (formOptions.property_subtypes || []).map((subtype) => (
-                      <option key={subtype.value || subtype.label || subtype} value={subtype.value || subtype.label || subtype}>{subtype.label || subtype.value || subtype}</option>
-                    ))}
+                    {formData.propertyType && (formOptions.property_categories || [])
+                      .filter((category) => {
+                        // Filter categories by selected property type using type_id
+                        if (!category.type_id) return true; // Show all if no association
+                        const selectedTypeId = PROPERTY_TYPE_ID_MAP[formData.propertyType];
+                        return String(category.type_id) === String(selectedTypeId);
+                      })
+                      .map((category) => (
+                        <option key={category.value || category.id || category.slug} value={category.slug || category.value || category.label}>
+                          {category.label || category.name || category.slug}
+                        </option>
+                      ))}
                   </select>
                 </div>
+              </div>
+
+              {/* Builder Selection - New from CRM */}
+              <div className="pt-4 border-t border-gray-100">
+                <div className="flex items-center space-x-3 mb-4">
+                  <input
+                    type="checkbox"
+                    id="is_builder_listed"
+                    name="is_builder_listed"
+                    checked={formData.is_builder_listed}
+                    onChange={handleChange}
+                    className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <label htmlFor="is_builder_listed" className="text-sm font-medium text-gray-700 cursor-pointer">
+                    Is this property listed by a builder?
+                  </label>
+                </div>
+
+                {formData.is_builder_listed && (
+                  <div className="pl-6 space-y-3 border-l-2 border-gray-200">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">
+                        Select Builder {formData.is_builder_listed && <span className="text-red-500">*</span>}
+                      </label>
+                      <select
+                        name="builder_id"
+                        value={formData.builder_id}
+                        onChange={(e) => {
+                          const selectedBuilder = builders.find(b => String(b.id) === e.target.value);
+                          setFormData(prev => ({
+                            ...prev,
+                            builder_id: e.target.value,
+                            builder_name: selectedBuilder?.name || ''
+                          }));
+                        }}
+                        disabled={isLoadingBuilders || builders.length === 0}
+                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all disabled:opacity-50 disabled:bg-gray-50 disabled:cursor-not-allowed shadow-sm"
+                      >
+                        <option value="">
+                          {isLoadingBuilders ? 'Loading builders...' : builders.length === 0 ? 'No builders available' : 'Choose a builder...'}
+                        </option>
+                        {builders.map((builder) => (
+                          <option key={builder.id} value={String(builder.id)}>
+                            {builder.name} {builder.city ? `(${builder.city})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      {builders.length === 0 && !isLoadingBuilders && (
+                        <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <p className="text-xs text-yellow-800">
+                            <strong>No builders found.</strong> Either no builders exist in the database or they don't have <code>type='builder'</code>.
+                          </p>
+                          <p className="text-xs text-yellow-600 mt-1">
+                            Check browser console for API response details.
+                          </p>
+                        </div>
+                      )}
+                      {builders.length > 0 && (
+                        <p className="mt-1 text-xs text-green-600">
+                          {builders.length} builder(s) available
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
 
@@ -1354,23 +1895,7 @@ function SellProperty() {
 
               {/* BHK and Bathrooms removed from Step 1 */}
 
-
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">RERA Number</label>
-                  <div className="relative">
-                    <FileSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <input
-                      type="text"
-                      name="rera_number"
-                      value={formData.rera_number}
-                      onChange={handleChange}
-                      placeholder="PRM-KA-RAA..."
-                      className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
-                    />
-                  </div>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Possession Date</label>
                   <div className="relative">
@@ -1488,41 +2013,20 @@ function SellProperty() {
                 <div className="border-t border-gray-100 pt-6 mt-6 space-y-6">
                   <h3 className="text-lg font-bold text-gray-900 mb-4">Residential Details</h3>
 
-                  {/* BHK Configuration */}
+                  {/* BHK Configuration - CRM Style */}
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-2 ml-1">BHK Configuration (Select Multiple) <span className="text-red-500">*</span></label>
                     <div className="flex flex-wrap gap-2">
-                      {(formOptions.bhk || []).map((b) => {
-                        const bhkValue = b.value || b.label || b;
-                        const bhkLabel = b.label || b.value || b;
-                        const isSelected = formData.bhk.includes(bhkValue);
+                      {(formOptions.bhk || formOptions.bhk_options || []).map((b) => {
+                        const bhkValue = typeof b === 'object' ? (b.value || b.option_key || b.label) : b;
+                        const bhkLabel = typeof b === 'object' ? (b.label || b.value || b.option_key || b) : b;
+                        const bhkSlug = typeof b === 'object' ? (b.slug || b.value || b.option_key) : b;
+                        const isSelected = formData.selectedBHKs?.includes(bhkSlug) || formData.bhk?.includes(bhkValue);
                         return (
                           <button
-                            key={bhkValue}
+                            key={bhkSlug || bhkValue}
                             type="button"
-                            onClick={() => {
-                              let updatedSelected = [...formData.bhk];
-                              let updatedDetails = [...formData.bhkDetails];
-
-                              if (isSelected) {
-                                updatedSelected = updatedSelected.filter(item => item !== bhkValue);
-                                updatedDetails = updatedDetails.filter(d => d.type !== bhkValue);
-                              } else {
-                                updatedSelected.push(bhkValue);
-                                const bedrooms = parseInt(bhkValue) || 1;
-                                updatedDetails.push({
-                                  type: bhkValue,
-                                  bedrooms: bedrooms,
-                                  bathrooms: '',
-                                  kitchens: '',
-                                  balconies: '0',
-                                  additionalRooms: '0',
-                                  floorPlan: null,
-                                  floorPlanPreview: null
-                                });
-                              }
-                              setFormData(prev => ({ ...prev, bhk: updatedSelected, bhkDetails: updatedDetails }));
-                            }}
+                            onClick={() => toggleBHK(bhkSlug || bhkValue)}
                             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all border flex items-center gap-2 ${isSelected
                                 ? 'bg-primary text-white border-primary shadow-md'
                                 : 'bg-white text-gray-600 border-gray-200 hover:border-primary hover:text-primary'
@@ -1552,7 +2056,9 @@ function SellProperty() {
                           </div>
                         </div>
 
+                        {/* BHK Configuration Fields - CRM Style */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {/* Bedrooms - Read only */}
                           <div>
                             <label className="flex items-center gap-2 text-xs font-semibold text-gray-600 mb-1.5 ml-1">
                               <BedDouble size={14} className="text-red-600" />
@@ -1565,59 +2071,195 @@ function SellProperty() {
                               className="w-full px-5 py-4 bg-gray-100 border-none rounded-2xl font-bold text-gray-500 cursor-not-allowed"
                             />
                           </div>
+
+                          {/* Bathrooms */}
                           <div>
                             <label className="flex items-center gap-2 text-xs font-semibold text-gray-600 mb-1.5 ml-1">
                               <Bath size={14} className="text-red-600" />
                               Bathrooms *
                             </label>
                             <select
-                              value={detail.bathrooms}
-                              onChange={(e) => {
-                                const updatedDetails = [...formData.bhkDetails];
-                                updatedDetails[index].bathrooms = e.target.value;
-                                setFormData(prev => ({ ...prev, bhkDetails: updatedDetails }));
-                              }}
+                              value={detail.bathrooms || ''}
+                              onChange={(e) => updateBHKDetail(index, 'bathrooms', e.target.value)}
                               className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
                             >
                               <option value="">Select Bathrooms</option>
                               {[1, 2, 3, 4, 5, '6+'].map(n => <option key={n} value={n}>{n}</option>)}
                             </select>
                           </div>
+
+                          {/* Kitchens */}
                           <div>
                             <label className="flex items-center gap-2 text-xs font-semibold text-gray-600 mb-1.5 ml-1">
                               <Utensils size={14} className="text-red-600" />
                               Kitchens *
                             </label>
                             <select
-                              value={detail.kitchens}
-                              onChange={(e) => {
-                                const updatedDetails = [...formData.bhkDetails];
-                                updatedDetails[index].kitchens = e.target.value;
-                                setFormData(prev => ({ ...prev, bhkDetails: updatedDetails }));
-                              }}
+                              value={detail.kitchens || ''}
+                              onChange={(e) => updateBHKDetail(index, 'kitchens', e.target.value)}
                               className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
                             >
                               <option value="">Select Kitchens</option>
                               {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
                             </select>
                           </div>
-                          <div>
-                            <label className="flex items-center gap-2 text-xs font-semibold text-gray-600 mb-1.5 ml-1">
-                              <Wind size={14} className="text-red-600" />
-                              Balcony (Optional)
-                            </label>
-                            <select
-                              value={detail.balconies}
-                              onChange={(e) => {
-                                const updatedDetails = [...formData.bhkDetails];
-                                updatedDetails[index].balconies = e.target.value;
-                                setFormData(prev => ({ ...prev, bhkDetails: updatedDetails }));
-                              }}
-                              className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
-                            >
-                              {[0, 1, 2, 3, 4, '5+'].map(n => <option key={n} value={n}>{n}</option>)}
-                            </select>
+
+                          {/* Halls - For 2+ BHK */}
+                          {getBhkFieldVisibility(detail.type_slug || detail.type).showHallField && (
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Hall</label>
+                              <select
+                                value={detail.halls || '1'}
+                                onChange={(e) => updateBHKDetail(index, 'halls', e.target.value)}
+                                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
+                              >
+                                {[0, 1, 2, 3].map(n => <option key={n} value={n}>{n}</option>)}
+                              </select>
+                            </div>
+                          )}
+
+                          {/* Balconies */}
+                          {getBhkFieldVisibility(detail.type_slug || detail.type).showBalconyField && (
+                            <div>
+                              <label className="flex items-center gap-2 text-xs font-semibold text-gray-600 mb-1.5 ml-1">
+                                <Wind size={14} className="text-red-600" />
+                                Balcony
+                              </label>
+                              <select
+                                value={detail.balconies || '0'}
+                                onChange={(e) => updateBHKDetail(index, 'balconies', e.target.value)}
+                                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
+                              >
+                                {[0, 1, 2, 3, 4, '5+'].map(n => <option key={n} value={n}>{n}</option>)}
+                              </select>
+                            </div>
+                          )}
+
+                          {/* Terrace - For 2+ BHK */}
+                          {getBhkFieldVisibility(detail.type_slug || detail.type).showTerraceField && (
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Terrace</label>
+                              <select
+                                value={detail.terrace || '0'}
+                                onChange={(e) => updateBHKDetail(index, 'terrace', e.target.value)}
+                                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
+                              >
+                                {[0, 1, 2].map(n => <option key={n} value={n}>{n}</option>)}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Per-BHK Configuration Details - New from CRM */}
+                        <div className="mt-6 p-5 bg-blue-50/50 rounded-xl border border-blue-100">
+                          <div className="flex items-center gap-2 mb-4">
+                            <span className="text-lg">📦</span>
+                            <p className="text-sm font-semibold text-gray-900">Configuration-Specific Details</p>
                           </div>
+
+                          {/* Smart summary display */}
+                          {(detail.carpet_area || detail.price) && (
+                            <div className="mb-4 px-3 py-2 bg-white rounded-lg text-xs font-medium text-gray-600 border border-gray-200">
+                              {detail.type} • {detail.price ? `₹${Number(detail.price).toLocaleString('en-IN')}` : 'Price not set'} • {detail.carpet_area ? `${detail.carpet_area} sqft` : 'Area not set'}
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {/* Carpet Area */}
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Carpet Area (sqft)</label>
+                              <input
+                                type="number"
+                                value={detail.carpet_area || ''}
+                                onChange={(e) => updateBHKDetail(index, 'carpet_area', e.target.value)}
+                                placeholder="1200"
+                                min="0"
+                                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
+                              />
+                            </div>
+
+                            {/* Built-up Area */}
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Built-up Area (sqft)</label>
+                              <input
+                                type="number"
+                                value={detail.builtup_area || ''}
+                                onChange={(e) => updateBHKDetail(index, 'builtup_area', e.target.value)}
+                                placeholder="1400"
+                                min="0"
+                                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
+                              />
+                            </div>
+
+                            {/* Price per Unit */}
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Price (₹)</label>
+                              <input
+                                type="number"
+                                value={detail.price || ''}
+                                onChange={(e) => updateBHKDetail(index, 'price', e.target.value)}
+                                placeholder="6500000"
+                                min="0"
+                                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
+                              />
+                            </div>
+
+                            {/* Floor Number */}
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Floor Number</label>
+                              <input
+                                type="number"
+                                value={detail.floor_number || ''}
+                                onChange={(e) => updateBHKDetail(index, 'floor_number', e.target.value)}
+                                placeholder="0 (Ground)"
+                                min="0"
+                                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
+                              />
+                            </div>
+
+                            {/* Furnishing Status */}
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Furnishing Status</label>
+                              <select
+                                value={detail.furnishing_status || ''}
+                                onChange={(e) => updateBHKDetail(index, 'furnishing_status', e.target.value)}
+                                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
+                              >
+                                <option value="">Select furnishing</option>
+                                {(formOptions.furnishing_status || []).map((f) => {
+                                  const val = f.value || f.key || f.label || f;
+                                  const label = f.label || f.key || f.value || f;
+                                  return <option key={val} value={val}>{label.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>;
+                                })}
+                              </select>
+                            </div>
+
+                            {/* Unit Name */}
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Unit Name</label>
+                              <input
+                                type="text"
+                                value={detail.unit_name || ''}
+                                onChange={(e) => updateBHKDetail(index, 'unit_name', e.target.value)}
+                                placeholder="e.g. A-1203"
+                                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Additional Space (for half BHK) */}
+                          {getBhkFieldVisibility(detail.type_slug || detail.type).showAdditionalSpaceField && (
+                            <div className="mt-4">
+                              <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Additional Space Description</label>
+                              <textarea
+                                value={detail.additionalSpace === '0' ? '' : (detail.additionalSpace || '')}
+                                onChange={(e) => updateBHKDetail(index, 'additionalSpace', e.target.value)}
+                                placeholder="Describe study room, puja room, or extra space..."
+                                rows={2}
+                                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm resize-none"
+                              />
+                            </div>
+                          )}
                         </div>
 
                         {/* Floor Plan Upload for this BHK Type */}
@@ -2062,8 +2704,8 @@ function SellProperty() {
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Water Availability</label>
                       <select
-                        name="water_source_land"
-                        value={formData.water_source_land}
+                        name="water_source"
+                        value={formData.water_source}
                         onChange={handleChange}
                         className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
                       >
@@ -2347,9 +2989,9 @@ function SellProperty() {
                         onChange={handleChange}
                         className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
                       >
-                        {(formOptions.furnishing || []).map((status) => {
-                          const statusValue = status.value || status.label || status;
-                          const statusLabel = status.label || status.value || status;
+                        {(formOptions.furnishing_status || []).map((status) => {
+                          const statusValue = status.value || status.key || status.label || status;
+                          const statusLabel = status.label || status.key || status.value || status;
                           return (
                             <option key={statusValue} value={statusValue}>
                               {statusLabel.replace(/_/g, ' ').charAt(0).toUpperCase() + statusLabel.replace(/_/g, ' ').slice(1)}
@@ -2473,14 +3115,133 @@ function SellProperty() {
 
 
 
+          {/* Step 3: Specifications - NEW from CRM */}
           {step === 3 && (
-
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="mb-6 pb-4 border-b border-gray-100">
+                <h3 className="text-xl flex items-center gap-2 font-bold text-gray-900"><LayoutDashboard className="w-5 h-5 text-primary" /> Specifications</h3>
+                <p className="text-xs text-gray-500 mt-1 ml-7">Project details, dimensions, and additional specifications.</p>
+              </div>
 
+              {/* Specifications Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Total Units</label>
+                  <input
+                    type="number"
+                    name="total_units"
+                    value={formData.total_units}
+                    onChange={handleChange}
+                    placeholder="e.g. 120"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Total Floors</label>
+                  <input
+                    type="number"
+                    name="total_floors"
+                    value={formData.total_floors}
+                    onChange={handleChange}
+                    placeholder="e.g. 15"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Project Area</label>
+                  <input
+                    type="number"
+                    name="total_area"
+                    value={formData.total_area}
+                    onChange={handleChange}
+                    placeholder="e.g. 50000"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Year Built</label>
+                  <input
+                    type="number"
+                    name="year_built"
+                    value={formData.year_built}
+                    onChange={handleChange}
+                    placeholder="e.g. 2024"
+                    min="1900"
+                    max="2099"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Facing Direction</label>
+                  <select
+                    name="facing_direction"
+                    value={formData.facing_direction}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
+                  >
+                    <option value="">Select direction</option>
+                    {(formOptions.facing_direction || []).map((d) => {
+                      const val = d.value || d.label || d;
+                      const label = d.label || d.value || d;
+                      return <option key={val} value={val}>{label}</option>;
+                    })}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Construction Quality</label>
+                  <select
+                    name="construction_quality"
+                    value={formData.construction_quality}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="luxury">Luxury</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Property Features Checkboxes */}
+              <div className="border-t border-gray-100 pt-6">
+                <h4 className="text-sm font-semibold text-gray-700 mb-4">Property Features</h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {[
+                    { key: 'power_backup', label: '⚡ Power Backup' },
+                    { key: 'lift_available', label: '🛗 Lift / Elevator' },
+                    { key: 'rainwater_harvesting', label: '💧 Rainwater Harvesting' },
+                    { key: 'security_24x7', label: '🔒 24/7 Security' },
+                    { key: 'pet_friendly', label: '🐕 Pet Friendly' },
+                    { key: 'vegan_friendly', label: '🌿 Vegan Friendly' },
+                    { key: 'is_corner_unit', label: '📐 Corner Unit / Plot' },
+                    { key: 'vaastu_compliance', label: '🏛️ Vaastu Compliant' },
+                    { key: 'smart_home_features', label: '🏠 Smart Home' },
+                  ].map((feat) => (
+                    <label
+                      key={feat.key}
+                      className="flex items-center gap-2 rounded-lg border border-gray-200 p-3 cursor-pointer transition-all hover:bg-gray-50 has-[:checked]:bg-primary/5 has-[:checked]:border-primary"
+                    >
+                      <input
+                        type="checkbox"
+                        name={feat.key}
+                        checked={formData[feat.key] || false}
+                        onChange={handleChange}
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <span className="text-sm font-medium text-gray-700">{feat.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: Pricing Details */}
+          {step === 4 && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               {/* Pricing Section */}
-
               <div className="space-y-8">
-
                 <h3 className="text-xl font-black text-gray-900 border-b border-gray-100 pb-4">Pricing Details</h3>
 
 
@@ -2750,336 +3511,310 @@ function SellProperty() {
 
 
 
-          {step === 4 && (
-
+          {/* Step 5: Location & Compliance */}
+          {step === 5 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-
-              <div>
-
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Address Line 1 *</label>
-
-                <input
-
-                  type="text"
-
-                  name="address_line1"
-
-                  value={formData.address_line1}
-
-                  onChange={handleChange}
-
-                  placeholder="e.g. 123, Main Street"
-
-                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
-
-                />
-
+              <div className="mb-6 pb-4 border-b border-gray-100">
+                <h3 className="text-xl flex items-center gap-2 font-bold text-gray-900"><MapPin className="w-5 h-5 text-primary" /> Location & Compliance</h3>
+                <p className="text-xs text-gray-500 mt-1 ml-7">Property location and legal compliance details.</p>
               </div>
 
-              <div>
-
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Address Line 2</label>
-
-                <input
-
-                  type="text"
-
-                  name="address_line2"
-
-                  value={formData.address_line2}
-
-                  onChange={handleChange}
-
-                  placeholder="e.g. Near Landmark"
-
-                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
-
-                />
-
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
+              {/* Location Fields */}
+              <div className="space-y-6">
                 <div>
-
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">City *</label>
-
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Address Line 1 *</label>
                   <input
-
                     type="text"
-
-                    name="city"
-
-                    value={formData.city}
-
+                    name="address_line1"
+                    value={formData.address_line1}
                     onChange={handleChange}
-
-                    placeholder="e.g. Bangalore"
-
+                    placeholder="e.g. 123, Main Street"
                     className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
-
                   />
-
                 </div>
 
                 <div>
-
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">State *</label>
-
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Address Line 2</label>
                   <input
-
                     type="text"
-
-                    name="state"
-
-                    value={formData.state}
-
+                    name="address_line2"
+                    value={formData.address_line2}
                     onChange={handleChange}
-
-                    placeholder="e.g. Karnataka"
-
+                    placeholder="e.g. Near Landmark"
                     className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
-
                   />
-
                 </div>
 
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-                <div>
-
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Country</label>
-
-                  <select
-
-                    name="country"
-
-                    value={formData.country}
-
-                    onChange={handleChange}
-
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
-
-                  >
-
-                    <option value="IN">India</option>
-
-                    <option value="US">United States</option>
-
-                    <option value="UK">United Kingdom</option>
-
-                  </select>
-
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">City *</label>
+                    <input
+                      type="text"
+                      name="city"
+                      value={formData.city}
+                      onChange={handleChange}
+                      placeholder="e.g. Bangalore"
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">State *</label>
+                    <select
+                      name="state"
+                      value={formData.state}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
+                    >
+                      <option value="">Select State</option>
+                      {(formOptions.states || []).map((s) => (
+                        <option key={s.value || s.code} value={s.value || s.label}>
+                          {s.label || s.value}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-
-                <div>
-
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">ZIP Code *</label>
-
-                  <input
-
-                    type="text"
-
-                    name="zip_code"
-
-                    value={formData.zip_code}
-
-                    onChange={handleChange}
-
-                    placeholder="e.g. 560001"
-
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
-
-                  />
-
-                </div>
-
-                <div>
-
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Locality *</label>
-
-                  <input
-
-                    type="text"
-
-                    name="locality"
-
-                    value={formData.locality}
-
-                    onChange={handleChange}
-
-                    placeholder="e.g. Koramangala"
-
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
-
-                  />
-
-                </div>
-
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-                <div>
-
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Landmark</label>
-
-                  <input
-
-                    type="text"
-
-                    name="landmark"
-
-                    value={formData.landmark}
-
-                    onChange={handleChange}
-
-                    placeholder="e.g. Near Metro Station"
-
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
-
-                  />
-
-                </div>
-
-                <div>
-
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Latitude</label>
-
-                  <input
-
-                    type="number"
-
-                    step="any"
-
-                    name="latitude"
-
-                    value={formData.latitude}
-
-                    onChange={handleChange}
-
-                    placeholder="e.g. 12.9716"
-
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
-
-                  />
-
-                </div>
-
-                <div>
-
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Longitude</label>
-
-                  <input
-
-                    type="number"
-
-                    step="any"
-
-                    name="longitude"
-
-                    value={formData.longitude}
-
-                    onChange={handleChange}
-
-                    placeholder="e.g. 77.5946"
-
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
-
-                  />
-
-                </div>
-
-              </div>
-
-
-
-              <div className="mb-6 border-t border-gray-100 pt-8 mt-8">
-
-                <label className="block text-[11px] font-black uppercase tracking-widest text-gray-400 mb-4">Distance from Popular Places</label>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-                  {[
-
-                    { label: 'Hospital', name: 'hospitalDistance' },
-
-                    { label: 'School', name: 'schoolDistance' },
-
-                    { label: 'Metro Station', name: 'metroDistance' },
-
-                    { label: 'Bus Stand', name: 'busStandDistance' },
-
-                    { label: 'Airport', name: 'airportDistance' },
-
-                    { label: 'Railway Station', name: 'railwayDistance' }
-
-                  ].map((field) => (
-
-                    <div key={field.name}>
-
-                      <label className="block text-[11px] font-black uppercase tracking-widest text-gray-500 mb-2">{field.label}</label>
-
-                      <select
-
-                        name={field.name}
-
-                        value={formData[field.name]}
-
-                        onChange={handleChange}
-
-                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
-
-                      >
-
-                        <option value="">Select Distance</option>
-
-                        <option value="0-1 km">0-1 km</option>
-
-                        <option value="1-3 km">1-3 km</option>
-
-                        <option value="3-5 km">3-5 km</option>
-
-                        <option value="5+ km">5+ km</option>
-
-                      </select>
-
-                    </div>
-
-                  ))}
-
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Country</label>
+                    <select
+                      name="country"
+                      value={formData.country}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
+                    >
+                      <option value="IN">India</option>
+                      <option value="US">United States</option>
+                      <option value="UK">United Kingdom</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">ZIP Code *</label>
+                    <input
+                      type="text"
+                      name="zip_code"
+                      value={formData.zip_code}
+                      onChange={handleChange}
+                      placeholder="e.g. 560001"
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Locality *</label>
+                    <input
+                      type="text"
+                      name="locality"
+                      value={formData.locality}
+                      onChange={handleChange}
+                      placeholder="e.g. Koramangala"
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
+                    />
+                  </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Landmark</label>
+                    <input
+                      type="text"
+                      name="landmark"
+                      value={formData.landmark}
+                      onChange={handleChange}
+                      placeholder="e.g. Near Metro Station"
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Latitude</label>
+                    <input
+                      type="number"
+                      step="any"
+                      name="latitude"
+                      value={formData.latitude}
+                      onChange={handleChange}
+                      placeholder="e.g. 12.9716"
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Longitude</label>
+                    <input
+                      type="number"
+                      step="any"
+                      name="longitude"
+                      value={formData.longitude}
+                      onChange={handleChange}
+                      placeholder="e.g. 77.5946"
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
+                    />
+                  </div>
+                </div>
               </div>
 
-            </div>
+              {/* Nearby Connectivity - CRM Style */}
+              <div className="mb-6 border-t border-gray-100 pt-8 mt-8">
+                <label className="block text-[11px] font-black uppercase tracking-widest text-gray-400 mb-4">Nearby Connectivity</label>
+                <p className="text-xs text-gray-500 mb-4">Add distance for metro station, bus stand, railway station, and more.</p>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {/* CRM-style distance fields with custom option */}
+                  {[
+                    { label: 'Near Metro Station', field: 'near_metro_distance', customField: 'near_metro_distance_custom' },
+                    { label: 'Near Railway Station', field: 'near_railway_distance', customField: 'near_railway_distance_custom' },
+                    { label: 'Near Bus Stand', field: 'near_busstand_distance', customField: 'near_busstand_distance_custom' },
+                    { label: 'Near Airport', field: 'near_airport_distance', customField: 'near_airport_distance_custom' },
+                    { label: 'Near Highway/Main Road', field: 'near_highway_distance', customField: 'near_highway_distance_custom' },
+                    { label: 'Near Auto/Taxi Stand', field: 'near_auto_taxi_distance', customField: 'near_auto_taxi_distance_custom' },
+                    { label: 'Near Hospital', field: 'near_hospital_distance', customField: 'near_hospital_distance_custom' },
+                    { label: 'Near School', field: 'near_school_distance', customField: 'near_school_distance_custom' },
+                    { label: 'Near Market', field: 'near_market_distance', customField: 'near_market_distance_custom' },
+                  ].map(({ label, field, customField }) => (
+                    <div key={field} className="space-y-3 rounded-xl border border-gray-200 bg-white p-3">
+                      <p className="text-sm font-medium text-gray-700">{label}</p>
+                      <select
+                        name={field}
+                        value={formData[field] || ''}
+                        onChange={(e) => {
+                          handleChange(e);
+                          // Clear custom value if not using custom option
+                          if (e.target.value !== 'custom') {
+                            setFormData(prev => ({ ...prev, [customField]: '' }));
+                          }
+                        }}
+                        className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-900 transition-all focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary"
+                      >
+                        <option value="">Select km...</option>
+                        <option value="0-1 km">0-1 km</option>
+                        <option value="1-3 km">1-3 km</option>
+                        <option value="3-5 km">3-5 km</option>
+                        <option value="5+ km">5+ km</option>
+                        <option value="custom">Custom</option>
+                      </select>
+                      {formData[field] === 'custom' && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            name={customField}
+                            value={formData[customField] || ''}
+                            onChange={handleChange}
+                            placeholder="Enter km"
+                            className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-900 transition-all focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary"
+                          />
+                          <span className="text-xs font-medium uppercase tracking-wide text-gray-500">km</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Compliance Section - RERA */}
+              <div className="border-t border-gray-100 pt-8 mt-8">
+                <h4 className="text-sm font-semibold text-gray-700 mb-4">Compliance</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">
+                      RERA Number
+                      <span className="text-[10px] text-gray-400 font-normal ml-1">
+                        ({getReraExampleByLocation({ city: formData.city, state: formData.state }).hint})
+                      </span>
+                    </label>
+                    <div className="relative">
+                      <FileSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                      <input
+                        type="text"
+                        name="rera_number"
+                        value={formData.rera_number}
+                        onChange={handleChange}
+                        placeholder={getReraExampleByLocation({ city: formData.city, state: formData.state }).placeholder}
+                        className={`w-full pl-9 pr-10 py-2.5 bg-white border rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm ${
+                          reraError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200'
+                        }`}
+                      />
+                      {reraChecking && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <div className="w-4 h-4 border-2 border-gray-300 border-t-primary rounded-full animate-spin"></div>
+                        </div>
+                      )}
+                      {reraError && !reraChecking && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500">
+                          <AlertCircle className="w-4 h-4" />
+                        </div>
+                      )}
+                    </div>
+                    {reraError && <p className="mt-1 text-xs text-red-500">{reraError}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">RERA Expiry Date</label>
+                    <input
+                      type="date"
+                      name="rera_expiry_date"
+                      value={formData.rera_expiry_date}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
 
 
 
-          {step === 5 && (
+          {/* Step 6: Media & SEO */}
+          {step === 6 && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <PropertyMediaForm
+                formData={formData}
+                setFormData={setFormData}
+                mediaPreviews={mediaPreviews}
+                setMediaPreviews={setMediaPreviews}
+                onMediaChange={handleCategorizedMediaChange}
+                onMediaRemove={removeCategorizedMedia}
+                onMediaReplace={handleMediaReplace}
+              />
 
-            <PropertyMediaForm
+              {/* SEO Section */}
+              <div className="border-t border-gray-100 pt-8 mt-8">
+                <h4 className="text-sm font-semibold text-gray-700 mb-4">SEO & Metadata</h4>
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">
+                      Meta Title
+                      <span className="text-gray-400 font-normal ml-1">({(formData.meta_title || '').length}/60 chars)</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="meta_title"
+                      value={formData.meta_title}
+                      onChange={handleChange}
+                      placeholder="Skyline Towers - Premium Flats in Andheri"
+                      maxLength={70}
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
+                    />
+                  </div>
 
-              formData={formData}
-
-              setFormData={setFormData}
-
-              mediaPreviews={mediaPreviews}
-
-              setMediaPreviews={setMediaPreviews}
-
-              onMediaChange={handleCategorizedMediaChange}
-
-              onMediaRemove={removeCategorizedMedia}
-
-              onMediaReplace={handleMediaReplace}
-
-            />
-
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">
+                      Meta Description
+                      <span className="text-gray-400 font-normal ml-1">({(formData.meta_description || '').length}/160 chars)</span>
+                    </label>
+                    <textarea
+                      name="meta_description"
+                      value={formData.meta_description}
+                      onChange={(e) => {
+                        if (e.target.value.length <= 200) handleChange(e);
+                      }}
+                      rows={3}
+                      placeholder="Enter 150-160 character search snippet for Google..."
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm resize-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
 
 
@@ -3106,7 +3841,7 @@ function SellProperty() {
                   </svg>
                   Saving...
                 </span>
-              ) : step === 5 ? 'Finish Listing' : 'Next Step'}
+              ) : step === 6 ? 'Finish Listing' : 'Next Step'}
             </button>
           </div>
 

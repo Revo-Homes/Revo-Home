@@ -142,6 +142,12 @@ export const propertyApi = {
   
   // Form Options (property types, categories, etc.)
   getFormOptions: () => get('/properties/form-options'),
+
+  // RERA Validation
+  checkReraExists: (reraNumber, excludePropertyId = null) => get('/properties/check-rera', { rera_number: reraNumber, exclude_property_id: excludePropertyId }),
+
+  // Builders (organizations with type=builder)
+  getBuilders: (params = {}) => get('/organizations', { type: 'builder', ...params }),
 };
 
 // -------------------- LISTINGS --------------------

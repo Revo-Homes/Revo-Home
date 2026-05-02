@@ -1657,8 +1657,9 @@ function PropertyDetails() {
                   <div className="flex items-center gap-2 text-gray-600 text-base flex-wrap">
   <MapPin className="text-primary flex-shrink-0" size={18} />
   <span className="font-medium">{property.location}</span>
+  <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">Rera Details: {property.rera_number || 'N/A'}</span>
   {property.distance !== null && property.distance !== undefined &&  (
-    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">
+    <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">
       <Navigation size={11} />
       {property.distance < 1
         ? `${(property.distance * 1000).toFixed(0)}m from you`
@@ -1694,18 +1695,13 @@ function PropertyDetails() {
               </div>
 
               {/* Key Highlights Row */}
-              <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-6">
+              <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-5 gap-1 sm:gap-3 mb-6">
                 <InfoBadge icon={BedDouble} label="Configuration" value={normalizeBhkLabel(property.bhk)} highlight />
                 <InfoBadge icon={Maximize} label="Carpet Area" value={property.area ? `${property.area} sq.ft` : 'N/A'} />
                 <InfoBadge icon={Home} label="Furnishing" value={property.furnished || 'N/A'} />
                 <InfoBadge icon={Building2} label="Developer" value={property.developer || 'N/A'} />
                 <InfoBadge icon={Calendar} label="Possession" value={formatDateLabel(property.possessionDate) || 'N/A'} />
-                <InfoBadge
-                  icon={ShieldCheck}
-                  label="RERA No."
-                  value={property.rera_number || 'N/A'}
-                  highlight={!!property.rera_number}
-                />
+                
               </div>
 
               <div className="space-y-6">
@@ -1749,6 +1745,137 @@ function PropertyDetails() {
 
             {!isGuestView && (
             <>
+            {/* MEDIA GALLERY SECTION */}
+            <section id="media-gallery" className="SectionCard scroll-mt-32">
+              <SectionTitle icon={Eye} title="Media Gallery" />
+              
+              {/* PHOTOS SUB-SECTION */}
+              {(property.images?.length > 0 || property.photos?.length > 0) && (
+                <div className="mb-8">
+                  <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Eye size={16} className="text-primary" />
+                    </span>
+                    Property Photos ({(property.images?.length || 0) + (property.photos?.length || 0)})
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {[...(property.images || []), ...(property.photos || [])].map((img, idx) => (
+                      <div key={idx} className="aspect-square rounded-xl overflow-hidden border border-gray-200 hover:border-primary/50 transition-all group cursor-pointer">
+                        <img 
+                          src={typeof img === 'string' ? img : img?.url || img?.image_url || img} 
+                          alt={`Property Photo ${idx + 1}`} 
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* FLOOR PLANS SUB-SECTION */}
+              {property.floor_plans?.length > 0 && (
+                <div className="mb-8">
+                  <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                      <Maximize size={16} className="text-blue-600" />
+                    </span>
+                    Floor Plans ({property.floor_plans.length})
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {property.floor_plans.map((plan, idx) => (
+                      <div key={plan.id || idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:border-primary/50 transition-all group">
+                        <div className="aspect-[4/3] bg-gray-100 relative">
+                          <img 
+                            src={plan.thumbnail_url || plan.url || '/placeholder-floorplan.jpg'} 
+                            alt={plan.title || `Floor Plan ${idx + 1}`}
+                            className="w-full h-full object-contain p-4"
+                          />
+                          {plan.bhk && (
+                            <span className="absolute top-3 left-3 px-3 py-1 bg-primary text-white text-xs font-bold rounded-full">
+                              {plan.bhk} BHK
+                            </span>
+                          )}
+                          {plan.floor_number !== undefined && (
+                            <span className="absolute top-3 right-3 px-3 py-1 bg-gray-800 text-white text-xs font-bold rounded-full">
+                              Floor {plan.floor_number}
+                            </span>
+                          )}
+                        </div>
+                        <div className="p-4 border-t border-gray-100">
+                          <p className="font-semibold text-gray-900">{plan.title || `Floor Plan ${idx + 1}`}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* VIRTUAL TOUR SUB-SECTION */}
+              {(property.virtual_tour?.length > 0 || property.virtual_tour_url || property.video_url || property.youtube_url) && (
+                <div className="mb-8">
+                  <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                      <Video size={16} className="text-purple-600" />
+                    </span>
+                    Virtual Tour & Videos
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {(property.virtual_tour || []).map((tour, idx) => (
+                      <div key={idx} className="aspect-video rounded-xl overflow-hidden bg-gray-900 relative group">
+                        <iframe
+                          src={typeof tour === 'string' ? tour : tour?.url}
+                          className="w-full h-full"
+                          allowFullScreen
+                          title={`Virtual Tour ${idx + 1}`}
+                        />
+                      </div>
+                    ))}
+                    {property.virtual_tour_url && (
+                      <a href={property.virtual_tour_url} target="_blank" rel="noopener noreferrer" 
+                         className="aspect-video rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white hover:opacity-90 transition-opacity">
+                        <div className="text-center">
+                          <Video size={32} className="mx-auto mb-2" />
+                          <p className="font-semibold">3D Virtual Tour</p>
+                        </div>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* DOCUMENTS SUB-SECTION */}
+              {(property.documents?.length > 0) && (
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                      <FileText size={16} className="text-green-600" />
+                    </span>
+                    Documents ({property.documents.length})
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {property.documents.map((doc, idx) => (
+                      <a
+                        key={idx}
+                        href={typeof doc === 'string' ? doc : doc?.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl hover:bg-primary/5 hover:border-primary/20 border border-gray-200 transition-all group"
+                      >
+                        <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <FileText size={20} className="text-red-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-900 truncate">{doc?.name || doc?.title || `Document ${idx + 1}`}</p>
+                          <p className="text-xs text-gray-500">Click to view</p>
+                        </div>
+                        <Download size={18} className="text-gray-400 group-hover:text-primary" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+
             {/* PRICE CONFIGURATION SECTION */}
             <section id="floor-plans" className="SectionCard scroll-mt-32">
               <SectionTitle 

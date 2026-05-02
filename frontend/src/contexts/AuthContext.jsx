@@ -263,12 +263,16 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const sendOtp = async (identifier, channel = 'sms') => {
+  const sendOtp = async (identifier, channel = 'sms', mode = null) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await authApi.sendOtp({ identifier, channel });
-      return { success: true, message: response.message || 'OTP sent successfully!' };
+      const payload = { identifier, channel };
+      if (mode) {
+        payload.mode = mode;
+      }
+      const response = await authApi.sendOtp(payload);
+      return { success: true, message: response.message || 'OTP sent successfully!', is_new_user: response.is_new_user };
     } catch (err) {
       setError(err.message || 'Failed to send OTP');
       return { success: false, message: err.message || 'Failed to send OTP' };

@@ -150,11 +150,30 @@ function DashboardProperties() {
                   disabled={p.disabled}
                   customBadge={
                     <div className="flex flex-col gap-1">
-                      <span className={`px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest shadow-lg backdrop-blur-md ${
-                        p.disabled ? 'bg-gray-500 text-white' : (p.status === 'Live' || !p.status ? 'bg-green-500 text-white' : 'bg-amber-500 text-white')
-                      }`}>
-                        {p.disabled ? 'Disabled' : (typeof p.status === 'string' ? p.status : (p.status?.name || p.status?.status || 'Live'))}
-                      </span>
+                      {(() => {
+                        // Determine status display
+                        const status = p.disabled ? 'hidden' : 
+                                      (p.status?.status || p.status || 'draft');
+                        
+                        const statusConfig = {
+                          'active': { label: 'Active', color: 'bg-green-500' },
+                          'live': { label: 'Active', color: 'bg-green-500' },
+                          'draft': { label: 'Pending Approval', color: 'bg-amber-500' },
+                          'inactive': { label: 'Inactive', color: 'bg-gray-500' },
+                          'hidden': { label: 'Hidden', color: 'bg-gray-500' },
+                          'disabled': { label: 'Disabled', color: 'bg-gray-500' },
+                          'expired': { label: 'Expired', color: 'bg-red-500' },
+                          'withdrawn': { label: 'Withdrawn', color: 'bg-red-500' }
+                        };
+                        
+                        const config = statusConfig[status.toLowerCase()] || { label: status, color: 'bg-gray-500' };
+                        
+                        return (
+                          <span className={`px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest shadow-lg backdrop-blur-md ${config.color} text-white`}>
+                            {config.label}
+                          </span>
+                        );
+                      })()}
                     </div>
                   }
                   footerActions={

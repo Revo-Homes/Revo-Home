@@ -4,7 +4,7 @@ import { X, Smartphone, User, Mail, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 function SignupModal({ isOpen, onClose, onLoginClick }) {
-  const { handlePhoneVerified } = useAuth();
+  const { sendOtp, verifyOtp, closeAuthModal } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -26,7 +26,7 @@ function SignupModal({ isOpen, onClose, onLoginClick }) {
     if (error) setError('');
   };
 
-  const handleSendOTP = (e) => {
+  const handleSendOTP = async (e) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.phone.trim()) {
       setError('Name and Mobile Number are required');
@@ -38,34 +38,58 @@ function SignupModal({ isOpen, onClose, onLoginClick }) {
     }
 
     setLoading(true);
-    // Mock API call
-    setTimeout(() => {
-      console.log('Signup OTP sent to:', formData.phone);
-      setStep('otp');
+    setError('');
+    try {
+      // Store signup data for post-verification profile update
+      const signupData = {
+        first_name: formData.name.split(' ')[0] || formData.name,
+        last_name: formData.name.split(' ').slice(1).join(' ') || '',
+        phone: formData.phone,
+        email: formData.email || null
+      };
+      sessionStorage.setItem('signup_data', JSON.stringify(signupData));
+
+      // Send OTP with signup mode to trigger auto-provisioning
+      const result = await sendOtp(formData.phone, 'sms', 'signup');
+      if (result.success) {
+        setStep('otp');
+      } else {
+        setError(result.message || 'Failed to send OTP. Please try again.');
+      }
+    } catch (err) {
+      console.error('Signup OTP error:', err);
+      setError(err.message || 'Something went wrong. Please try again.');
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
-  const handleVerifyOTP = (e) => {
+  const handleVerifyOTP = async (e) => {
     e.preventDefault();
-    if (otp.join('').length !== 6) {
+    const otpValue = otp.join('');
+    if (otpValue.length !== 6) {
       setError('Please enter the 6-digit OTP');
       return;
     }
 
     setLoading(true);
-    // Mock API call
-    setTimeout(() => {
-      console.log('User signed up (mock):', formData);
-      setSuccess(true);
+    setError('');
+    try {
+      const result = await verifyOtp(formData.phone, otpValue, 'sms');
+      if (result.success) {
+        setSuccess(true);
+        setTimeout(() => {
+          closeAuthModal();
+        }, 1500);
+      } else {
+        setError(result.message || 'Invalid OTP. Please try again.');
+      }
+    } catch (err) {
+      console.error('OTP verification error:', err);
+      setError(err.message || 'Invalid OTP. Please try again.');
+    } finally {
       setLoading(false);
-      
-      // Perform mock login via AuthContext to make dashboard visible
-      setTimeout(() => {
-        handlePhoneVerified(formData.phone);
-        onClose();
-      }, 1500);
-    }, 1000);
+    }
   };
 
   const handleOtpChange = (index, value) => {
