@@ -542,6 +542,251 @@ const renderFieldValue = (key, value) => {
   return <span className="font-semibold text-gray-900">{formatted}</span>;
 };
 
+const getMediaUrl = (item) => {
+  if (!item) return '';
+  if (typeof item === 'string') return item;
+  return item.url || item.file_url || item.image_url || item.video_url || item.document_url || item.path || item.src || '';
+};
+
+const getMediaTitle = (item, fallback) => {
+  if (!item || typeof item === 'string') {
+    const name = String(item || '').split('/').pop()?.split('?')[0];
+    return name || fallback;
+  }
+  return item.title || item.name || item.file_name || item.filename || item.alt_text || fallback;
+};
+
+const getMediaDescription = (item) => {
+  if (!item || typeof item === 'string') return '';
+  return item.description || item.notes || item.caption || item.alt_text || '';
+};
+
+const getMediaKindText = (item) => {
+  if (!item || typeof item === 'string') return '';
+  return [
+    item.media_type,
+    item.plan_type,
+    item.source_type,
+    item.document_type,
+    item.mime_type,
+    item.type,
+  ].filter(Boolean).join(' ').toLowerCase();
+};
+
+const isYouTubeUrl = (url) => /(?:youtube\.com|youtu\.be)/i.test(url || '');
+const isImageUrl = (url) => /\.(png|jpe?g|webp|gif|bmp|avif)(\?|#|$)/i.test(url || '');
+const isVideoUrl = (url) => /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(url || '');
+const isDocumentUrl = (url) => /\.(pdf|docx?|xlsx?|pptx?|zip|rar)(\?|#|$)/i.test(url || '');
+
+const normalizeMediaItem = (item, fallbackTitle, override = {}) => ({
+  raw: item,
+  url: getMediaUrl(item),
+  title: getMediaTitle(item, fallbackTitle),
+  description: getMediaDescription(item),
+  kindText: getMediaKindText(item),
+  ...override,
+});
+
+const uniqueMediaItems = (items) => {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = `${item.url || ''}|${item.title || ''}|${item.type || ''}`;
+    if (!item.url && !item.title) return false;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const buildGroupedMedia = (property = {}) => {
+  const source = property || {};
+  const grouped = {
+    images: [],
+    floorPlans: [],
+    videos: [],
+    links: [],
+    documents: [],
+  };
+
+  const addItem = (target, item, title, type) => {
+    const normalized = normalizeMediaItem(item, title, { type });
+    if (normalized.url || normalized.title) grouped[target].push(normalized);
+  };
+
+  [...toArray(source.images), ...toArray(source.photos)].forEach((item, idx) => {
+    addItem('images', item, `Property Image ${idx + 1}`, 'Image');
+  });
+
+  toArray(source.floor_plans).forEach((item, idx) => {
+    addItem('floorPlans', item, `Floor Plan ${idx + 1}`, 'Floor Plan');
+  });
+
+  [...toArray(source.documents), ...toArray(source.brochures), ...toArray(source.resale_documents)].forEach((item, idx) => {
+    addItem('documents', item, `Document ${idx + 1}`, 'Document');
+  });
+
+  toArray(source.virtual_tour).forEach((item, idx) => {
+    const url = getMediaUrl(item);
+    addItem(isYouTubeUrl(url) ? 'links' : 'videos', item, `Walkthrough ${idx + 1}`, isYouTubeUrl(url) ? 'YouTube' : 'Video');
+  });
+
+  [
+    source.virtual_tour_url,
+    source.video_url,
+    source.youtube_url,
+    source.brochure_url,
+    source.floor_plan_url,
+  ].filter(Boolean).forEach((url, idx) => {
+    if (url === source.brochure_url) addItem('documents', url, `Brochure ${idx + 1}`, 'Brochure');
+    else if (url === source.floor_plan_url) addItem('floorPlans', url, `Floor Plan ${idx + 1}`, 'Floor Plan');
+    else addItem(isYouTubeUrl(url) ? 'links' : 'videos', url, `Media Link ${idx + 1}`, isYouTubeUrl(url) ? 'YouTube' : 'Video');
+  });
+
+  [...toArray(source.media), ...toArray(source.media_items)].forEach((item, idx) => {
+    const normalized = normalizeMediaItem(item, `Media ${idx + 1}`);
+    const text = normalized.kindText;
+    const url = normalized.url;
+
+    if (/floor|project_plan|master_plan|amenities_plan|elevation_plan/.test(text)) {
+      grouped.floorPlans.push({ ...normalized, type: 'Floor Plan' });
+    } else if (/youtube|link|external|url/.test(text) || isYouTubeUrl(url)) {
+      grouped.links.push({ ...normalized, type: isYouTubeUrl(url) ? 'YouTube' : 'External Link' });
+    } else if (/video|walkthrough|tour/.test(text) || isVideoUrl(url)) {
+      grouped.videos.push({ ...normalized, type: 'Video' });
+    } else if (/document|brochure|pdf|file|zip|doc/.test(text) || isDocumentUrl(url)) {
+      grouped.documents.push({ ...normalized, type: /brochure/.test(text) ? 'Brochure' : 'Document' });
+    } else if (/image|photo/.test(text) || isImageUrl(url)) {
+      grouped.images.push({ ...normalized, type: 'Image' });
+    }
+  });
+
+  return {
+    images: uniqueMediaItems(grouped.images),
+    floorPlans: uniqueMediaItems(grouped.floorPlans),
+    videos: uniqueMediaItems(grouped.videos),
+    links: uniqueMediaItems(grouped.links),
+    documents: uniqueMediaItems(grouped.documents),
+  };
+};
+
+const MediaSectionHeader = ({ icon: Icon, title, description, count, tone = 'primary' }) => (
+  <div className="mb-3 flex items-start justify-between gap-3">
+    <div className="flex items-start gap-3">
+      <span className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl ${tone === 'blue' ? 'bg-blue-50 text-blue-600' : tone === 'purple' ? 'bg-purple-50 text-purple-600' : tone === 'green' ? 'bg-green-50 text-green-600' : 'bg-primary/10 text-primary'}`}>
+        <Icon size={18} />
+      </span>
+      <div>
+        <h4 className="text-sm font-bold text-gray-900">{title}</h4>
+        <p className="mt-0.5 text-xs text-gray-500">{description}</p>
+      </div>
+    </div>
+    <span className="shrink-0 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-bold text-gray-600">
+      {count}
+    </span>
+  </div>
+);
+
+const EmptyMediaState = ({ text }) => (
+  <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/70 px-4 py-5 text-sm font-medium text-gray-400">
+    {text}
+  </div>
+);
+
+const ImageMediaCard = ({ item, label, contain = false }) => (
+  <a
+    href={item.url}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="group overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg hover:shadow-gray-200/70"
+  >
+    <div className="relative aspect-[4/3] bg-gray-50">
+      {item.url ? (
+        <img
+          src={item.url}
+          alt={item.title}
+          className={`h-full w-full ${contain ? 'object-contain p-3' : 'object-cover'} transition-transform duration-500 group-hover:scale-105`}
+        />
+      ) : (
+        <div className="flex h-full items-center justify-center text-gray-300">
+          <FileText size={28} />
+        </div>
+      )}
+      <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-gray-700 shadow-sm">
+        {label}
+      </span>
+    </div>
+    <div className="p-3">
+      <p className="truncate text-sm font-bold text-gray-900">{item.title}</p>
+      {item.description && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{item.description}</p>}
+    </div>
+  </a>
+);
+
+const VideoMediaCard = ({ item }) => (
+  <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg hover:shadow-gray-200/70">
+    <div className="aspect-video bg-gray-950">
+      {isVideoUrl(item.url) ? (
+        <video src={item.url} controls className="h-full w-full object-cover" />
+      ) : (
+        <a href={item.url} target="_blank" rel="noopener noreferrer" className="flex h-full flex-col items-center justify-center gap-2 text-white">
+          <Video size={28} />
+          <span className="text-sm font-semibold">Open walkthrough</span>
+        </a>
+      )}
+    </div>
+    <div className="p-3">
+      <p className="truncate text-sm font-bold text-gray-900">{item.title}</p>
+      {item.description && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{item.description}</p>}
+    </div>
+  </div>
+);
+
+const LinkMediaCard = ({ item }) => (
+  <a
+    href={item.url}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="group flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-primary/5 hover:shadow-lg hover:shadow-gray-200/70"
+  >
+    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-primary">
+      <ExternalLink size={20} />
+    </span>
+    <div className="min-w-0 flex-1">
+      <p className="truncate text-sm font-bold text-gray-900">{item.title}</p>
+      <p className="truncate text-xs text-gray-500">{isYouTubeUrl(item.url) ? 'YouTube / video link' : 'External media link'}</p>
+    </div>
+    <ExternalLink size={16} className="text-gray-300 group-hover:text-primary" />
+  </a>
+);
+
+const DocumentMediaCard = ({ item }) => (
+  <a
+    href={item.url}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="group flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-gray-50 hover:shadow-lg hover:shadow-gray-200/70"
+  >
+    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
+      <FileText size={20} />
+    </span>
+    <div className="min-w-0 flex-1">
+      <p className="truncate text-sm font-bold text-gray-900">{item.title}</p>
+      <p className="truncate text-xs text-gray-500">{item.type || 'Document'} file</p>
+    </div>
+    <span className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-gray-500 ring-1 ring-gray-200 group-hover:text-primary">
+      Open
+      <Download size={14} />
+    </span>
+  </a>
+);
+
+const GroupedMediaSection = ({ icon, title, description, count, emptyText, children, tone }) => (
+  <div className="rounded-2xl border border-gray-100 bg-gray-50/40 p-4">
+    <MediaSectionHeader icon={icon} title={title} description={description} count={count} tone={tone} />
+    {count > 0 ? children : <EmptyMediaState text={emptyText} />}
+  </div>
+);
+
 // ============================================
 // SQUAREYARDS-STYLE HELPER COMPONENTS
 // ============================================
@@ -842,19 +1087,26 @@ function ContactSidePanel({
   const maskedPhone = owner.phone ? owner.phone.replace(/\d(?=\d{3})/g, 'X') : 'Available after enquiry';
   const fullPhone = owner.phone || '';
   const ownerEmail = property?.owner?.email || '';
+  const quickFacts = [
+    { label: 'Price', value: property?.price || property?.price_min ? formatShortPrice(property?.price || property?.price_min) : 'On request', icon: IndianRupee },
+    { label: 'Area', value: property?.area || property?.total_area ? `${property?.area || property?.total_area} sq.ft` : 'Not listed', icon: Maximize },
+    { label: 'Location', value: property?.city || property?.locality || 'Prime location', icon: MapPin },
+  ];
   
   return (
     <div className="space-y-4">
       {/* Main Contact Card */}
       <motion.div 
-        className="bg-white rounded-2xl p-5 border border-gray-100 shadow-lg hover:shadow-xl transition-shadow"
+        className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-xl shadow-gray-200/60 transition-shadow hover:shadow-2xl"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
+        <div className="h-1.5 bg-gradient-to-r from-primary via-red-500 to-amber-400" />
+        <div className="p-5">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+          <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
             <Phone className="text-primary" size={16} />
             Contact Owner
           </h3>
@@ -881,7 +1133,7 @@ function ContactSidePanel({
         </div>
 
         {/* Masked Phone - Always Visible */}
-        <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl mb-4 border border-gray-100">
+        <div className="flex items-center gap-2 p-3 bg-gradient-to-br from-gray-50 to-white rounded-2xl mb-4 border border-gray-100">
           <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
             <Phone size={14} className="text-primary" />
           </div>
@@ -925,9 +1177,42 @@ function ContactSidePanel({
             </motion.button>
           </div>
         </div>
+        </div>
       </motion.div>
 
-     
+      <motion.div
+        className="rounded-3xl border border-gray-100 bg-white p-4 shadow-lg shadow-gray-200/50"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.18 }}
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <h4 className="text-sm font-bold text-gray-900">Listing Snapshot</h4>
+          <span className="rounded-full bg-green-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-green-700">
+            Verified
+          </span>
+        </div>
+        <div className="space-y-2.5">
+          {quickFacts.map(({ label, value, icon: Icon }) => (
+            <div key={label} className="flex items-center gap-3 rounded-2xl bg-gray-50 px-3 py-2.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-primary shadow-sm">
+                <Icon size={16} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">{label}</p>
+                <p className="truncate text-sm font-bold text-gray-900">{value}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 rounded-2xl border border-primary/10 bg-primary/5 p-3">
+          <p className="text-xs font-semibold text-gray-800">Need help deciding?</p>
+          <p className="mt-1 text-xs leading-5 text-gray-500">
+            Send an enquiry and our team will help with availability, documents, and next visit slots.
+          </p>
+        </div>
+      </motion.div>
+
     </div>
   );
 }
@@ -1191,6 +1476,7 @@ function PropertyDetails() {
   const isGuestView = !isLoggedIn;
   const priceConfigurations = buildPriceConfigurations(property);
   const similarProperties = buildSimilarProperties(listings, property);
+  const mediaGroups = buildGroupedMedia(property);
 
   // Load reviews from localStorage and merge with backend reviews
   useEffect(() => {
@@ -1748,132 +2034,84 @@ function PropertyDetails() {
             {/* MEDIA GALLERY SECTION */}
             <section id="media-gallery" className="SectionCard scroll-mt-32">
               <SectionTitle icon={Eye} title="Media Gallery" />
-              
-              {/* PHOTOS SUB-SECTION */}
-              {(property.images?.length > 0 || property.photos?.length > 0) && (
-                <div className="mb-8">
-                  <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <span className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <Eye size={16} className="text-primary" />
-                    </span>
-                    Property Photos ({(property.images?.length || 0) + (property.photos?.length || 0)})
-                  </h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                    {[...(property.images || []), ...(property.photos || [])].map((img, idx) => (
-                      <div key={idx} className="aspect-square rounded-xl overflow-hidden border border-gray-200 hover:border-primary/50 transition-all group cursor-pointer">
-                        <img 
-                          src={typeof img === 'string' ? img : img?.url || img?.image_url || img} 
-                          alt={`Property Photo ${idx + 1}`} 
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                        />
-                      </div>
+              <div className="space-y-5">
+                <GroupedMediaSection
+                  icon={Eye}
+                  title="Property Images"
+                  description="Main listing photos and gallery images."
+                  count={mediaGroups.images.length}
+                  emptyText="No property images uploaded yet"
+                >
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {mediaGroups.images.map((item, idx) => (
+                      <ImageMediaCard key={`${item.url}-${idx}`} item={item} label="Image" />
                     ))}
                   </div>
-                </div>
-              )}
+                </GroupedMediaSection>
 
-              {/* FLOOR PLANS SUB-SECTION */}
-              {property.floor_plans?.length > 0 && (
-                <div className="mb-8">
-                  <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <span className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                      <Maximize size={16} className="text-blue-600" />
-                    </span>
-                    Floor Plans ({property.floor_plans.length})
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {property.floor_plans.map((plan, idx) => (
-                      <div key={plan.id || idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:border-primary/50 transition-all group">
-                        <div className="aspect-[4/3] bg-gray-100 relative">
-                          <img 
-                            src={plan.thumbnail_url || plan.url || '/placeholder-floorplan.jpg'} 
-                            alt={plan.title || `Floor Plan ${idx + 1}`}
-                            className="w-full h-full object-contain p-4"
-                          />
-                          {plan.bhk && (
-                            <span className="absolute top-3 left-3 px-3 py-1 bg-primary text-white text-xs font-bold rounded-full">
-                              {plan.bhk} BHK
-                            </span>
-                          )}
-                          {plan.floor_number !== undefined && (
-                            <span className="absolute top-3 right-3 px-3 py-1 bg-gray-800 text-white text-xs font-bold rounded-full">
-                              Floor {plan.floor_number}
-                            </span>
-                          )}
-                        </div>
-                        <div className="p-4 border-t border-gray-100">
-                          <p className="font-semibold text-gray-900">{plan.title || `Floor Plan ${idx + 1}`}</p>
-                        </div>
-                      </div>
+                <GroupedMediaSection
+                  icon={Maximize}
+                  title="Floor Plans"
+                  description="Layout images and plan files separated from property photos."
+                  count={mediaGroups.floorPlans.length}
+                  emptyText="No floor plans uploaded yet"
+                  tone="blue"
+                >
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {mediaGroups.floorPlans.map((item, idx) => (
+                      isImageUrl(item.url) ? (
+                        <ImageMediaCard key={`${item.url}-${idx}`} item={item} label="Floor Plan" contain />
+                      ) : (
+                        <DocumentMediaCard key={`${item.url}-${idx}`} item={item} />
+                      )
                     ))}
                   </div>
-                </div>
-              )}
+                </GroupedMediaSection>
 
-              {/* VIRTUAL TOUR SUB-SECTION */}
-              {(property.virtual_tour?.length > 0 || property.virtual_tour_url || property.video_url || property.youtube_url) && (
-                <div className="mb-8">
-                  <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <span className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                      <Video size={16} className="text-purple-600" />
-                    </span>
-                    Virtual Tour & Videos
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {(property.virtual_tour || []).map((tour, idx) => (
-                      <div key={idx} className="aspect-video rounded-xl overflow-hidden bg-gray-900 relative group">
-                        <iframe
-                          src={typeof tour === 'string' ? tour : tour?.url}
-                          className="w-full h-full"
-                          allowFullScreen
-                          title={`Virtual Tour ${idx + 1}`}
-                        />
-                      </div>
+                <GroupedMediaSection
+                  icon={Video}
+                  title="Videos / Walkthroughs"
+                  description="Uploaded videos and virtual walkthrough files."
+                  count={mediaGroups.videos.length}
+                  emptyText="No videos available"
+                  tone="purple"
+                >
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {mediaGroups.videos.map((item, idx) => (
+                      <VideoMediaCard key={`${item.url}-${idx}`} item={item} />
                     ))}
-                    {property.virtual_tour_url && (
-                      <a href={property.virtual_tour_url} target="_blank" rel="noopener noreferrer" 
-                         className="aspect-video rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white hover:opacity-90 transition-opacity">
-                        <div className="text-center">
-                          <Video size={32} className="mx-auto mb-2" />
-                          <p className="font-semibold">3D Virtual Tour</p>
-                        </div>
-                      </a>
-                    )}
                   </div>
-                </div>
-              )}
+                </GroupedMediaSection>
 
-              {/* DOCUMENTS SUB-SECTION */}
-              {(property.documents?.length > 0) && (
-                <div>
-                  <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <span className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
-                      <FileText size={16} className="text-green-600" />
-                    </span>
-                    Documents ({property.documents.length})
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {property.documents.map((doc, idx) => (
-                      <a
-                        key={idx}
-                        href={typeof doc === 'string' ? doc : doc?.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl hover:bg-primary/5 hover:border-primary/20 border border-gray-200 transition-all group"
-                      >
-                        <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <FileText size={20} className="text-red-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-900 truncate">{doc?.name || doc?.title || `Document ${idx + 1}`}</p>
-                          <p className="text-xs text-gray-500">Click to view</p>
-                        </div>
-                        <Download size={18} className="text-gray-400 group-hover:text-primary" />
-                      </a>
+                <GroupedMediaSection
+                  icon={ExternalLink}
+                  title="YouTube / External Links"
+                  description="Clickable media links that open safely in a new tab."
+                  count={mediaGroups.links.length}
+                  emptyText="No YouTube or external links available"
+                >
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {mediaGroups.links.map((item, idx) => (
+                      <LinkMediaCard key={`${item.url}-${idx}`} item={item} />
                     ))}
                   </div>
-                </div>
-              )}
+                </GroupedMediaSection>
+
+                <GroupedMediaSection
+                  icon={FileText}
+                  title="Brochures / Documents / Other Files"
+                  description="Brochures, approvals, PDFs, and supporting files."
+                  count={mediaGroups.documents.length}
+                  emptyText="No brochures or documents uploaded yet"
+                  tone="green"
+                >
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {mediaGroups.documents.map((item, idx) => (
+                      <DocumentMediaCard key={`${item.url}-${idx}`} item={item} />
+                    ))}
+                  </div>
+                </GroupedMediaSection>
+              </div>
             </section>
 
             {/* PRICE CONFIGURATION SECTION */}
@@ -2317,7 +2555,7 @@ function PropertyDetails() {
 
           {/* Right Sidebar - New Contact Side Panel */}
           <div className="space-y-4 sm:space-y-6">
-            <div className="sticky top-20 sm:top-24 space-y-4 sm:space-y-6">
+            <div className="lg:sticky lg:top-24 space-y-4 sm:space-y-6">
               <ContactSidePanel
                   property={property}
                   isLoggedIn={isLoggedIn}
@@ -2341,39 +2579,47 @@ function PropertyDetails() {
                 />
 
                 {/* Calculators */}
-                <div className="space-y-2">
-                <div
-                  onClick={() => setShowEMI(true)}
-                  className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100 shadow-sm hover:shadow-md transition-all cursor-pointer"
-                >
-                  <div className="w-8 h-8 bg-red-50 rounded-lg flex items-center justify-center">
-                    <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
+                <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-lg shadow-gray-200/50">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-gray-900">Smart Tools</h4>
+                    <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-primary">
+                      Quick
+                    </span>
                   </div>
-                  <div className="flex-1">
-                    <h4 className="text-sm font-semibold text-gray-900">EMI Calculator</h4>
-                    <p className="text-xs text-gray-500">Monthly estimate</p>
-                  </div>
-                  <ChevronRight size={16} className="text-gray-400" />
-                </div>
+                  <div className="space-y-2.5">
+                    <div
+                      onClick={() => setShowEMI(true)}
+                      className="group flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-3 py-3 transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-white hover:shadow-md"
+                    >
+                      <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center">
+                        <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-bold text-gray-900">EMI Calculator</h4>
+                        <p className="text-xs text-gray-500">Monthly estimate</p>
+                      </div>
+                      <ChevronRight size={16} className="text-gray-400 group-hover:text-primary" />
+                    </div>
 
-                <div
-                  onClick={() => setShowRental(true)}
-                  className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100 shadow-sm hover:shadow-md transition-all cursor-pointer"
-                >
-                  <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center">
-                    <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
+                    <div
+                      onClick={() => setShowRental(true)}
+                      className="group flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-3 py-3 transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-white hover:shadow-md"
+                    >
+                      <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center">
+                        <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-bold text-gray-900">Rental Yield</h4>
+                        <p className="text-xs text-gray-500">Investment return</p>
+                      </div>
+                      <ChevronRight size={16} className="text-gray-400 group-hover:text-primary" />
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <h4 className="text-sm font-semibold text-gray-900">Rental Yield</h4>
-                    <p className="text-xs text-gray-500">Investment return</p>
-                  </div>
-                  <ChevronRight size={16} className="text-gray-400" />
                 </div>
-              </div>
                 
             </div>
           </div>
