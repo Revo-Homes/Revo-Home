@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import SmartSearchBar from '../components/SmartSearchBar';
 import PropertyCard from '../components/PropertyCard';import CompareModal from '../components/CompareModal';import { useProperty } from '../contexts/PropertyContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from '../contexts/LocationContext';
 import { MapPin, Navigation } from 'lucide-react';
 
@@ -186,6 +187,7 @@ function ServiceIcon({ name }) {
 
 function Home() {
   const { listings, featured } = useProperty();
+  const { isLoggedIn, openLogin } = useAuth();
   const { location, formatLocation } = useLocation();
   const filters = useSelector((state) => state.properties.filters);
   const [activeServiceIndex, setActiveServiceIndex] = useState(0);
@@ -206,6 +208,12 @@ function Home() {
   const isCompared = useCallback((id) =>
     compareProperties.some(p => (p.id || p.propertyId) === id),
   [compareProperties]);
+
+  const featuredProperties = useMemo(() => {
+    if (featured && featured.length > 0) return featured;
+    if (!listings || listings.length === 0) return [];
+    return [...listings].sort(() => Math.random() - 0.5).slice(0, 8);
+  }, [featured, listings]);
 
   const filteredResults = useMemo(() => {
     if (!listings || listings.length === 0) return [];
@@ -448,12 +456,7 @@ const [isPaused, setIsPaused] = useState(false);
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Show featured listings if available, otherwise show random listings */}
-            {(featured && featured.length > 0 ? featured : 
-              // Fallback: get 8 random listings from all listings
-              listings && listings.length > 0 
-                ? [...listings].sort(() => Math.random() - 0.5).slice(0, 8)
-                : []
-            ).map((prop) => (
+            {featuredProperties.map((prop) => (
               <PropertyCard 
                 key={prop.id} 
                 {...prop} 
@@ -847,13 +850,21 @@ const [isPaused, setIsPaused] = useState(false);
 
             {/* Compare Button */}
             {compareProperties.length >= 2 && (
-              <button
-                onClick={() => setIsCompareOpen(true)}
-                className="px-4 py-2 bg-cta text-white rounded-lg font-semibold text-sm hover:opacity-90 transition-opacity"
-              >
-                Compare Details
-              </button>
-            )}
+  <button
+    onClick={() => {
+      if (!isLoggedIn) { openLogin(); return; }
+      setIsCompareOpen(true);
+    }}
+    className="px-4 py-2 bg-cta text-white rounded-lg font-semibold text-sm hover:opacity-90 transition-opacity flex items-center gap-1.5"
+  >
+    {!isLoggedIn && (
+      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+      </svg>
+    )}
+    {isLoggedIn ? 'Compare Details' : 'Login to Compare'}
+  </button>
+)}
 
             {/* Clear Button */}
             <button

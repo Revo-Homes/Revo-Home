@@ -71,6 +71,7 @@ const request = (method, path, body = null, opts = {}) => {
   const config = {
     method,
     headers,
+    credentials: 'include', // Enable cookies for cross-origin auth
   };
   
   if (body && method !== 'GET') {

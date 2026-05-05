@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { billingApi } from '../services/billingApi';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 const STEPS = ['Plan', 'Payment', 'Confirmation'];
 
@@ -33,10 +35,51 @@ function StepBar({ current }) {
   );
 }
 
+function submitPayUForm(order) {
+  if (!order?.action || !order?.fields) {
+    console.error('[submitPayUForm] Invalid order:', order);
+    throw new Error('Invalid PayU order configuration');
+  }
+
+  console.log('[submitPayUForm] Creating form for PayU...');
+
+  // Remove any existing PayU forms
+  const existingForm = document.getElementById('payu-payment-form');
+  if (existingForm) {
+    existingForm.remove();
+  }
+
+  const form = document.createElement("form");
+  form.id = 'payu-payment-form';
+  form.method = order.method || "POST";
+  form.action = order.action;
+  form.style.display = 'none';
+
+  // Add all fields
+  Object.entries(order.fields).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = key;
+      input.value = String(value);
+      form.appendChild(input);
+    }
+  });
+
+  document.body.appendChild(form);
+
+  console.log('[submitPayUForm] Submitting form to:', order.action);
+
+  // Small delay to ensure form is in DOM
+  setTimeout(() => {
+    form.submit();
+  }, 100);
+}
+
 function Checkout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { subscribeUser } = useAuth();
+  const { user, isLoggedIn } = useAuth();
   const plan = location.state?.plan;
   const from = location.state?.from;
   const returnTo = location.state?.returnTo;
@@ -44,10 +87,12 @@ function Checkout() {
   const [status, setStatus] = useState('idle');
   const [countdown, setCountdown] = useState(3);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     if (!plan) navigate('/subscription');
-  }, [plan, navigate]);
+    if (!isLoggedIn) navigate('/login');
+  }, [plan, isLoggedIn, navigate]);
 
   useEffect(() => {
     if (status === 'success') {
@@ -56,7 +101,7 @@ function Checkout() {
         // If returning from builder form, redirect back to it
         if (returnTo === 'become-builder-form') {
           navigate('/become-builder', {
-            state: { 
+            state: {
               returnTo: 'become-builder-form',
               savedStep: savedStep || 2
             }
@@ -71,29 +116,111 @@ function Checkout() {
     }
   }, [status, navigate, from, returnTo, savedStep]);
 
-  if (!plan) return null;
+  if (!plan || !isLoggedIn) return null;
 
-  const rawPrice = parseInt(plan.priceLabel.replace(/[^0-9]/g, ''), 10) || 0;
-  const gstAmount = Math.round(rawPrice * 0.18);
-  const totalAmount = rawPrice + gstAmount;
+  const rawPrice = Number(plan.basePrice || 0);
+  const gstRate = Number(plan.gstRate ?? 18);
+  const gstAmount =
+    plan.gstAmount != null && plan.gstAmount !== ''
+      ? Math.round(Number(plan.gstAmount))
+      : Math.round((rawPrice * gstRate) / 100);
+  const totalAmount =
+    plan.totalPrice != null && plan.totalPrice !== ''
+      ? Math.round(Number(plan.totalPrice))
+      : rawPrice + gstAmount;
   const fmtINR = (n) => `₹${n.toLocaleString('en-IN')}`;
 
-  const currentStep = status === 'idle' ? 1 : status === 'processing' ? 1 : status === 'success' ? 2 : 1;
+  const currentStep = status === 'idle' ? 0 : status === 'processing' ? 1 : status === 'success' ? 2 : 0;
 
-  const handlePayment = () => {
-    setStatus('processing');
+  const handlePayment = async () => {
+    if (isProcessing) return;
+
+    setIsProcessing(true);
     setErrorMessage('');
-    setTimeout(() => {
-      // Simulate highly reliable payment for demo purposes
-      const ok = true; 
-      if (ok) { 
-        setStatus('success'); 
-        subscribeUser(plan.id); 
-      } else { 
-        setStatus('fail');
-        setErrorMessage('Transaction declined by your bank. Please try another method.');
+    setStatus('processing');
+
+    try {
+      // Create subscription
+      const organizationId = user?.organization?.id || user?.organization_id || user?.organizationId;
+      if (!organizationId) {
+        throw new Error('Your account is missing organization context — cannot checkout.');
       }
-    }, 2500);
+
+      console.log('[Checkout] Creating subscription with plan:', plan.id, 'for org:', organizationId);
+
+      const subscriptionPayload = {
+        planId: plan.id,
+        categoryKey: 'property_owner_sell',
+        billingCycle: plan.billingCycle || 'one_time',
+        advancePaymentPercent: 100,
+        organizationId,
+        replaceExisting: true,
+      };
+
+      let subscriptionResult;
+      try {
+        subscriptionResult = await billingApi.createSubscription(subscriptionPayload);
+      } catch (subError) {
+        console.error('[Checkout] Subscription creation failed:', subError);
+        throw new Error(`Failed to create subscription: ${subError.message}`);
+      }
+
+      console.log('[Checkout] Subscription result:', subscriptionResult);
+
+      const sub = subscriptionResult?.subscription || subscriptionResult;
+      const invoiceId =
+        sub?.latestInvoiceId ||
+        sub?.latest_invoice_id ||
+        subscriptionResult?.invoice?.id ||
+        sub?.latestInvoice?.id;
+
+      if (!invoiceId) {
+        console.error('[Checkout] No invoice ID found in subscription:', sub);
+        throw new Error('Failed to create subscription invoice. Please try again or contact support.');
+      }
+
+      console.log('[Checkout] Creating PayU order for invoice:', invoiceId);
+
+      let payuPayload;
+      try {
+        payuPayload = await billingApi.createPayUOrder({ invoiceId });
+      } catch (payuError) {
+        console.error('[Checkout] PayU order creation failed:', payuError);
+        throw new Error(`Payment gateway error: ${payuError.message}`);
+      }
+
+      console.log('[Checkout] PayU payload received:', payuPayload);
+
+      const order = payuPayload?.order || payuPayload;
+
+      if (!order?.action || !order?.fields?.key) {
+        console.error('[Checkout] Invalid PayU order:', order);
+        throw new Error('Invalid payment gateway response. Please try again.');
+      }
+
+      // Store payment reference for later verification
+      sessionStorage.setItem('pendingPayment', JSON.stringify({
+        invoiceId,
+        subscriptionId: sub?.id,
+        planName: plan.name,
+        amount: totalAmount,
+        txnid: order.fields.txnid,
+        timestamp: Date.now()
+      }));
+
+      // Submit PayU form - this will redirect to PayU
+      console.log('[Checkout] Submitting PayU form to:', order.action);
+      submitPayUForm(order);
+
+      // Note: The page will redirect to PayU, so code below won't execute immediately
+      // But we keep the processing state in case of delays
+
+    } catch (error) {
+      console.error('[Checkout] Payment error:', error);
+      setStatus('idle');
+      setErrorMessage(error.message || 'Payment failed. Please try again.');
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -141,7 +268,7 @@ function Checkout() {
                   <div className="flex justify-between text-sm pb-3 border-b border-gray-200">
                     <span className="text-gray-500 font-bold flex items-center gap-1.5">
                       <span className="w-5 h-5 bg-blue-100 text-blue-600 rounded text-[10px] font-black flex items-center justify-center">%</span>
-                      GST (18%)
+                      GST ({gstRate}%)
                     </span>
                     <span className="text-gray-900 font-bold">+ {fmtINR(gstAmount)}</span>
                   </div>
@@ -174,13 +301,30 @@ function Checkout() {
 
                 <button
                   onClick={handlePayment}
-                  className="w-full py-4 bg-primary hover:bg-primary-dark text-white rounded-2xl font-black text-base shadow-xl shadow-primary/30 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3"
+                  disabled={isProcessing}
+                  className="w-full py-4 bg-primary hover:bg-primary-dark text-white rounded-2xl font-black text-base shadow-xl shadow-primary/30 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                  Pay {fmtINR(totalAmount)} Securely
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                      Pay {fmtINR(totalAmount)} Securely
+                    </>
+                  )}
                 </button>
+
+                {errorMessage && (
+                  <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-red-800 text-sm font-medium">{errorMessage}</p>
+                  </div>
+                )}
               </motion.div>
             )}
 

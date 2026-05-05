@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useProperty } from '../contexts/PropertyContext';
+import { billingApi } from '../services/billingApi';
 import { 
   Crown, 
   CheckCircle2, 
@@ -10,64 +11,106 @@ import {
   Star, 
   Zap,
   Shield,
-  TrendingUp
+  TrendingUp,
+  Loader2
 } from 'lucide-react';
 
-const SUBSCRIPTION_PLANS = [
+// Fallback plans if API fails - matching the expected structure
+const FALLBACK_PLANS = [
   {
-    id: 'basic',
-    name: 'Basic',
-    price: 'Free',
-    priceLabel: '₹0',
-    propertiesLimit: 1,
-    features: [
-      'List 1 Property',
-      'Basic Property Details',
-      'Photo Upload (5 photos)',
-      '30 Days Listing',
-      'Basic Support'
-    ],
-    highlighted: false,
-    popular: false
+    id: 'owner-simple-sell',
+    slug: 'owner-simple-sell',
+    name: 'Simple Plan',
+    displayName: 'Simple Plan',
+    priceLabel: '₹15,000',
+    basePrice: 15000,
+    billingCycle: 'one_time',
+    maxProperties: 1,
+    maxListings: null,
+    serviceValidityDays: 60,
+    features: {
+      guaranteedSell: false,
+      propertyShowcaseVideo: true,
+      propertyListing: true,
+      brokerNetworkPromotion: true,
+      filteredInquiries: false,
+      whatsappMarketing: false,
+      negotiationSupport: false,
+      siteVisitSupport: false,
+      landingPageSupport: false,
+      classifiedAds: false,
+      relationshipManager: false,
+      closingManager: false
+    },
+    quotaConfig: { properties: 1 },
+    isPopular: false,
+    isRecommended: false,
+    hasGuarantee: false,
+    commissionPercent: 2
   },
   {
-    id: 'premium',
-    name: 'Premium',
-    price: '2999',
-    priceLabel: '₹2,999',
-    propertiesLimit: 5,
-    features: [
-      'List 5 Properties',
-      'Advanced Property Details',
-      'Photo Upload (20 photos)',
-      'Video Upload',
-      '90 Days Listing',
-      'Priority Support',
-      'Featured Badge',
-      'Better Visibility'
-    ],
-    highlighted: true,
-    popular: true
+    id: 'owner-advance-sell',
+    slug: 'owner-advance-sell',
+    name: 'Advance Plan',
+    displayName: 'Advance Plan',
+    priceLabel: '₹50,000',
+    basePrice: 50000,
+    billingCycle: 'one_time',
+    maxProperties: 1,
+    maxListings: null,
+    serviceValidityDays: 120,
+    features: {
+      guaranteedSell: true,
+      propertyShowcaseVideo: true,
+      propertyListing: true,
+      brokerNetworkPromotion: true,
+      filteredInquiries: true,
+      whatsappMarketing: true,
+      negotiationSupport: true,
+      siteVisitSupport: false,
+      landingPageSupport: false,
+      classifiedAds: false,
+      relationshipManager: true,
+      closingManager: true
+    },
+    quotaConfig: { properties: 1 },
+    isPopular: true,
+    isRecommended: true,
+    hasGuarantee: true,
+    commissionPercent: 1,
+    badgeText: 'Guaranteed Sell'
   },
   {
-    id: 'unlimited',
-    name: 'Unlimited',
-    price: '5999',
-    priceLabel: '₹5,999',
-    propertiesLimit: -1, // -1 for unlimited
-    features: [
-      'Unlimited Properties',
-      'All Premium Features',
-      'Unlimited Photos & Videos',
-      '365 Days Listing',
-      'Dedicated Support',
-      'Premium Badge',
-      'Maximum Visibility',
-      'Property Analytics',
-      'Lead Management'
-    ],
-    highlighted: false,
-    popular: false
+    id: 'owner-master-sell',
+    slug: 'owner-master-sell',
+    name: 'Master Plan',
+    displayName: 'Master Plan',
+    priceLabel: '₹1,00,000',
+    basePrice: 100000,
+    billingCycle: 'one_time',
+    maxProperties: 1,
+    maxListings: null,
+    serviceValidityDays: 150,
+    features: {
+      guaranteedSell: true,
+      propertyShowcaseVideo: true,
+      propertyListing: true,
+      brokerNetworkPromotion: true,
+      filteredInquiries: true,
+      whatsappMarketing: true,
+      negotiationSupport: true,
+      siteVisitSupport: true,
+      landingPageSupport: true,
+      classifiedAds: true,
+      relationshipManager: true,
+      closingManager: true
+    },
+    quotaConfig: { properties: 1 },
+    isPopular: false,
+    isRecommended: false,
+    hasGuarantee: true,
+    commissionPercent: 0,
+    badgeText: 'Zero Commission'
   }
 ];
 
@@ -77,11 +120,64 @@ export default function PropertySubscription() {
   const navigate = useNavigate();
   const [userProperties, setUserProperties] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [apiLoading, setApiLoading] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState(null);
+  const [plans, setPlans] = useState([]);
+  const [apiError, setApiError] = useState(null);
+
+  // Fetch plans from API
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        setApiLoading(true);
+        const response = await billingApi.getPlans({ categoryKey: 'property_owner_sell' });
+        const apiPlans = response?.plans || response || [];
+        
+        if (apiPlans.length > 0) {
+          // Transform API plans to match component structure
+          const transformedPlans = apiPlans.map(plan => ({
+            id: plan.id || plan.slug,
+            slug: plan.slug,
+            name: plan.name || plan.displayName,
+            displayName: plan.displayName || plan.name,
+            priceLabel: plan.basePrice === 0 ? '₹0' : `₹${plan.basePrice?.toLocaleString('en-IN')}`,
+            basePrice: plan.basePrice,
+            billingCycle: plan.billingCycle || 'one_time',
+            maxProperties: plan.maxProperties ?? plan.quotaConfig?.properties ?? plan.quotaConfig?.maxProperties,
+            maxListings: plan.maxListings ?? plan.quotaConfig?.maxListings,
+            serviceValidityDays: plan.serviceValidityDays,
+            features: plan.features || {},
+            quotaConfig: plan.quotaConfig || {},
+            isPopular: plan.isPopular || plan.isRecommended,
+            isRecommended: plan.isRecommended,
+            gstRate: plan.gstRate || 18,
+            totalPrice: plan.totalPrice || (plan.basePrice * 1.18),
+            hasGuarantee: plan.hasGuarantee,
+            commissionPercent: plan.commissionPercent,
+            badgeText: plan.badgeText
+          }));
+          setPlans(transformedPlans);
+        } else {
+          setPlans(FALLBACK_PLANS);
+        }
+      } catch (error) {
+        console.error('Failed to fetch plans from API:', error);
+        setApiError('Using fallback plans due to API error');
+        setPlans(FALLBACK_PLANS);
+      } finally {
+        setApiLoading(false);
+      }
+    };
+
+    fetchPlans();
+  }, []);
 
   useEffect(() => {
     const fetchUserProperties = async () => {
-      if (!isLoggedIn || !user?.id) return;
+      if (!isLoggedIn || !user?.id) {
+        setLoading(false);
+        return;
+      }
       
       try {
         const properties = await getUserProperties();
@@ -97,27 +193,43 @@ export default function PropertySubscription() {
     fetchUserProperties();
   }, [isLoggedIn, user?.id, getUserProperties]);
 
-  const handleSubscribe = async (planId) => {
+  const handleSubscribe = async (planSlug) => {
     if (!isLoggedIn) {
       navigate('/login');
       return;
     }
 
-    setSelectedPlan(planId);
+    setSelectedPlan(planSlug);
+    
+    // Find the full plan object
+    const plan = plans.find(p => p.slug === planSlug || p.id === planSlug);
+    
+    if (!plan) {
+      console.error('Plan not found:', planSlug);
+      setSelectedPlan(null);
+      return;
+    }
     
     // Subscribe user
-    const success = await subscribeUser(planId);
-    
-    if (success) {
-      // Redirect to checkout
-      const plan = SUBSCRIPTION_PLANS.find(p => p.id === planId);
-      navigate('/checkout', { 
-        state: { 
-          plan,
-          type: 'property_subscription',
-          from: '/sell' 
-        } 
-      });
+    try {
+      const success = await subscribeUser(planSlug);
+      
+      if (success) {
+        // Redirect to checkout with full plan data from API
+        navigate('/checkout', { 
+          state: { 
+            plan,
+            planId: plan.id,
+            planSlug: plan.slug,
+            categoryKey: 'property_owner_sell',
+            type: 'property_subscription',
+            from: '/sell' 
+          } 
+        });
+      }
+    } catch (error) {
+      console.error('Subscription failed:', error);
+      setSelectedPlan(null);
     }
   };
 
@@ -128,11 +240,11 @@ export default function PropertySubscription() {
   const getPropertyCount = () => userProperties.length;
   const canListMoreWithBasic = () => getPropertyCount() < 1;
 
-  if (loading) {
+  if (loading || apiLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <Loader2 className="animate-spin h-12 w-12 text-primary mx-auto mb-4" />
           <p className="text-gray-600">Loading subscription options...</p>
         </div>
       </div>
@@ -178,11 +290,17 @@ export default function PropertySubscription() {
           )}
         </div>
 
+        {apiError && (
+          <div className="max-w-3xl mx-auto mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+            <p className="text-yellow-700 text-sm">{apiError}</p>
+          </div>
+        )}
+
         {/* Pricing Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-          {SUBSCRIPTION_PLANS.map((plan) => {
-            const isPopular = plan.popular;
-            const isHighlighted = plan.highlighted;
+          {plans.map((plan) => {
+            const isPopular = plan.isPopular || plan.isRecommended;
+            const isHighlighted = plan.isRecommended || plan.isPopular;
             const isDisabled = plan.id === 'basic' && !canListMoreWithBasic();
             
             return (
@@ -221,7 +339,7 @@ export default function PropertySubscription() {
                     }`}>
                       {plan.priceLabel}
                     </span>
-                    {plan.price !== 'Free' && (
+                    {plan.basePrice > 0 && (
                       <span className={`text-sm font-medium ${
                         isPopular ? 'text-white/80' : 'text-gray-500'
                       }`}>
@@ -230,15 +348,15 @@ export default function PropertySubscription() {
                     )}
                   </div>
                   
-                  {plan.propertiesLimit > 0 && (
+                  {plan.maxProperties > 0 && (
                     <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold ${
                       isPopular ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'
                     }`}>
                       <Home className="w-3 h-3" />
-                      {plan.propertiesLimit} Properties
+                      {plan.maxProperties} Properties
                     </div>
                   )}
-                  {plan.propertiesLimit === -1 && (
+                  {(plan.maxProperties === null || plan.maxProperties === undefined || plan.maxProperties === -1) && (
                     <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold ${
                       isPopular ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'
                     }`}>
@@ -251,18 +369,33 @@ export default function PropertySubscription() {
                 {/* Features */}
                 <div className="p-6">
                   <ul className="space-y-3 mb-8">
-                    {plan.features.map((feature, index) => (
+                    {Object.entries(plan.features || {}).slice(0, 6).map(([key, value], index) => (
                       <li key={index} className="flex items-start gap-3">
                         <CheckCircle2 className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
                           isPopular ? 'text-primary' : 'text-green-500'
                         }`} />
-                        <span className="text-sm font-medium text-gray-700">{feature}</span>
+                        <span className="text-sm font-medium text-gray-700">
+                          {typeof value === 'boolean' 
+                            ? `${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}: ${value ? 'Yes' : 'No'}`
+                            : `${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}: ${value}`
+                          }
+                        </span>
                       </li>
                     ))}
+                    {plan.serviceValidityDays && (
+                      <li className="flex items-start gap-3">
+                        <CheckCircle2 className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                          isPopular ? 'text-primary' : 'text-green-500'
+                        }`} />
+                        <span className="text-sm font-medium text-gray-700">
+                          {plan.serviceValidityDays} Days Validity
+                        </span>
+                      </li>
+                    )}
                   </ul>
 
                   {/* CTA Button */}
-                  {plan.id === 'basic' ? (
+                  {plan.basePrice === 0 ? (
                     <button
                       onClick={handleContinueWithBasic}
                       disabled={isDisabled}
@@ -276,17 +409,17 @@ export default function PropertySubscription() {
                     </button>
                   ) : (
                     <button
-                      onClick={() => handleSubscribe(plan.id)}
-                      disabled={selectedPlan === plan.id}
+                      onClick={() => handleSubscribe(plan.slug || plan.id)}
+                      disabled={selectedPlan === (plan.slug || plan.id)}
                       className={`w-full py-4 rounded-2xl font-bold text-sm uppercase tracking-wider transition-all ${
                         isPopular
                           ? 'bg-primary text-white hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/30'
                           : 'bg-gray-900 text-white hover:bg-gray-800 hover:shadow-lg'
-                      } ${selectedPlan === plan.id ? 'opacity-50 cursor-wait' : ''}`}
+                      } ${selectedPlan === (plan.slug || plan.id) ? 'opacity-50 cursor-wait' : ''}`}
                     >
-                      {selectedPlan === plan.id ? (
+                      {selectedPlan === (plan.slug || plan.id) ? (
                         <span className="flex items-center justify-center gap-2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <Loader2 className="animate-spin h-4 w-4" />
                           Processing...
                         </span>
                       ) : (

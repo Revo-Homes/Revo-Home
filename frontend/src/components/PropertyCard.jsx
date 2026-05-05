@@ -182,11 +182,12 @@ function PropertyCard({
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -5 }}
       transition={{ duration: 0.3 }}
-      className={`group bg-white rounded-[32px] overflow-hidden border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 flex flex-col h-full relative ${disabled ? 'grayscale' : ''}`}
+      className={`group bg-white rounded-[32px] overflow-hidden border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 flex flex-col h-full relative cursor-pointer ${disabled ? 'grayscale' : ''}`}
+      onClick={handleCardClick}
     >
       {/* Image Container */}
       <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 flex-shrink-0">
-        <div onClick={handleCardClick} className="block w-full h-full cursor-pointer">
+        <div className="block w-full h-full cursor-pointer">
           <img
             src={image}
             alt={title}
@@ -299,7 +300,7 @@ function PropertyCard({
           )}
         </div>
 
-        <div onClick={handleCardClick} className="block">
+        <div className="block">
           <h3 className="text-lg font-bold text-gray-900 leading-tight mb-2 line-clamp-1 group-hover:text-primary transition-colors">
             {title}
           </h3>
@@ -375,10 +376,13 @@ function PropertyCard({
         )}
         
         {footerActions && (
-          <div className="mt-5 pt-5 border-t border-gray-100">
-            {footerActions}
-          </div>
-        )}
+  <div
+    className="mt-5 pt-5 border-t border-gray-100"
+    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+  >
+    {footerActions}
+  </div>
+)}
       </div>
     </motion.div>
   );

@@ -7,7 +7,7 @@ import { buildStructuredMessage, splitFullName, submitPublicEnquiry } from '../s
 import { X, Info, User, Mail, Phone, MessageSquare, Loader2 } from 'lucide-react';
 
 function CompareModal({ isOpen, onClose, properties }) {
-  if (!isOpen) return null;
+  
 
   const formatPrice = (p) => {
     if (!p) return '—';
@@ -19,12 +19,15 @@ function CompareModal({ isOpen, onClose, properties }) {
   // Logic to "rate the best" based on price per sqft (lower is better value)
   const ratedProperties = properties.map(p => ({
     ...p,
-    pricePerSqft: p.price / parseInt(p.area)
+    pricePerSqft: p.pricePerSqft || (p.price && Number(p.area) > 0 ? p.price / Number(p.area) : Infinity)
   }));
 
-  const bestValueId = ratedProperties.reduce((min, p) => 
-    p.pricePerSqft < min.pricePerSqft ? p : min, ratedProperties[0]
-  ).id;
+  const bestValueId = ratedProperties.length > 0
+  ? ratedProperties.reduce((min, p) =>
+      (p.pricePerSqft || Infinity) < (min.pricePerSqft || Infinity) ? p : min,
+      ratedProperties[0]
+    ).id
+  : null;
 
   const { user, isLoggedIn, openLogin } = useAuth();
   const { generateLead } = useRevoLeadTracker();
@@ -141,6 +144,7 @@ function CompareModal({ isOpen, onClose, properties }) {
       setIsSubmitting(false);
     }
   };
+  if (!isOpen) return null; 
 
   return (
     <AnimatePresence>
@@ -177,50 +181,54 @@ function CompareModal({ isOpen, onClose, properties }) {
 
           <div className="flex-1 overflow-x-auto p-8 pt-4">
             <div className="min-w-[800px]">
-              <div className="grid grid-cols-[200px_1fr_1fr_1fr] gap-8">
-                {/* Labels Column */}
-                <div className="flex flex-col gap-12 pt-[220px]">
-                  <div className="h-10 flex items-center font-bold text-gray-400 uppercase tracking-widest text-xs">Price</div>
-                  <div className="h-10 flex items-center font-bold text-gray-400 uppercase tracking-widest text-xs">BHK</div>
-                  <div className="h-10 flex items-center font-bold text-gray-400 uppercase tracking-widest text-xs">Area</div>
-                  <div className="h-10 flex items-center font-bold text-gray-400 uppercase tracking-widest text-xs">Type</div>
-                  <div className="h-10 flex items-center font-bold text-gray-400 uppercase tracking-widest text-xs">Location</div>
-                  <div className="h-10 flex items-center font-bold text-gray-400 uppercase tracking-widest text-xs">Value Rating</div>
-                </div>
-
-                {/* Property Columns */}
+              <div className={`grid gap-6 mb-6 ${
+    properties.length === 1 ? 'grid-cols-[180px_1fr]' :
+    properties.length === 2 ? 'grid-cols-[180px_1fr_1fr]' :
+    'grid-cols-[180px_1fr_1fr_1fr]'
+  }`}>
+                <div />
                 {ratedProperties.slice(0, 3).map((p) => (
-                  <div key={p.id} className={`flex flex-col gap-12 p-6 rounded-[32px] transition-all duration-500 ${
-                    p.id === bestValueId ? 'bg-primary/5 ring-2 ring-primary/20 scale-[1.02] shadow-xl' : 'hover:bg-gray-50'
-                  }`}>
-                    {/* Property Card Head */}
-                    <div className="flex flex-col gap-4">
-                      <div className="relative aspect-video rounded-2xl overflow-hidden shadow-lg">
-                        <img src={p.image} alt={p.title} className="w-full h-full object-cover" />
-                        {p.id === bestValueId && (
-                          <div className="absolute top-3 left-3 bg-primary text-white text-[10px] font-black uppercase tracking-tighter px-3 py-1 rounded-full shadow-lg">
-                            ⭐ Best Value
-                          </div>
-                        )}
-                      </div>
-                      <h3 className="font-bold text-gray-900 line-clamp-2 min-h-[3rem] leading-tight">{p.title}</h3>
+                  <div key={p.id} className={`p-4 rounded-[24px] ${p.id === bestValueId ? 'bg-primary/5 ring-2 ring-primary/20' : ''}`}>
+                    <div className="relative h-[150px] rounded-xl overflow-hidden shadow-md mb-3">
+                      <img src={p.image} alt={p.title} className="w-full h-full object-cover" />
+                      {p.id === bestValueId && (
+                        <div className="absolute top-2 left-2 bg-primary text-white text-[10px] font-black uppercase px-3 py-1 rounded-full shadow">
+                          ⭐ Best Value
+                        </div>
+                      )}
                     </div>
-
-                    <div className="h-10 flex items-center text-xl font-black text-primary">{formatPrice(p.price)}</div>
-                    <div className="h-10 flex items-center text-lg font-bold text-gray-900">{p.bhk} BHK</div>
-                    <div className="h-10 flex items-center text-lg font-bold text-gray-900">{p.area} sqft</div>
-                    <div className="h-10 flex items-center text-lg font-bold text-gray-900 uppercase tracking-wide text-sm">{p.propertyType}</div>
-                    <div className="h-10 flex items-center text-gray-500 font-medium text-sm line-clamp-1 italic">{p.location}</div>
-                    <div className="h-10 flex items-center">
-                      <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                        p.id === bestValueId ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'
-                      }`}>
-                        {p.id === bestValueId ? 'Excellent Value' : 'Good Quality'}
-                      </div>
-                    </div>
+                    <h3 className="font-bold text-gray-900 text-sm leading-tight line-clamp-2">{p.title}</h3>
                   </div>
                 ))}
               </div>
+
+              {[
+                { label: 'PRICE', render: (p) => <span className="text-xl font-black text-primary">{p.price ? formatPrice(p.price) : '—'}</span> },
+                { label: 'BHK', render: (p) => <span className="text-base font-bold text-gray-900">{p.bhk && String(p.bhk).trim() && String(p.bhk).trim() !== 'undefined' ? (String(p.bhk).includes('BHK') ? p.bhk : `${p.bhk} BHK`) : '—'}</span> },
+                { label: 'AREA', render: (p) => <span className="text-base font-bold text-gray-900">{Number(p.area) > 0 ? `${p.area} sqft` : '—'}</span> },
+                { label: 'TYPE', render: (p) => <span className="text-base font-bold text-gray-900 uppercase">{p.propertyType || '—'}</span> },
+                { label: 'LOCATION', render: (p) => <span className="text-sm text-gray-500 italic">{p.location || '—'}</span> },
+                { label: 'VALUE RATING', render: (p) => (
+                  <div className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${p.id === bestValueId ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                    {p.id === bestValueId ? 'Excellent Value' : 'Good Quality'}
+                  </div>
+                )},
+              ].map((row, i) => (
+                <div key={i} className={`grid gap-6 border-t border-gray-100 ${
+      properties.length === 1 ? 'grid-cols-[180px_1fr]' :
+      properties.length === 2 ? 'grid-cols-[180px_1fr_1fr]' :
+      'grid-cols-[180px_1fr_1fr_1fr]'
+    }`}>
+                  <div className="py-4 flex items-center font-bold text-gray-400 uppercase tracking-widest text-xs">
+                    {row.label}
+                  </div>
+                  {ratedProperties.slice(0, 3).map((p) => (
+                    <div key={p.id} className={`py-4 px-4 flex items-center ${p.id === bestValueId ? 'bg-primary/5' : ''}`}>
+                      {row.render(p)}
+                    </div>
+                  ))}
+                </div>
+              ))}
             </div>
           </div>
 

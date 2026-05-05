@@ -32,9 +32,10 @@ function DashboardSaved() {
   }, [fetchSaved, isLoggedIn, authLoading]);
 
   const toggleSelection = (id) => {
-    setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
+    setSelectedIds(prev => {
+      if (!prev.includes(id) && prev.length >= 3) return prev;
+      return prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id];
+    });
   };
 
   const safeSaved = (Array.isArray(savedProperties) ? savedProperties : [])
@@ -79,7 +80,7 @@ function DashboardSaved() {
             onClick={() => setSelectedIds([])}
             className="text-primary font-bold text-sm hover:underline"
           >
-            Clear Selection ({selectedIds.length})
+            Clear Selection ({selectedIds.length}/3)
           </button>
         )}
       </div>

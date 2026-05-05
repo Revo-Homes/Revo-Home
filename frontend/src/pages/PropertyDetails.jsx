@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useProperty } from '../contexts/PropertyContext';
 import { useRevoLeadTracker } from '../hooks/useRevoLeadTracker';
 import { buildStructuredMessage, splitFullName, submitPublicEnquiry } from '../services/publicEnquiry';
+import { billingApi } from '../services/billingApi';
 import PropertyMap from "../components/PropertyMap";
 import ImageGallery from "../components/ImageGallery";
 import EMICalculator from './EMICalculator';
@@ -1154,6 +1155,24 @@ function EnquiryModal({
   );
 }
 
+function submitPayUForm(order) {
+  if (!order?.action || !order?.fields) return;
+  const form = document.createElement('form');
+  form.method = order.method || 'POST';
+  form.action = order.action;
+  Object.entries(order.fields).forEach(([key, value]) => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = key;
+    input.value = value ?? '';
+    form.appendChild(input);
+  });
+  document.body.appendChild(form);
+  form.submit();
+}
+
+const DOCUMENT_UNLOCK_BASE_INR = 99;
+
 function PropertyDetails() {
   const navigate = useNavigate();
   const { slug } = useParams();
@@ -1222,6 +1241,22 @@ function PropertyDetails() {
     });
   }, [listingIdentifier, property?.reviews]);
 
+  useEffect(() => {
+    if (!isLoggedIn || !listingIdentifier) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const access = await billingApi.getListingDocumentAccess(listingIdentifier);
+        if (!cancelled) setHasPaidForDocuments(Boolean(access?.paid));
+      } catch {
+        if (!cancelled) setHasPaidForDocuments(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, listingIdentifier]);
+
   const handleDeleteReview = (reviewId) => {
     const updatedReviews = reviews.filter(r => r.id !== reviewId);
     setReviews(updatedReviews);
@@ -1254,45 +1289,41 @@ function PropertyDetails() {
       openLoginForPropertyDetails();
       return;
     }
-    if (property?.isResale) {
-      setShowPaymentModal(true);
-    } else {
+    if (hasPaidForDocuments) {
       generateAndDownloadDocument();
+      return;
     }
+    if (property?.hasBrochure) {
+      setShowPaymentModal(true);
+      return;
+    }
+    generateAndDownloadDocument();
   };
 
   const initiatePayment = async () => {
+    const organizationId = user?.organization?.id || user?.organization_id || user?.organizationId || 1;
     setPaymentLoading(true);
-    
-    // Simulate payment processing (2 seconds)
-    setTimeout(() => {
-      // Mock successful payment
-      const mockPaymentId = `pay_${Date.now()}`;
-      const mockOrderId = `order_${Date.now()}`;
-      
-      console.log('Payment successful:', { paymentId: mockPaymentId, orderId: mockOrderId });
-      
-      // Store payment info in localStorage
-      const paymentHistory = JSON.parse(localStorage.getItem('document_payments') || '[]');
-      paymentHistory.push({
-        propertyId: listingIdentifier,
-        paymentId: mockPaymentId,
-        orderId: mockOrderId,
-        timestamp: new Date().toISOString(),
-        amount: 49,
+    try {
+      const checkout = await billingApi.createListingDocumentCheckout({
+        organizationId,
+        listingId: listingIdentifier,
+        baseAmount: DOCUMENT_UNLOCK_BASE_INR,
+        description: property?.title
+          ? `Listing documents — ${property.title}`
+          : `Listing documents — ${listingIdentifier}`,
       });
-      localStorage.setItem('document_payments', JSON.stringify(paymentHistory));
-      
-      // Close modal and reset loading
-      setShowPaymentModal(false);
+      const invoiceId = checkout?.invoice?.id;
+      if (!invoiceId) {
+        throw new Error('Could not create invoice for document download');
+      }
+      const payuPayload = await billingApi.createPayUOrder({ invoiceId });
+      const order = payuPayload?.order || payuPayload;
+      submitPayUForm(order);
+    } catch (err) {
+      console.error('Document checkout failed:', err);
+      alert(err?.message || 'Payment could not be started. Please try again.');
       setPaymentLoading(false);
-      
-      // Generate and download document
-      generateAndDownloadDocument();
-      
-      // Show success message
-      alert('Payment successful! Your document is being downloaded.');
-    }, 2000);
+    }
   };
 
   const generateAndDownloadDocument = () => {
@@ -2217,13 +2248,7 @@ function PropertyDetails() {
                     }
                     alert('Callback request submitted! We will contact you shortly.');
                   }}
-                  onBrochureClick={() => {
-                    if (!isLoggedIn) {
-                      openLoginForPropertyDetails();
-                      return;
-                    }
-                    setShowPaymentModal(true);
-                  }}
+                  onBrochureClick={handleDownloadDocuments}
                   onLoginClick={openLoginForPropertyDetails}
                 />
 
@@ -2332,7 +2357,7 @@ function PropertyDetails() {
                               className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-dark text-white text-sm font-semibold rounded-lg transition-all shadow-md hover:shadow-lg"
                             >
                               <IndianRupee size={14} />
-                              99 - Download Documents
+                              {DOCUMENT_UNLOCK_BASE_INR} + GST — Download Documents
                             </button>
                           </div>
                         </div>
@@ -2591,10 +2616,11 @@ function PropertyDetails() {
                 <div className="flex items-center justify-between bg-primary/10 rounded-xl p-4 mb-6">
                   <div>
                     <span className="text-gray-600 text-sm">One-time payment</span>
-                    <p className="text-xs text-gray-500 mt-0.5">Instant download after payment</p>
+                    <p className="text-xs text-gray-500 mt-0.5">GST 18% added at PayU checkout · unlocks brochure PDF</p>
                   </div>
                   <div className="text-right">
-                    <span className="text-2xl font-bold text-primary">₹99</span>
+                    <span className="text-2xl font-bold text-primary">₹{DOCUMENT_UNLOCK_BASE_INR}</span>
+                    <p className="text-[11px] text-gray-500 mt-0.5">+ GST</p>
                   </div>
                 </div>
                 

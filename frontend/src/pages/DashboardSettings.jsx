@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useProperty } from '../contexts/PropertyContext';
 import { userApi } from '../services/api';
+import billingApi from '../services/billingApi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -11,7 +12,7 @@ const TABS = [
   { id: 'professional', label: 'Professional', icon: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
   { id: 'security',     label: 'Security',     icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
   { id: 'activity',     label: 'Activity',     icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-  { id: 'buy-plan',     label: 'Buy Plan',     icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
+  { id: 'my-plan',      label: 'My Plan',      icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
 ];
 
 const INPUT_BASE = `w-full h-12 px-4 bg-white border border-gray-200 rounded-xl
@@ -195,17 +196,24 @@ function FieldTextarea({ label, error, ...props }) {
 }
 
 // ─── SECTION WRAPPER ──────────────────────────────────────────────────────────
-function Section({ title, subtitle, icon, children, className = '' }) {
+function Section({ title, subtitle, icon, children, className = '', action = null }) {
   return (
     <div className={`mb-8 last:mb-0 ${className}`}>
-      <div className="flex items-start gap-3 mb-5">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center text-white shadow-md shadow-red-200 flex-shrink-0 mt-0.5">
-          {icon}
+      <div className="flex items-start justify-between mb-5">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center text-white shadow-md shadow-red-200 flex-shrink-0 mt-0.5">
+            {icon}
+          </div>
+          <div>
+            <h4 className="font-bold text-gray-900 text-base leading-tight">{title}</h4>
+            {subtitle && <p className="text-gray-400 text-xs mt-0.5">{subtitle}</p>}
+          </div>
         </div>
-        <div>
-          <h4 className="font-bold text-gray-900 text-base leading-tight">{title}</h4>
-          {subtitle && <p className="text-gray-400 text-xs mt-0.5">{subtitle}</p>}
-        </div>
+        {action && (
+          <div className="flex-shrink-0 ml-4">
+            {action}
+          </div>
+        )}
       </div>
       <div className="pl-0">{children}</div>
     </div>
@@ -663,6 +671,225 @@ function BuyPlanPanel({ isSubscribed, user }) {
   );
 }
 
+// ─── MY PLAN PANEL ────────────────────────────────────────────────────────────
+function MyPlanPanel({ subscription, loadingSubscription, onRefreshSubscription }) {
+  const navigate = useNavigate();
+  
+  if (loadingSubscription) {
+    return (
+      <div className="bg-white rounded-2xl shadow-md shadow-gray-100/80 border border-gray-100 p-8">
+        <Section title="My Plan" subtitle="Loading your subscription details..." icon={<Icon path="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" className="w-4 h-4" />}>
+          <div className="p-6 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500"></div>
+          </div>
+        </Section>
+      </div>
+    );
+  }
+
+  console.log('[MyPlanPanel] Subscription:', subscription);
+  const hasActivePlan = subscription && 
+    (subscription.status === 'active' || subscription.status === 'trialing' || subscription.status === 'paid');
+  const planName = subscription?.planName || subscription?.plan?.name || subscription?.plan_name || subscription?.plan_display_name || 'Current Plan';
+  const totalAmount = subscription?.totalAmount || subscription?.total_amount || subscription?.totalAmount || 0;
+  const categoryKey = subscription?.categoryKey || subscription?.category_key || subscription?.plan_category_key || 'N/A';
+  const billingCycle = subscription?.billingCycle || subscription?.billing_cycle || subscription?.plan_billing_cycle || 'one_time';
+  const periodStart = subscription?.currentPeriodStart || subscription?.current_period_start || subscription?.currentPeriodStart;
+  const periodEnd = subscription?.currentPeriodEnd || subscription?.current_period_end || subscription?.currentPeriodEnd;
+  const status = subscription?.status || 'unknown';
+  
+  // Extract plan features and quotas
+  const planFeatures = subscription?.plan_features || subscription?.features || {};
+  const planQuotas = subscription?.plan_quota_config || subscription?.quota_config || {};
+  const planDescription = subscription?.plan_description || subscription?.description || '';
+  const maxProperties = subscription?.plan_max_properties || planQuotas?.max_properties || 0;
+  const maxUsers = subscription?.plan_max_users || planQuotas?.max_users || 0;
+  const maxTeamSize = subscription?.plan_max_team_size || planQuotas?.max_team_size || 0;
+  const maxFeaturedProperties = subscription?.plan_max_featured_properties || planQuotas?.max_featured_properties || 0;
+  
+  return (
+    <div className="bg-white rounded-2xl shadow-md shadow-gray-100/80 border border-gray-100 p-8">
+      <Section 
+        title="My Plan" 
+        subtitle="Your current subscription details" 
+        icon={<Icon path="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" className="w-4 h-4" />}
+        action={
+          <button
+            onClick={onRefreshSubscription}
+            disabled={loadingSubscription}
+            className="px-3 py-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+          >
+            <Icon path="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" className="w-3 h-3" />
+            Refresh
+          </button>
+        }
+      >
+        {hasActivePlan ? (
+          <div className="p-6 bg-gradient-to-br from-green-50 to-emerald-50/80 rounded-2xl border border-green-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <Badge variant="green">{status === 'trialing' ? 'Trialing' : 'Active'}</Badge>
+                <h4 className="text-xl font-black text-gray-900 mt-3">{planName}</h4>
+                <p className="text-sm text-gray-500 font-medium mt-1">
+                  Category: {categoryKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                </p>
+                <p className="text-sm text-gray-500 font-medium">
+                  Billing: {billingCycle}
+                </p>
+                {periodStart && periodEnd && (
+                  <p className="text-sm text-gray-400 mt-2">
+                    Valid until: {new Date(periodEnd).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+              <div className="text-right">
+                <p className="text-3xl font-black text-gray-900">₹{totalAmount.toLocaleString()}</p>
+                <p className="text-sm text-gray-500">
+                  {subscription?.gstRate || subscription?.gst_rate || 18}% GST included
+                </p>
+                <button 
+                  onClick={() => navigate('/subscription')} 
+                  className="mt-4 px-6 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-all shadow-sm"
+                >
+                  Manage Plan
+                </button>
+              </div>
+            </div>
+
+            {/* Plan Description */}
+            {planDescription && (
+              <div className="mb-6 p-4 bg-white/50 rounded-xl border border-green-100">
+                <p className="text-sm text-gray-600 leading-relaxed">{planDescription}</p>
+              </div>
+            )}
+
+            {/* Plan Features & Quotas */}
+            <div className="space-y-4">
+              <h5 className="font-bold text-gray-900 text-sm uppercase tracking-wider">Plan Features & Limits</h5>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {maxProperties > 0 && (
+                  <div className="flex items-center gap-3 p-3 bg-white/50 rounded-lg border border-green-100">
+                    <div className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center flex-shrink-0">
+                      <Icon path="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Properties</p>
+                      <p className="font-bold text-gray-900">{maxProperties === 999999 ? 'Unlimited' : maxProperties}</p>
+                    </div>
+                  </div>
+                )}
+
+                {maxFeaturedProperties > 0 && (
+                  <div className="flex items-center gap-3 p-3 bg-white/50 rounded-lg border border-green-100">
+                    <div className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center flex-shrink-0">
+                      <Icon path="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Featured Properties</p>
+                      <p className="font-bold text-gray-900">{maxFeaturedProperties === 999999 ? 'Unlimited' : maxFeaturedProperties}</p>
+                    </div>
+                  </div>
+                )}
+
+                {maxUsers > 0 && (
+                  <div className="flex items-center gap-3 p-3 bg-white/50 rounded-lg border border-green-100">
+                    <div className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center flex-shrink-0">
+                      <Icon path="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Team Users</p>
+                      <p className="font-bold text-gray-900">{maxUsers === 999999 ? 'Unlimited' : maxUsers}</p>
+                    </div>
+                  </div>
+                )}
+
+                {maxTeamSize > 0 && (
+                  <div className="flex items-center gap-3 p-3 bg-white/50 rounded-lg border border-green-100">
+                    <div className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center flex-shrink-0">
+                      <Icon path="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Team Size</p>
+                      <p className="font-bold text-gray-900">{maxTeamSize === 999999 ? 'Unlimited' : maxTeamSize}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Additional Features */}
+                {Object.entries(planFeatures).map(([key, value]) => {
+                  if (typeof value === 'boolean' && value) {
+                    return (
+                      <div key={key} className="flex items-center gap-3 p-3 bg-white/50 rounded-lg border border-green-100">
+                        <div className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center flex-shrink-0">
+                          <Icon path="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 capitalize">{key.replace(/_/g, ' ')}</p>
+                          <p className="font-bold text-gray-900">Enabled</p>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })}
+
+                {/* Fallback if no features found */}
+                {maxProperties === 0 && maxFeaturedProperties === 0 && maxUsers === 0 && maxTeamSize === 0 && 
+                 Object.keys(planFeatures).length === 0 && (
+                  <div className="col-span-full p-4 bg-white/50 rounded-lg border border-green-100 text-center">
+                    <Icon path="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" className="w-8 h-8 text-green-500 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600">No specific limits or features configured for this plan</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : subscription ? (
+          <div className="p-6 bg-gradient-to-br from-yellow-50 to-orange-50/80 rounded-2xl border border-yellow-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <Badge variant="yellow">{subscription.status}</Badge>
+                <h4 className="text-xl font-black text-gray-900 mt-3">{planName}</h4>
+                <p className="text-sm text-gray-500 font-medium mt-1">
+                  Your subscription is currently {subscription.status}
+                </p>
+              </div>
+              <button 
+                onClick={() => navigate('/subscription')} 
+                className="px-6 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-all shadow-sm"
+              >
+                View Plans
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="p-6 sm:p-8 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl shadow-md shadow-red-200 text-white relative overflow-hidden group">
+            <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_70%_50%,_white_1px,_transparent_1px)] bg-[length:18px_18px]"></div>
+            <div className="absolute right-0 top-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover:bg-white/20 transition-all duration-700" />
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div>
+                <span className="inline-flex items-center px-3 py-1 bg-white/20 text-white text-[11px] font-bold uppercase tracking-widest rounded-full mb-4 shadow-sm backdrop-blur-md">Free Tier</span>
+                <h4 className="text-2xl sm:text-3xl font-black mb-2 tracking-tight">No Active Plan</h4>
+                <p className="text-red-100 text-sm font-medium max-w-md leading-relaxed">
+                  You don't have an active subscription. Choose a plan to unlock premium features.
+                </p>
+              </div>
+              <button 
+                onClick={() => navigate('/subscription', { state: { from: 'my-plan' } })} 
+                className="px-8 py-3.5 bg-white text-red-600 rounded-xl text-sm font-black shadow-xl hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all w-full md:w-auto flex-shrink-0 text-center flex justify-center items-center gap-2"
+              >
+                View Plans
+                <Icon path="M17 8l4 4m0 0l-4 4m4-4H3" className="w-4 h-4 ml-1" />
+              </button>
+            </div>
+          </div>
+        )}
+      </Section>
+    </div>
+  );
+}
+
 // ─── ERROR TOAST ──────────────────────────────────────────────────────────────
 function ErrorToast({ message, onClose }) {
   return (
@@ -696,6 +923,63 @@ function DashboardSettings() {
       setActiveTab(tabFromUrl);
     }
   }, [location.search]);
+
+  // Fetch active subscription
+  const fetchSubscription = useCallback(async () => {
+    // Only fetch if user is authenticated
+    if (!user?.id) {
+      console.log('[DashboardSettings] User not authenticated, skipping subscription fetch');
+      setLoadingSubscription(false);
+      return;
+    }
+    
+    try {
+      setLoadingSubscription(true);
+      const response = await billingApi.getActiveSubscription();
+      console.log('[DashboardSettings] Active subscription response:', response);
+      
+      // Handle different response formats
+      const subData = response?.data || response?.subscription || response;
+      if (subData && (subData.id || subData.planId)) {
+        console.log('[DashboardSettings] Setting subscription:', subData);
+        setSubscription(subData);
+      } else {
+        console.log('[DashboardSettings] No active subscription found');
+        setSubscription(null);
+      }
+    } catch (error) {
+      console.error('[DashboardSettings] Failed to fetch subscription:', error);
+      // Don't clear existing subscription on error, just log it
+    } finally {
+      setLoadingSubscription(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchSubscription();
+  }, [fetchSubscription]); // Re-fetch when fetchSubscription function changes
+
+  // Listen for payment success events
+  useEffect(() => {
+    const handlePaymentSuccess = (event) => {
+      console.log('[DashboardSettings] Payment success detected, refreshing subscription');
+      fetchSubscription();
+    };
+
+    // Listen for custom payment success events
+    window.addEventListener('paymentSuccess', handlePaymentSuccess);
+    
+    // Check URL parameters for payment success on component mount
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('status') === 'success' && urlParams.get('txnid')) {
+      console.log('[DashboardSettings] Payment success detected in URL, refreshing subscription');
+      fetchSubscription();
+    }
+
+    return () => {
+      window.removeEventListener('paymentSuccess', handlePaymentSuccess);
+    };
+  }, [fetchSubscription]);
   const [loading, setLoading]             = useState(true);
   const [saving, setSaving]               = useState(false);
   const [saveSuccess, setSaveSuccess]     = useState(false);
@@ -704,6 +988,8 @@ function DashboardSettings() {
   const [viewModel, setViewModel]         = useState(null);
   const [formData, setFormData]           = useState({});
   const [propertyStats, setPropertyStats] = useState({ total_properties:0, active_listings:0, total_inquiries:0, total_views:0, featured_properties:0 });
+  const [subscription, setSubscription]   = useState(null);
+  const [loadingSubscription, setLoadingSubscription] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -809,7 +1095,7 @@ function DashboardSettings() {
       case 'professional': return withForm(ProfessionalForm);
       case 'security':     return <SecurityPanel viewModel={viewModel} />;
       case 'activity':     return <ActivityPanel viewModel={viewModel} propertyStats={propertyStats} />;
-      case 'buy-plan':     return <BuyPlanPanel isSubscribed={isSubscribed} user={user} />;
+      case 'my-plan':      return <MyPlanPanel subscription={subscription} loadingSubscription={loadingSubscription} onRefreshSubscription={fetchSubscription} />;
       default:             return null;
     }
   };
