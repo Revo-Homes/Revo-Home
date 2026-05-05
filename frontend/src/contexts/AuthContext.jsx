@@ -307,7 +307,13 @@ export function AuthProvider({ children }) {
           console.log('🔐 OAuth OTP verified successfully');
         } else {
           // Regular email OTP flow
+        // Defensive check: Ensure we're not saving "undefined" or "null" as a string
+        if (token && token !== 'undefined' && token !== 'null') {
           localStorage.setItem(TOKEN_KEY, token);
+        } else {
+          console.error('[AuthContext] Attempted to save invalid token:', token);
+          return { success: false, message: 'Invalid token received from server' };
+        }
           userData = await syncProfile();
           console.log('📧 Email OTP verified successfully');
         }
@@ -357,13 +363,27 @@ export function AuthProvider({ children }) {
     try {
       setLoading(true);
       const response = await authApi.oauthCallback(payload);
+      
+      // Handle missing phone number - require verification
+      if (response.status === 'phone_required') {
+        const tempToken = response.temp_token;
+        if (tempToken && tempToken !== 'undefined' && tempToken !== 'null') {
+          localStorage.setItem(TOKEN_KEY, tempToken);
+        }
+        return { 
+          success: true, 
+          status: 'phone_required', 
+          user: response.user,
+          message: response.message
+        };
+      }
+
       const token = response.token || response.access_token || response.data?.access_token;
       if (token) {
         localStorage.setItem(TOKEN_KEY, token);
         const userData = await syncProfile();
         
         // Always log in after successful OAuth
-        // Phone verification happens inside the dashboard via PhoneVerificationGuard
         setIsLoggedIn(true);
         setIsNewUser(false);
         if (userData && userData.phone) {
@@ -374,7 +394,51 @@ export function AuthProvider({ children }) {
       }
       return { success: false, message: 'OAuth failed' };
     } catch (err) {
-      return { success: false, message: err.message };
+      console.error('OAuth Callback Error:', err);
+      return { success: false, message: err.message || 'Social login failed' };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendPhoneVerificationOtp = async (phone) => {
+    try {
+      setLoading(true);
+      const response = await authApi.sendPhoneOtp({ phone });
+      return { success: true, message: response.message || 'OTP sent successfully' };
+    } catch (err) {
+      return { success: false, message: err.message || 'Failed to send OTP' };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyPhoneVerificationOtp = async (code) => {
+    try {
+      setLoading(true);
+      const response = await authApi.verifyPhoneOtp({ code });
+      const token = response.token || response.access_token || response.data?.access_token;
+      const userData = response.user || response.data?.user;
+      
+      if (token) {
+        // Defensive check: Ensure we're not saving "undefined" or "null" as a string
+        if (token && token !== 'undefined' && token !== 'null') {
+          localStorage.setItem(TOKEN_KEY, token);
+        } else {
+          console.error('[AuthContext] Attempted to save invalid token:', token);
+          throw new Error('Invalid authentication token received');
+        }
+        const finalUser = userData || await syncProfile();
+        
+        setUser(finalUser);
+        setIsLoggedIn(true);
+        setIsPhoneVerified(true);
+        dispatch(loginSuccess({ user: finalUser, token }));
+        return { success: true, user: finalUser, token };
+      }
+      throw new Error('Verification failed');
+    } catch (err) {
+      return { success: false, message: err.message || 'Verification failed' };
     } finally {
       setLoading(false);
     }
@@ -412,8 +476,8 @@ export function AuthProvider({ children }) {
     setShowSignupModal(true);
   };
 
-  const openOtp = (method, identifier) => {
-    setOtpModeData({ method, identifier });
+  const openOtp = (method, identifier, mode = null) => {
+    setOtpModeData({ method, identifier, mode });
     setAuthModalMode('otp');
     setShowAuthModal(true);
   };
@@ -429,33 +493,37 @@ export function AuthProvider({ children }) {
     localStorage.setItem('phoneVerified', 'true');
     localStorage.setItem('userPhoneNumber', phoneNumber);
     
-    // Create a temporary user session for demo purposes
-    // In production, this would involve actual backend authentication
-    const tempUser = {
-      id: 'temp_user_' + Date.now(),
-      email: 'user@example.com',
-      phone: phoneNumber,
-      first_name: 'User',
-      last_name: 'Demo',
-      isPhoneVerified: true
-    };
+    // Only create a temporary user session if no user is currently logged in (for demo/legacy flows)
+    if (!user && !isLoggedIn) {
+      const tempUser = {
+        id: 'temp_user_' + Date.now(),
+        email: 'user@example.com',
+        phone: phoneNumber,
+        first_name: 'User',
+        last_name: 'Demo',
+        isPhoneVerified: true
+      };
+      
+      const tempToken = 'temp_token_' + Date.now();
+      
+      setUser(tempUser);
+      setIsLoggedIn(true);
+      localStorage.setItem(TOKEN_KEY, tempToken);
+      localStorage.setItem(USER_KEY, JSON.stringify(tempUser));
+      
+      dispatch(loginSuccess({ user: tempUser, token: tempToken }));
+    } else if (user) {
+      // Update existing user object with verified phone status
+      const updatedUser = { ...user, phone: phoneNumber, isPhoneVerified: true };
+      setUser(updatedUser);
+      localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+    }
     
-    // Create a temporary token for demo purposes
-    const tempToken = 'temp_token_' + Date.now();
-    
-    // Set user as logged in
-    setUser(tempUser);
-    setIsLoggedIn(true);
-    localStorage.setItem(TOKEN_KEY, tempToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(tempUser));
-    
-    // Dispatch login success for Redux
-    dispatch(loginSuccess({ user: tempUser, token: tempToken }));
-    
-    console.log('✅ Phone verified and user logged in:', phoneNumber);
-    
-    // After phone verification, redirect to home
-    window.location.href = '/';
+    // Refresh the page to ensure all components recognize the new authenticated state
+    // We use a small timeout to ensure localStorage is settled
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
   };
 
   const handleEmailLoginSuccess = (userData) => {
@@ -514,6 +582,7 @@ export function AuthProvider({ children }) {
         handlePhoneVerified, handleEmailLoginSuccess,
         login, logout, sendOtp, verifyOtp, signup, updateProfile, subscribeUser,
         forgotPassword, resetPassword, changePassword, verifyEmailToken, verify2fa, oauthCallback,
+        sendPhoneVerificationOtp, verifyPhoneVerificationOtp,
         syncProfile, updateUserProfile, updateUserPreferences
       }}
     >

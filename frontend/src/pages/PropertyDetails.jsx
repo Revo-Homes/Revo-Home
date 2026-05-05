@@ -433,7 +433,9 @@ const buildPriceConfigurations = (property) => {
     property?.unitConfigurations ||
     property?.units ||
     property?.pricing ||
-    property?.price_configurations,
+    property?.price_configurations ||
+    property?.bhk_details ||
+    property?.meta?.bhk_details,
     []
   );
 
@@ -453,6 +455,11 @@ const buildPriceConfigurations = (property) => {
           priceMin && priceMax && Number(priceMin) !== Number(priceMax)
             ? `${formatShortPrice(priceMin)} - ${formatShortPrice(priceMax)}`
             : formatShortPrice(priceMin || priceMax),
+        bathrooms: parseInt(unit.bathrooms || unit.configuration?.bathrooms || 0),
+        kitchens: parseInt(unit.kitchens || unit.configuration?.kitchens || 0),
+        balconies: parseInt(unit.balconies || unit.configuration?.balconies || 0),
+        halls: parseInt(unit.halls || unit.configuration?.halls || 0),
+        floorPlan: unit.floorPlan || unit.floor_plan_url || unit.url
       };
     })
     .filter(Boolean);
@@ -855,7 +862,7 @@ const LocationBenefitItem = ({ name, distance, icon: Icon }) => (
   </div>
 );
 
-const PriceConfigRow = ({ bhk, area, price, unit, isHighlighted = false }) => (
+const PriceConfigRow = ({ bhk, area, price, unit, config, isHighlighted = false }) => (
   <div className={`flex items-center justify-between p-4 rounded-lg border ${isHighlighted ? 'border-primary bg-primary/5' : 'border-gray-100 bg-white hover:border-gray-200'} transition-all cursor-pointer`}>
     <div className="flex items-center gap-4">
       <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${isHighlighted ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'}`}>
@@ -863,7 +870,10 @@ const PriceConfigRow = ({ bhk, area, price, unit, isHighlighted = false }) => (
       </div>
       <div>
         <p className="font-bold text-gray-900">{bhk} BHK</p>
-        <p className="text-sm text-gray-500">{area} sq.ft</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-gray-500">{area} sq.ft</p>
+          {config?.bathrooms > 0 && <span className="text-xs text-gray-400">• {config.bathrooms} Bath</span>}
+        </div>
       </div>
     </div>
     <div className="text-right">
@@ -2147,6 +2157,7 @@ function PropertyDetails() {
                     area={config.area} 
                     price={config.priceLabel}
                     unit=""
+                    config={config}
                     isHighlighted={String(property.bhk) === String(config.bhk)}
                   />
                 ))}
@@ -2171,14 +2182,39 @@ function PropertyDetails() {
                     key={config.id || idx} 
                     className={`bg-gray-50 rounded-lg p-4 text-center border-2 transition-all cursor-pointer hover:border-primary/30 ${String(property.bhk) === String(config.bhk) ? 'border-primary bg-primary/5' : 'border-transparent'}`}
                   >
-                    <div className="h-20 bg-white rounded-lg mb-3 flex items-center justify-center shadow-sm">
-                      <Maximize className="text-gray-300" size={32} />
+                    <div className="h-28 bg-white rounded-lg mb-3 flex items-center justify-center shadow-sm overflow-hidden border border-gray-100">
+                      {config.floorPlan ? (
+                        <img 
+                          src={config.floorPlan} 
+                          alt={`${config.bhk} Floor Plan`} 
+                          className="w-full h-full object-contain p-2 hover:scale-110 transition-transform" 
+                        />
+                      ) : (
+                        <Maximize className="text-gray-300" size={32} />
+                      )}
                     </div>
                     <p className="font-bold text-gray-900">{normalizeBhkLabel(config.bhk)}</p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <div className="flex flex-wrap justify-center gap-1.5 mt-2">
+                      {config.bathrooms > 0 && (
+                        <span className="text-[10px] bg-white px-1.5 py-0.5 rounded border border-gray-100 text-gray-600 font-medium">
+                          {config.bathrooms} Bath
+                        </span>
+                      )}
+                      {config.kitchens > 0 && (
+                        <span className="text-[10px] bg-white px-1.5 py-0.5 rounded border border-gray-100 text-gray-600 font-medium">
+                          {config.kitchens} Kit
+                        </span>
+                      )}
+                      {config.balconies > 0 && (
+                        <span className="text-[10px] bg-white px-1.5 py-0.5 rounded border border-gray-100 text-gray-600 font-medium">
+                          {config.balconies} Balc
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
                       {config.area || 'Area not provided'}
                     </p>
-                    <p className="text-sm text-primary font-semibold mt-2">
+                    <p className="text-sm text-primary font-bold mt-1">
                       {config.priceLabel || 'Price on request'}
                     </p>
                   </div>

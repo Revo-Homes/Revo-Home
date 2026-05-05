@@ -76,6 +76,11 @@ function Login({ isModal = false, isPropertyDetails = false }) {
         });
 
         if (result.success) {
+          if (result.status === 'phone_required') {
+            // Store temp token and navigate to OTP verify with a special flag
+            openOtp('sms', '', 'link_phone');
+            return;
+          }
           if (isModal) {
             // Handle email login success for new auth flow
             if (!isPropertyDetails) {

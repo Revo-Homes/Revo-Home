@@ -66,6 +66,7 @@ const request = (method, path, body = null, opts = {}) => {
   const config = {
     method,
     headers,
+    credentials: 'include', // Support HTTP-only cookies
   };
   
   if (body && method !== 'GET') {
@@ -104,6 +105,8 @@ export const authApi = {
   sendOtp: (payload) => post('/auth/otp/request', payload),
   verifyOtp: (payload) => post('/auth/otp/verify', payload),
   oauthCallback: (payload) => post('/auth/oauth/callback', payload),
+  sendPhoneOtp: (payload) => post('/auth/send-phone-otp', payload),
+  verifyPhoneOtp: (payload) => post('/auth/verify-phone-otp', payload),
   getMe: () => get('/auth/me'),
   logout: () => post('/auth/logout', {}),
   changePassword: (payload) => post('/auth/change-password', payload),
@@ -147,7 +150,7 @@ export const propertyApi = {
   checkReraExists: (reraNumber, excludePropertyId = null) => get('/properties/check-rera', { rera_number: reraNumber, exclude_property_id: excludePropertyId }),
 
   // Builders (organizations with type=builder)
-  getBuilders: (params = {}) => get('/organizations', { type: 'builder', ...params }),
+  getBuilders: (params = {}) => get('/builders', { type: 'builder', ...params }),
 };
 
 // -------------------- LISTINGS --------------------

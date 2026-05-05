@@ -846,55 +846,79 @@ export function PropertyProvider({ children }) {
     };
 
     return {
-      // Basic Information
       organization_id: data.organization_id || 1,
       property_type_id: typeMapping[data.propertyType] || 1,
       property_category_id: categoryMapping[data.property_category] || 1,
       name: title,
       slug: slug,
       description: data.description || '',
-
-      // RERA Details
       rera_number: data.rera_number || '',
       rera_expiry_date: data.rera_expiry_date || '',
+      listing_type: data.listing_type || data.listingType?.toLowerCase() || 'sale',
+      property_id: data.propertyId || data.id,
 
-      // Location Details
-      address_line1: data.address_line1 || data.address || '',
-      address_line2: data.address_line2 || '',
-      city: data.city || '',
-      state: data.state || '',
-      country: data.country || 'IN',
-      zip_code: data.zip_code || '',
-      locality: data.locality || '',
-      landmark: data.landmark || '',
-      latitude: data.latitude ? parseFloat(data.latitude) : null,
-      longitude: data.longitude ? parseFloat(data.longitude) : null,
+      address: {
+        line1: data.address_line1 || data.address || '',
+        line2: data.address_line2 || '',
+        city: data.city || '',
+        state: data.state || '',
+        country: data.country || 'IN',
+        zip_code: data.zip_code || '',
+        locality: data.locality || '',
+        landmark: data.landmark || ''
+      },
 
-      // Property Specifications
-      total_units: parseInt(data.total_units) || 0,
-      total_floors: parseInt(data.total_floors) || 0,
-      total_area: data.total_area ? parseFloat(data.total_area) : null,
-      builtup_area: data.builtup_area ? parseFloat(data.builtup_area) : null,
-      carpet_area: Number(data.area) || Number(data.carpet_area) || 0,
-      area_unit: data.area_unit || 'sqft',
-      year_built: data.year_built ? parseInt(data.year_built) : null,
-      possession_date: data.possession_date || '',
-      facing_direction: data.facing_direction || '',
-      parking_spaces: parseInt(data.parking_spaces) || 0,
+      dimensions: {
+        total_units: parseInt(data.total_units) || 1,
+        total_floors: parseInt(data.total_floors) || 1,
+        total_area: data.total_area ? parseFloat(data.total_area) : null,
+        builtup_area: data.builtup_area ? parseFloat(data.builtup_area) : null,
+        carpet_area: Number(data.area) || Number(data.carpet_area) || 0,
+        area_unit: data.area_unit || 'sqft'
+      },
 
-      // Pricing Information
-      price_min: Number(data.price_min) || Number(data.price) || 0,
-      price_max: Number(data.price_max) || Number(data.price) || 0,
-      price_on_request: Boolean(data.price_on_request),
-      currency: data.currency || 'INR',
+      construction: {
+        year_built: data.year_built ? parseInt(data.year_built) : null,
+        possession_date: data.possession_date || '',
+        facing_direction: data.facing_direction || '',
+        parking_spaces: parseInt(data.parking_spaces) || 0,
+        age_of_property: data.age_of_property || ''
+      },
 
-      // Status and Features
-      status: data.status || 'draft',
-      is_featured: Boolean(data.is_featured),
-      features: Array.isArray(data.features) ? data.features : [],
-      meta_title: data.meta_title || '',
-      meta_description: data.meta_description || '',
-      meta: data.meta || {},
+      pricing: {
+        price_min: Number(data.price_min) || Number(data.price) || 0,
+        price_max: Number(data.price_max) || Number(data.price) || 0,
+        price_on_request: Boolean(data.price_on_request),
+        currency: data.currency || 'INR',
+        security_deposit: Number(data.security_deposit) || 0,
+        maintenance_charge: Number(data.maintenance_charges) || 0
+      },
+
+      status: {
+        status: data.status || 'draft',
+        is_featured: Boolean(data.is_featured),
+        is_published: Boolean(data.is_published)
+      },
+
+      features: {
+        amenities: Array.isArray(data.features) ? data.features : [],
+        community: [],
+        infrastructure: [],
+        security: [],
+        utilities: [],
+        sustainability: [],
+        room_features: []
+      },
+
+      seo: {
+        meta_title: data.meta_title || '',
+        meta_description: data.meta_description || ''
+      },
+
+      meta: {
+        ...data.meta,
+        source: 'web'
+      },
 
       created_by: user?.id
     };
@@ -986,9 +1010,9 @@ return normalized;
       const payload = isBackendListingPayload(data) ? data : transformToBackendPayload(data);
       console.log('PropertyContext: Transformed payload:', payload);
 
-      // Revo Homes only uses listings - create via listing API
-      const response = await listingApi.create(payload);
-      console.log('PropertyContext: Listing API response:', response);
+      // Revo Homes only uses listings - create via property API (which auto-creates listing)
+      const response = await propertyApi.create(payload);
+      console.log('PropertyContext: Property API response:', response);
       const newListing = normalizeProperty(extractSingle(response));
       console.log('PropertyContext: Normalized listing:', newListing);
       return newListing;
@@ -1004,11 +1028,12 @@ return normalized;
       const payload = isBackendListingPayload(data) ? data : transformToBackendPayload(data);
       console.log('PropertyContext: Transformed update payload:', payload);
 
-      // Revo Homes only uses listings - update via listing API
-      const listingResponse = await listingApi.update(id, payload);
-      console.log('PropertyContext: Listing update API response:', listingResponse);
+      // Revo Homes only uses listings - update via property API (which syncs listing)
+      const propertyId = data.propertyId || data.id || id;
+      const response = await propertyApi.update(propertyId, payload);
+      console.log('PropertyContext: Property update API response:', response);
 
-      const updated = normalizeProperty(extractSingle(listingResponse, ['listing']) || extractSingle(listingResponse));
+      const updated = normalizeProperty(extractSingle(response, ['property']) || extractSingle(response));
       console.log('PropertyContext: Normalized updated listing:', updated);
 
       setProperties((prev) => prev.map((item) =>
@@ -1024,8 +1049,10 @@ return normalized;
 
   const deleteProperty = useCallback(async (id) => {
     try {
-      await listingApi.delete(id);
-      setProperties((prev) => prev.filter((item) => item.id !== Number(id)));
+      const current = [...properties, ...listings].find(p => Number(p.id) === Number(id));
+      const propId = current?.propertyId || id;
+      await propertyApi.delete(propId);
+      setProperties((prev) => prev.filter((item) => Number(item.id) !== Number(id)));
     } catch (err) {
       console.error('Failed to delete listing:', err);
     }
@@ -1034,8 +1061,8 @@ return normalized;
   const togglePropertyVisibility = useCallback(async (id) => {
     try {
       const current = properties.find((item) => item.id === Number(id));
-      const nextStatus = current?.disabled || current?.status === 'hidden' ? 'active' : 'hidden';
-      await listingApi.update(id, { status: nextStatus });
+      const propId = current?.propertyId || id;
+      await propertyApi.update(propId, { status: nextStatus });
       setProperties((prev) => prev.map((item) =>
         item.id === Number(id) ? { ...item, disabled: nextStatus === 'hidden', status: nextStatus } : item
       ));
@@ -1046,14 +1073,15 @@ return normalized;
     }
   }, [properties]);
 
-  const uploadPropertyImages = useCallback(async (listingId, files) => {
+  const uploadPropertyImages = useCallback(async (propertyId, files) => {
     try {
       const formData = new FormData();
       files.forEach((file) => formData.append('images', file));
 
-      // Note: Listing API doesn't have direct image upload, may need separate implementation
-      console.log('PropertyContext: Image upload for listing', listingId, 'not yet implemented');
-      return false;
+      console.log('PropertyContext: Uploading images for property:', propertyId);
+      const response = await propertyApi.uploadImages(propertyId, formData);
+      console.log('PropertyContext: Image upload response:', response);
+      return response;
     } catch (err) {
       console.error('Failed to upload images:', err);
       return false;
