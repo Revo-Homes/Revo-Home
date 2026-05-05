@@ -285,7 +285,10 @@ const bhk = bhkFromMeta
   const state = item.state || item.property_state || '';
   const location =
     item.location ||
+    item.address ||
+    item.full_address ||
     [item.address_line1, item.locality, city, state].filter(Boolean).join(', ') ||
+    [city, state].filter(Boolean).join(', ') ||
     '';
 
   // Furnished status
@@ -317,6 +320,30 @@ const bhk = bhkFromMeta
     }
   }
 
+  const labels = (() => {
+    let tags = item.tags;
+    if (typeof tags === 'string') {
+      try { tags = JSON.parse(tags); } catch { tags = null; }
+    }
+    let result = [];
+    if (Array.isArray(tags)) {
+      const slugs = tags
+        .filter(Boolean)
+        .map(t => t?.slug || t?.tag_slug || t)
+        .filter(s => typeof s === 'string');
+      if (slugs.includes('sold_out')) return ['sold_out'];
+      const priority = ['sold_out', 'few_units_left', 'hot_sale', 'featured', 'top_selling', 'exclusive'];
+      result = slugs.sort((a, b) => priority.indexOf(a) - priority.indexOf(b)).slice(0, 2);
+    } else if (typeof item.tags === 'string' && item.tags.trim()) {
+      result = [item.tags.trim().toLowerCase().replace(/\s+/g, '_')];
+    }
+    // Add featured label if not already present and item is marked as featured
+    if (!result.includes('featured') && (item.is_featured || item.featured || item.badge === 'featured')) {
+      result.unshift('featured');
+    }
+    return result;
+  })();
+
   return {
     ...item,
     meta,
@@ -340,9 +367,17 @@ const bhk = bhkFromMeta
     propertyType:
       item.propertyType ||
       item.property_type_name ||
+      item.type_name ||
+      item.category ||
       PROPERTY_TYPE_LABELS[item.property_type_id] ||
+      PROPERTY_TYPE_LABELS[item.type_id] ||
       'Property',
     listingType: normalizeListingType(item.listing_type || item.listingType || 'sale'),
+    isResale: ['resale', 'Resale', 'RESALE'].includes(item.listing_type || ''),
+    hasBrochure: Boolean(
+      item.brochure_url || item.brochure || item.document_url ||
+      meta?.brochure_url || meta?.document_url || meta?.brochure
+    ),
     image: primaryImage,
     images: imageList.length > 0 ? imageList : [primaryImage],
     description: item.description || '',
@@ -363,22 +398,14 @@ const bhk = bhkFromMeta
     },
     owner_id: item.owner_id || item.created_by || null,
     disabled: item.status === 'inactive' || item.status === 'withdrawn',
-    labels: (() => {
-      let tags = item.tags;
-      if (typeof tags === 'string') {
-        try { tags = JSON.parse(tags); } catch { tags = null; }
-      }
-      if (Array.isArray(tags)) {
-        const slugs = tags.filter(Boolean).map(t => t?.slug || t?.tag_slug || t).filter(s => typeof s === 'string');
-        if (slugs.includes('sold_out')) return ['sold_out'];
-        const priority = ['sold_out', 'few_units_left', 'hot_sale', 'featured', 'top_selling', 'exclusive'];
-        return slugs.sort((a, b) => priority.indexOf(a) - priority.indexOf(b)).slice(0, 2);
-      }
-      if (typeof item.tags === 'string' && item.tags.trim()) {
-        return [item.tags.trim().toLowerCase().replace(/\s+/g, '_')];
-      }
-      return [];
-    })(),
+    labels,
+    featured: Boolean(
+      item.featured ||
+      item.is_featured ||
+      item.isFeatured ||
+      item.badge === 'featured' ||
+      (Array.isArray(labels) && labels.includes('featured'))
+    ),
     badge: item.is_featured ? 'featured' : item.is_verified ? 'verified' : undefined,
     views: item.views_count || 0,
     inquiries_count: item.inquiries_count || 0,
@@ -407,7 +434,7 @@ const LISTINGS_PAGE_SIZE = 100;
 const LISTINGS_MAX_PAGES = 25;
 
 export function PropertyProvider({ children }) {
-  const { isLoggedIn, user } = useAuth();
+  const { isLoggedIn, user, logout  } = useAuth();
   const { location: userLocation } = useLocation();
   const [properties, setProperties] = useState([]);
   const [listings, setListings] = useState([]);
@@ -491,20 +518,7 @@ export function PropertyProvider({ children }) {
 
     const nextFeatured = Array.isArray(featuredItems) && featuredItems.length > 0
       ? featuredItems
-      : (() => {
-        const featuredProperties = nextProperties.filter((item) => item.featured);
-        if (featuredProperties.length >= 8) {
-          return featuredProperties.slice(0, 8);
-        }
-
-        return [
-          ...featuredProperties,
-          ...nextProperties
-            .filter((item) => !item.featured)
-            .slice(0, Math.max(0, 8 - featuredProperties.length))
-            .map((item) => ({ ...item, featured: true })),
-        ];
-      })();
+      : nextProperties.filter((item) => item.featured).slice(0, 8);
 
     setListings(nextProperties);
     setProperties(nextProperties);
@@ -524,11 +538,22 @@ export function PropertyProvider({ children }) {
           listingApi.getFeatured().catch(() => null),
         ]);
 
-        const featuredItems = extractCollection(featuredResponse, ['listings'])
+        let featuredItems = extractCollection(featuredResponse, ['listings', 'featured', 'data'])
           .map(item => normalizeProperty(item, userLocation));
 
-        console.log('PropertyContext: Total normalized listings:', catalogItems.length);
-        applyPropertyCatalog(catalogItems, featuredItems);
+        // Merge featured items with cached catalog entries to get enriched data
+        const mergedFeatured = featuredItems.map(featuredItem => {
+          const cached = catalogItems.find(c =>
+            Number(c.id) === Number(featuredItem.id) ||
+            Number(c.listingId) === Number(featuredItem.id)
+          );
+          return cached ? { ...featuredItem, ...cached } : featuredItem;
+        });
+
+        // If featured array is empty, fall back to items with featured flag or featured label
+        let finalFeatured = mergedFeatured.length > 0 ? mergedFeatured : catalogItems.filter(item => item.featured).slice(0, 8);
+
+        applyPropertyCatalog(catalogItems, finalFeatured);
       } catch (fetchError) {
         console.error('PropertyContext: Backend fetch failed:', fetchError);
         applyPropertyCatalog([]);
@@ -551,7 +576,7 @@ export function PropertyProvider({ children }) {
         fetchAllListingsFromBackend(),
         listingApi.getFeatured().catch(() => null),
       ]);
-      const featuredItems = extractCollection(featuredResponse, ['listings'])
+      const featuredItems = extractCollection(featuredResponse, ['listings', 'featured', 'data'])
         .map(item => normalizeProperty(item, userLocation));
       applyPropertyCatalog(catalogItems, featuredItems);
     } catch (error) {
@@ -818,9 +843,10 @@ export function PropertyProvider({ children }) {
       return true;
     } catch (err) {
       console.error('Failed to toggle favorite:', err);
+       if (err?.status === 401) logout();
       return false;
     }
-  }, []);
+  }, [logout]);
 
   const transformToBackendPayload = (data) => {
     const title = data.title || `${data.bhk || ''} BHK ${data.propertyType || 'Property'} in ${data.locality || ''}`.trim();

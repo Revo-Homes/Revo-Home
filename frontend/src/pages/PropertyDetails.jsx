@@ -4,19 +4,20 @@ import { useAuth } from '../contexts/AuthContext';
 import { useProperty } from '../contexts/PropertyContext';
 import { useRevoLeadTracker } from '../hooks/useRevoLeadTracker';
 import { buildStructuredMessage, splitFullName, submitPublicEnquiry } from '../services/publicEnquiry';
+import { billingApi } from '../services/billingApi';
 import PropertyMap from "../components/PropertyMap";
 import ImageGallery from "../components/ImageGallery";
 import EMICalculator from './EMICalculator';
 import RentalYieldCalculator from './RentalYield';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  MapPin, 
-  BedDouble, 
-  Maximize, 
-  Home, 
-  Lock, 
-  CheckCircle2, 
-  Phone, 
+import {
+  MapPin,
+  BedDouble,
+  Maximize,
+  Home,
+  Lock,
+  CheckCircle2,
+  Phone,
   MessageSquare,
   MessageCircle,
   ChevronRight,
@@ -114,7 +115,7 @@ const AVATAR_COLORS = ["#E8F0FE", "#FCE8E6", "#E6F4EA", "#FFF4E5"];
 // Map backend amenity names to display format
 const mapAmenityName = (amenityName) => {
   const name = amenityName.toLowerCase();
-  
+
   // Convert snake_case to Title Case
   if (name.includes('security_24x7')) return '24x7 Security';
   if (name.includes('power_backup')) return 'Power Backup';
@@ -129,7 +130,7 @@ const mapAmenityName = (amenityName) => {
   if (name.includes('fire_alarm')) return 'Fire Alarm';
   if (name.includes('wifi')) return 'WiFi';
   if (name.includes('pet_friendly')) return 'Pet Friendly';
-  
+
   // Default: convert underscores to spaces and capitalize
   return amenityName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
@@ -137,35 +138,35 @@ const mapAmenityName = (amenityName) => {
 // Amenity icon mapping - comprehensive mapping from backend amenity names to icons
 const getAmenityIcon = (amenityName) => {
   const name = amenityName.toLowerCase();
-  
+
   // Swimming related
   if (name.includes('swimming') || name.includes('pool')) return Waves;
-  
+
   // Fitness related
   if (name.includes('gym') || name.includes('fitness') || name.includes('dumbbell')) return Dumbbell;
-  
+
   // Outdoor/Garden related
   if (name.includes('garden') || name.includes('park') || name.includes('trees')) return Trees;
-  
+
   // Kids/Play related
   if (name.includes('kids') || name.includes('play') || name.includes('game')) return Gamepad2;
-  
+
   // Sports related
-  if (name.includes('basketball') || name.includes('tennis') || name.includes('badminton') || 
-      name.includes('jogging') || name.includes('sport') || name.includes('court')) return Activity;
-  
+  if (name.includes('basketball') || name.includes('tennis') || name.includes('badminton') ||
+    name.includes('jogging') || name.includes('sport') || name.includes('court')) return Activity;
+
   // Community related
   if (name.includes('community') || name.includes('hall') || name.includes('club') || name.includes('party')) return Users;
-  
+
   // Food related
   if (name.includes('restaurant') || name.includes('cafeteria') || name.includes('food') || name.includes('utensils')) return Utensils;
-  
+
   // Security related
   if (name.includes('security') || name.includes('guard') || name.includes('cctv') || name.includes('surveillance')) return ShieldCheck;
   if (name.includes('video') || name.includes('camera')) return Video;
   if (name.includes('siren') || name.includes('alarm') || name.includes('fire')) return Siren;
   if (name.includes('gate') || name.includes('access') || name.includes('lock')) return Lock;
-  
+
   // Utilities related
   if (name.includes('water') || name.includes('droplet')) return Droplets;
   if (name.includes('power') || name.includes('electricity') || name.includes('backup') || name.includes('zap')) return Zap;
@@ -173,10 +174,10 @@ const getAmenityIcon = (amenityName) => {
   if (name.includes('parking') || name.includes('car') || name.includes('vehicle')) return Car;
   if (name.includes('wifi') || name.includes('internet') || name.includes('network')) return Wifi;
   if (name.includes('pet') || name.includes('dog') || name.includes('animal')) return Dog;
-  
+
   // Building/Property related
   if (name.includes('building') || name.includes('commercial') || name.includes('office')) return Building2;
-  
+
   // Default icon
   return Sparkles;
 };
@@ -186,7 +187,7 @@ const toArray = (val, fallback = []) => {
   if (Array.isArray(val)) return val;
   if (typeof val === 'string') {
     // Could be a JSON string like '["Parking", "Gym"]'
-    try { const parsed = JSON.parse(val); if (Array.isArray(parsed)) return parsed; } catch (_) {}
+    try { const parsed = JSON.parse(val); if (Array.isArray(parsed)) return parsed; } catch (_) { }
     // Could be a comma-separated string
     return val.split(',').map(s => s.trim()).filter(Boolean);
   }
@@ -198,7 +199,7 @@ const parseNearbyLandmarks = (nearbyData) => {
   if (!nearbyData || !Array.isArray(nearbyData) || nearbyData.length === 0) {
     return null; // Return null to trigger fallback
   }
-  
+
   return nearbyData.map(item => {
     // Handle string format like "Metro Station - 0.5 km"
     if (typeof item === 'string') {
@@ -250,18 +251,18 @@ const countNearbyByType = (nearbyData, type) => {
 // Parse highlights from property data
 const parseHighlights = (property) => {
   // Try to get highlights from various possible backend fields
-  const highlights = 
+  const highlights =
     toArray(property.highlights, null) ||
     toArray(property.features, null) ||
     toArray(property.selling_points, null);
-  
+
   if (highlights && highlights.length > 0) {
     return highlights.map((text, idx) => ({
       icon: getHighlightIcon(text, idx),
       text: typeof text === 'string' ? text : text.description || text.title || String(text)
     }));
   }
-  
+
   return null; // Return null to trigger fallback
 };
 
@@ -368,28 +369,28 @@ const formatFieldLabel = (key) => {
 const formatFieldValue = (key, value) => {
   // Handle null/undefined
   if (value === null || value === undefined) return null;
-  
+
   // Handle boolean
   if (typeof value === 'boolean') {
     return value ? 'Yes' : 'No';
   }
-  
+
   // Handle dates
   if (key.includes('_at') || key.includes('_date') || key.includes('available_')) {
     try {
       const date = new Date(value);
       if (!isNaN(date.getTime())) {
-        return date.toLocaleDateString('en-IN', { 
-          day: 'numeric', 
-          month: 'short', 
-          year: 'numeric' 
+        return date.toLocaleDateString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric'
         });
       }
     } catch (e) {
       return value;
     }
   }
-  
+
   // Handle currency/price fields
   if ((key.includes('price') || key.includes('rent') || key.includes('deposit') || key.includes('charge')) && !isNaN(Number(value))) {
     const num = Number(value);
@@ -402,13 +403,13 @@ const formatFieldValue = (key, value) => {
     }
     return `₹${num}`;
   }
-  
+
   // Handle area fields
   if ((key.includes('area') || key.includes('_area')) && !key.includes('unit') && !isNaN(Number(value))) {
     const unit = ' sq.ft';
     return `${Number(value).toLocaleString('en-IN')}${unit}`;
   }
-  
+
   return value;
 };
 
@@ -472,7 +473,7 @@ const buildPriceConfigurations = (property) => {
     area: property?.area ? `${property.area}` : 'N/A',
     priceLabel:
       property?.price_min && property?.price_max &&
-      property.price_min !== property.price_max
+        property.price_min !== property.price_max
         ? `${formatShortPrice(property.price_min)} - ${formatShortPrice(property.price_max)}`
         : formatShortPrice(property?.price || property?.price_min),
   }];
@@ -517,14 +518,14 @@ const buildSimilarProperties = (allListings, currentProperty) => {
 
 const renderFieldValue = (key, value) => {
   if (!isValidValue(value)) return null;
-  
+
   // Handle arrays (amenities, features, etc.)
   if (Array.isArray(value)) {
     return (
       <div className="flex flex-wrap gap-2">
         {value.map((item, idx) => (
-          <span 
-            key={idx} 
+          <span
+            key={idx}
             className="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full capitalize"
           >
             {item}
@@ -533,7 +534,7 @@ const renderFieldValue = (key, value) => {
       </div>
     );
   }
-  
+
   // Handle objects (JSON meta data)
   if (typeof value === 'object' && value !== null) {
     return (
@@ -544,7 +545,7 @@ const renderFieldValue = (key, value) => {
       </div>
     );
   }
-  
+
   const formatted = formatFieldValue(key, value);
   return <span className="font-semibold text-gray-900">{formatted}</span>;
 };
@@ -815,13 +816,11 @@ const SectionTitle = ({ icon: Icon, title, action }) => (
 );
 
 const InfoBadge = ({ icon: Icon, label, value, highlight = false }) => (
-  <div className={`flex flex-col items-center text-center gap-2 rounded-xl px-2 py-3 min-w-0 ${
-    highlight ? 'bg-primary/5 border border-primary/10' : 'bg-gray-50'
-  }`}>
+  <div className={`flex flex-col items-center text-center gap-2 rounded-xl px-2 py-3 min-w-0 ${highlight ? 'bg-primary/5 border border-primary/10' : 'bg-gray-50'
+    }`}>
     {Icon && (
-      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-        highlight ? 'bg-primary/15' : 'bg-white shadow-sm border border-gray-100'
-      }`}>
+      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${highlight ? 'bg-primary/15' : 'bg-white shadow-sm border border-gray-100'
+        }`}>
         <Icon size={18} className={highlight ? 'text-primary' : 'text-gray-500'} />
       </div>
     )}
@@ -830,9 +829,8 @@ const InfoBadge = ({ icon: Icon, label, value, highlight = false }) => (
         {label}
       </p>
       <p
-        className={`text-xs font-bold leading-tight truncate w-full ${
-          highlight ? 'text-primary' : 'text-gray-900'
-        }`}
+        className={`text-xs font-bold leading-tight truncate w-full ${highlight ? 'text-primary' : 'text-gray-900'
+          }`}
         title={value}
       >
         {value}
@@ -896,7 +894,7 @@ const UpdateItem = ({ date, text }) => (
 const SimilarPropertyCard = ({ property }) => {
   const navigate = useNavigate();
   return (
-    <div 
+    <div
       onClick={() => navigate(`/properties/${property.id}`)}
       className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-lg transition-all cursor-pointer group"
     >
@@ -936,14 +934,14 @@ const NAV_ITEMS = [
 function ExpertsCarousel({ property, handleExpertContact }) {
   const scrollRef = useRef(null);
   const experts = property?.experts || [];
-  
+
   const scroll = (direction) => {
     if (scrollRef.current) {
       const scrollAmount = direction === 'left' ? -320 : 320;
       scrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
     }
   };
-  
+
   return (
     <div className="relative">
       {/* Navigation Arrows */}
@@ -963,19 +961,19 @@ function ExpertsCarousel({ property, handleExpertContact }) {
           </button>
         </>
       )}
-      
+
       {/* Horizontal scroll container */}
-      <div 
+      <div
         ref={scrollRef}
-        className="flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide scroll-smooth" 
+        className="flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide scroll-smooth"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {experts.map((expert, idx) => {
           const initial = expert.name.charAt(0).toUpperCase();
           const avatarColor = AVATAR_COLORS[idx % AVATAR_COLORS.length];
-          
+
           return (
-            <motion.div 
+            <motion.div
               key={expert.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -984,14 +982,14 @@ function ExpertsCarousel({ property, handleExpertContact }) {
               className="flex-shrink-0 w-[300px] sm:w-[320px] bg-white rounded-2xl p-5 border border-gray-100 shadow-md hover:shadow-2xl transition-all duration-300 snap-start cursor-pointer group"
             >
               {/* Top strip with gradient pastel background */}
-              <div 
+              <div
                 className="h-16 rounded-xl mb-5 flex items-center justify-center relative overflow-hidden"
                 style={{ backgroundColor: avatarColor }}
               >
                 {/* Decorative circles */}
                 <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-white/20" />
                 <div className="absolute -bottom-4 -left-4 w-12 h-12 rounded-full bg-white/20" />
-                
+
                 {/* Avatar circle with gradient ring */}
                 <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-lg border-3 border-white relative z-10 group-hover:scale-110 transition-transform duration-300">
                   <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
@@ -999,7 +997,7 @@ function ExpertsCarousel({ property, handleExpertContact }) {
                   </div>
                 </div>
               </div>
-              
+
               {/* Name with verified badge */}
               <div className="flex items-center gap-2 mb-1">
                 <h3 className="font-bold text-gray-900 text-lg truncate">
@@ -1009,14 +1007,14 @@ function ExpertsCarousel({ property, handleExpertContact }) {
                   <Check size={12} className="text-white" />
                 </div>
               </div>
-              
+
               {/* Role with badge style */}
               <div className="mb-4">
                 <span className="inline-block px-3 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
                   {expert.role}
                 </span>
               </div>
-              
+
               {/* Stats Grid */}
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div className="bg-gray-50 rounded-xl p-3 text-center group-hover:bg-primary/5 transition-colors">
@@ -1032,7 +1030,7 @@ function ExpertsCarousel({ property, handleExpertContact }) {
                   <p className="text-xs text-gray-500">Languages</p>
                 </div>
               </div>
-              
+
               {/* Action Buttons */}
               <div className="flex gap-3">
                 {/* WhatsApp Button */}
@@ -1045,7 +1043,7 @@ function ExpertsCarousel({ property, handleExpertContact }) {
                 >
                   <MessageCircle size={20} className="text-white" />
                 </motion.button>
-                
+
                 {/* Get a call back Button */}
                 <motion.button
                   whileHover={{ scale: 1.02 }}
@@ -1061,12 +1059,12 @@ function ExpertsCarousel({ property, handleExpertContact }) {
           );
         })}
       </div>
-      
+
       {/* Scroll indicator dots */}
       {experts.length > 2 && (
         <div className="flex justify-center gap-2 mt-4">
           {experts.map((_, idx) => (
-            <motion.div 
+            <motion.div
               key={idx}
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
@@ -1076,7 +1074,7 @@ function ExpertsCarousel({ property, handleExpertContact }) {
           ))}
         </div>
       )}
-      
+
     </div>
   );
 }
@@ -1084,14 +1082,14 @@ function ExpertsCarousel({ property, handleExpertContact }) {
 // ============================================
 // CONTACT SIDE PANEL COMPONENT
 // ============================================
-function ContactSidePanel({ 
-  property, 
-  isLoggedIn, 
-  user, 
-  onEnquiryClick, 
-  onCallbackClick, 
+function ContactSidePanel({
+  property,
+  isLoggedIn,
+  user,
+  onEnquiryClick,
+  onCallbackClick,
   onBrochureClick,
-  onLoginClick 
+  onLoginClick
 }) {
   const owner = property?.owner || { name: 'Property Owner', phone: '', verified: false };
   const maskedPhone = owner.phone ? owner.phone.replace(/\d(?=\d{3})/g, 'X') : 'Available after enquiry';
@@ -1102,11 +1100,11 @@ function ContactSidePanel({
     { label: 'Area', value: property?.area || property?.total_area ? `${property?.area || property?.total_area} sq.ft` : 'Not listed', icon: Maximize },
     { label: 'Location', value: property?.city || property?.locality || 'Prime location', icon: MapPin },
   ];
-  
+
   return (
     <div className="space-y-4">
       {/* Main Contact Card */}
-      <motion.div 
+      <motion.div
         className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-xl shadow-gray-200/60 transition-shadow hover:shadow-2xl"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -1114,79 +1112,81 @@ function ContactSidePanel({
       >
         <div className="h-1.5 bg-gradient-to-r from-primary via-red-500 to-amber-400" />
         <div className="p-5">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-            <Phone className="text-primary" size={16} />
-            Contact Owner
-          </h3>
-          {owner.verified && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-600 text-[10px] font-semibold rounded-full border border-amber-100">
-              <Crown size={10} />
-              PREMIUM
-            </span>
-          )}
-        </div>
-        
-        {/* Owner Info */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary-dark rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-lg shadow-primary/20">
-            {owner.name?.charAt(0) || 'O'}
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+              <Phone className="text-primary" size={16} />
+              Contact Owner
+            </h3>
+            {owner.verified && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-600 text-[10px] font-semibold rounded-full border border-amber-100">
+                <Crown size={10} />
+                PREMIUM
+              </span>
+            )}
           </div>
-          <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-gray-900 text-sm truncate">{owner.name || 'Property Owner'}</h4>
-            <p className="text-xs text-gray-500 flex items-center gap-1">
-              <CheckCircle2 size={10} className="text-green-500" />
-              Verified Owner
-            </p>
-          </div>
-        </div>
 
-        {/* Masked Phone - Always Visible */}
-        <div className="flex items-center gap-2 p-3 bg-gradient-to-br from-gray-50 to-white rounded-2xl mb-4 border border-gray-100">
-          <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-            <Phone size={14} className="text-primary" />
+          {/* Owner Info */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary-dark rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-lg shadow-primary/20">
+              {owner.name?.charAt(0) || 'O'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h4 className="font-semibold text-gray-900 text-sm truncate">{owner.name || 'Property Owner'}</h4>
+              <p className="text-xs text-gray-500 flex items-center gap-1">
+                <CheckCircle2 size={10} className="text-green-500" />
+                Verified Owner
+              </p>
+            </div>
           </div>
-          <div className="flex-1">
-            <p className="text-xs text-gray-500 mb-0.5">Phone Number</p>
-            <p className="font-semibold text-gray-900 text-sm font-mono">{maskedPhone}</p>
-          </div>
-          <Lock size={14} className="text-gray-400" />
-        </div>
 
-        {/* CTA Buttons */}
-        <div className="space-y-2.5">
-          <motion.button
-            whileHover={{ scale: 1.02, y: -2 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={onEnquiryClick}
-            className="w-full py-3 bg-gradient-to-r from-primary to-primary-dark text-white font-semibold text-sm rounded-xl hover:shadow-lg hover:shadow-primary/30 transition-all flex justify-center items-center gap-2 shadow-md"
-          >
-            <MessageSquare size={16} />
-            Enquiry Now
-          </motion.button>
-          
-          <div className="grid grid-cols-2 gap-2">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={onCallbackClick}
-              className="py-2.5 bg-emerald-50 text-emerald-700 font-semibold text-xs rounded-xl hover:bg-emerald-100 transition-all flex items-center justify-center gap-1.5 border border-emerald-100"
-            >
-              <Phone size={14} />
-              Call Back
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={onBrochureClick}
-              className="py-2.5 bg-blue-50 text-blue-700 font-semibold text-xs rounded-xl hover:bg-blue-100 transition-all flex items-center justify-center gap-1.5 border border-blue-100"
-            >
-              <FileDown size={14} />
-              Brochure
-            </motion.button>
+          {/* Masked Phone - Always Visible */}
+          <div className="flex items-center gap-2 p-3 bg-gradient-to-br from-gray-50 to-white rounded-2xl mb-4 border border-gray-100">
+            <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+              <Phone size={14} className="text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs text-gray-500 mb-0.5">Phone Number</p>
+              <p className="font-semibold text-gray-900 text-sm font-mono">{maskedPhone}</p>
+            </div>
+            <Lock size={14} className="text-gray-400" />
           </div>
-        </div>
+
+          {/* CTA Buttons */}
+          <div className="space-y-2.5">
+            <motion.button
+              whileHover={{ scale: 1.02, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={onEnquiryClick}
+              className="w-full py-3 bg-gradient-to-r from-primary to-primary-dark text-white font-semibold text-sm rounded-xl hover:shadow-lg hover:shadow-primary/30 transition-all flex justify-center items-center gap-2 shadow-md"
+            >
+              <MessageSquare size={16} />
+              Enquiry Now
+            </motion.button>
+
+            <div className={`grid gap-2 ${property?.hasBrochure ? 'grid-cols-2' : 'grid-cols-1'}`}>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={onCallbackClick}
+                className="py-2.5 bg-emerald-50 text-emerald-700 font-semibold text-xs rounded-xl hover:bg-emerald-100 transition-all flex items-center justify-center gap-1.5 border border-emerald-100"
+              >
+                <Phone size={14} />
+                Call Back
+              </motion.button>
+              {property?.hasBrochure && (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={onBrochureClick}
+                  className="py-2.5 bg-blue-50 text-blue-700 font-semibold text-xs rounded-xl hover:bg-blue-100 transition-all flex items-center justify-center gap-1.5 border border-blue-100"
+                >
+                  <FileDown size={14} />
+                  Brochure
+                </motion.button>
+              )}
+            </div>
+          </div>
         </div>
       </motion.div>
 
@@ -1230,14 +1230,14 @@ function ContactSidePanel({
 // ============================================
 // ENQUIRY MODAL COMPONENT (ClearDeals Style)
 // ============================================
-function EnquiryModal({ 
-  isOpen, 
-  onClose, 
-  property, 
+function EnquiryModal({
+  isOpen,
+  onClose,
+  property,
   user,
   isLoggedIn,
   onLoginClick,
-  onSubmit 
+  onSubmit
 }) {
   const [formData, setFormData] = useState({
     name: user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : '',
@@ -1326,7 +1326,7 @@ function EnquiryModal({
                 {property?.title || 'Property'}
               </p>
             </div>
-            <button 
+            <button
               onClick={onClose}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
@@ -1345,76 +1345,76 @@ function EnquiryModal({
 
           {/* Form Fields */}
           <div className="space-y-4">
-              {/* Name Field */}
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                  Full Name <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={e => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Enter your full name"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm"
-                  />
-                </div>
-                {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+            {/* Name Field */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                Full Name <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Enter your full name"
+                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm"
+                />
               </div>
+              {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+            </div>
 
-              {/* Email Field */}
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                  Email <span className="text-gray-400">(Optional)</span>
-                </label>
-                <div className="relative">
-                  <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={e => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="Enter your email"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm"
-                  />
-                </div>
-                {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+            {/* Email Field */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                Email <span className="text-gray-400">(Optional)</span>
+              </label>
+              <div className="relative">
+                <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={e => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="Enter your email"
+                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm"
+                />
               </div>
+              {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+            </div>
 
-              {/* Phone Field */}
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                  Phone Number <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <Phone size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="+91 98765 43210"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm"
-                  />
-                </div>
-                {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
+            {/* Phone Field */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                Phone Number <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Phone size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="+91 98765 43210"
+                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm"
+                />
               </div>
+              {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
+            </div>
 
-              {/* Message Field */}
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                  Message <span className="text-gray-400">(Optional)</span>
-                </label>
-                <div className="relative">
-                  <MessageSquare size={18} className="absolute left-3 top-3 text-gray-400" />
-                  <textarea
-                    value={formData.message}
-                    onChange={e => setFormData({ ...formData, message: e.target.value })}
-                    placeholder="Tell us more about your requirements..."
-                    rows={3}
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm resize-none"
-                  />
-                </div>
+            {/* Message Field */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                Message <span className="text-gray-400">(Optional)</span>
+              </label>
+              <div className="relative">
+                <MessageSquare size={18} className="absolute left-3 top-3 text-gray-400" />
+                <textarea
+                  value={formData.message}
+                  onChange={e => setFormData({ ...formData, message: e.target.value })}
+                  placeholder="Tell us more about your requirements..."
+                  rows={3}
+                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm resize-none"
+                />
               </div>
+            </div>
           </div>
 
           {/* Submit Button */}
@@ -1447,6 +1447,24 @@ function EnquiryModal({
   );
 }
 
+function submitPayUForm(order) {
+  if (!order?.action || !order?.fields) return;
+  const form = document.createElement('form');
+  form.method = order.method || 'POST';
+  form.action = order.action;
+  Object.entries(order.fields).forEach(([key, value]) => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = key;
+    input.value = value ?? '';
+    form.appendChild(input);
+  });
+  document.body.appendChild(form);
+  form.submit();
+}
+
+const DOCUMENT_UNLOCK_BASE_INR = 99;
+
 function PropertyDetails() {
   const navigate = useNavigate();
   const { slug } = useParams();
@@ -1454,25 +1472,25 @@ function PropertyDetails() {
   const { isLoggedIn, isSubscribed, openLoginForPropertyDetails, user } = useAuth();
   const { getProperty, addEnquiry, isSaved, toggleFavorite, listings = [] } = useProperty();
   const { generateLead } = useRevoLeadTracker();
-  
+
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showEnquiryForm, setShowEnquiryForm] = useState(false);
   const [showEMI, setShowEMI] = useState(false);
   const [showRental, setShowRental] = useState(false);
-  
+
   // Dynamic Reviews State
   const [reviews, setReviews] = useState([]);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [newReview, setNewReview] = useState({ rating: 5, comment: '' });
   const [reviewToDelete, setReviewToDelete] = useState(null);
   const [enquirySent, setEnquirySent] = useState(false);
-  
+
   // Document Download Payment State
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [hasPaidForDocuments, setHasPaidForDocuments] = useState(false);
-  
+
   // SquareYards-style UI States
   const [activeTab, setActiveTab] = useState('overview');
   const [activeBhkTab, setActiveBhkTab] = useState('all');
@@ -1481,7 +1499,7 @@ function PropertyDetails() {
   const [expandedSection, setExpandedSection] = useState(null);
 
   const saved = isSaved(property?.propertyId || property?.id || listingIdentifier);
-  
+
   // Guest view mode - no login required to view limited preview
   const isGuestView = !isLoggedIn;
   const priceConfigurations = buildPriceConfigurations(property);
@@ -1496,10 +1514,10 @@ function PropertyDetails() {
     } catch (error) {
       console.error('PropertyDetails: Failed to parse saved reviews', error);
     }
-    
+
     // Get reviews from property backend data
     const backendReviews = property?.reviews || [];
-    
+
     // Merge: use saved reviews if they exist, otherwise use backend reviews
     // If both exist, prefer saved reviews (local user additions take precedence)
     if (savedReviews.length > 0) {
@@ -1509,12 +1527,28 @@ function PropertyDetails() {
     } else {
       setReviews([]);
     }
-    
-    console.log(`Reviews loaded for property ${listingIdentifier}:`, { 
-      localStorage: savedReviews.length, 
-      backend: backendReviews.length 
+
+    console.log(`Reviews loaded for property ${listingIdentifier}:`, {
+      localStorage: savedReviews.length,
+      backend: backendReviews.length
     });
   }, [listingIdentifier, property?.reviews]);
+
+  useEffect(() => {
+    if (!isLoggedIn || !listingIdentifier) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const access = await billingApi.getListingDocumentAccess(listingIdentifier);
+        if (!cancelled) setHasPaidForDocuments(Boolean(access?.paid));
+      } catch {
+        if (!cancelled) setHasPaidForDocuments(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, listingIdentifier]);
 
   const handleDeleteReview = (reviewId) => {
     const updatedReviews = reviews.filter(r => r.id !== reviewId);
@@ -1548,58 +1582,58 @@ function PropertyDetails() {
       openLoginForPropertyDetails();
       return;
     }
-    setShowPaymentModal(true);
+    if (hasPaidForDocuments) {
+      generateAndDownloadDocument();
+      return;
+    }
+    if (property?.hasBrochure) {
+      setShowPaymentModal(true);
+      return;
+    }
+    generateAndDownloadDocument();
   };
 
   const initiatePayment = async () => {
+    const organizationId = user?.organization?.id || user?.organization_id || user?.organizationId || 1;
     setPaymentLoading(true);
-    
-    // Simulate payment processing (2 seconds)
-    setTimeout(() => {
-      // Mock successful payment
-      const mockPaymentId = `pay_${Date.now()}`;
-      const mockOrderId = `order_${Date.now()}`;
-      
-      console.log('Payment successful:', { paymentId: mockPaymentId, orderId: mockOrderId });
-      
-      // Store payment info in localStorage
-      const paymentHistory = JSON.parse(localStorage.getItem('document_payments') || '[]');
-      paymentHistory.push({
-        propertyId: listingIdentifier,
-        paymentId: mockPaymentId,
-        orderId: mockOrderId,
-        timestamp: new Date().toISOString(),
-        amount: 49,
+    try {
+      const checkout = await billingApi.createListingDocumentCheckout({
+        organizationId,
+        listingId: listingIdentifier,
+        baseAmount: DOCUMENT_UNLOCK_BASE_INR,
+        description: property?.title
+          ? `Listing documents — ${property.title}`
+          : `Listing documents — ${listingIdentifier}`,
       });
-      localStorage.setItem('document_payments', JSON.stringify(paymentHistory));
-      
-      // Close modal and reset loading
-      setShowPaymentModal(false);
+      const invoiceId = checkout?.invoice?.id;
+      if (!invoiceId) {
+        throw new Error('Could not create invoice for document download');
+      }
+      const payuPayload = await billingApi.createPayUOrder({ invoiceId });
+      const order = payuPayload?.order || payuPayload;
+      submitPayUForm(order);
+    } catch (err) {
+      console.error('Document checkout failed:', err);
+      alert(err?.message || 'Payment could not be started. Please try again.');
       setPaymentLoading(false);
-      
-      // Generate and download document
-      generateAndDownloadDocument();
-      
-      // Show success message
-      alert('Payment successful! Your document is being downloaded.');
-    }, 2000);
+    }
   };
 
   const generateAndDownloadDocument = () => {
     // Create a comprehensive property document using jsPDF
     const { jsPDF } = require('jspdf');
     const doc = new jsPDF();
-    
+
     // Header
     doc.setFontSize(20);
     doc.setTextColor(99, 102, 241);
     doc.text('Revo Homes - Property Document', 105, 20, { align: 'center' });
-    
+
     // Property Details
     doc.setFontSize(12);
     doc.setTextColor(0, 0, 0);
     let y = 40;
-    
+
     doc.text('PROPERTY DETAILS', 20, y);
     y += 10;
     doc.setFontSize(10);
@@ -1613,7 +1647,7 @@ function PropertyDetails() {
     y += 7;
     doc.text(`Area: ${property?.area || 'N/A'} sq.ft`, 20, y);
     y += 15;
-    
+
     // Owner Details
     doc.setFontSize(12);
     doc.text('OWNER INFORMATION', 20, y);
@@ -1623,7 +1657,7 @@ function PropertyDetails() {
     y += 7;
     doc.text(`Phone: ${property?.owner?.phone || 'N/A'}`, 20, y);
     y += 15;
-    
+
     // Amenities
     if (property?.amenities && property.amenities.length > 0) {
       doc.setFontSize(12);
@@ -1635,14 +1669,14 @@ function PropertyDetails() {
         y += 6;
       });
     }
-    
+
     // Footer
     doc.setFontSize(8);
     doc.setTextColor(128, 128, 128);
     doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 280);
     doc.text('This document is generated by Revo Homes. Payment verified.', 20, 285);
     doc.text(`Payment ID: DOC_${Date.now()}`, 20, 290);
-    
+
     // Download
     doc.save(`${property?.title?.replace(/\s+/g, '_') || 'Property'}_Documents.pdf`);
   };
@@ -1669,7 +1703,7 @@ function PropertyDetails() {
   useEffect(() => {
     if (isLoggedIn && user && property) {
       console.log('?? Property viewed - generating/updating lead');
-      
+
       // Determine if this is a listing or property based on available data
       const isListing = property.listingType || property.listing_id;
       const leadData = {
@@ -1732,7 +1766,7 @@ function PropertyDetails() {
           <div className="bg-gray-200 rounded-2xl hidden md:block" />
           <div className="bg-gray-200 rounded-2xl hidden md:block" />
         </div>
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
           <div className="lg:col-span-2 space-y-8">
             <div className="bg-white rounded-[2.5rem] p-8 md:p-10 h-[600px]" />
@@ -1780,7 +1814,7 @@ function PropertyDetails() {
   // Full details require authentication (handled via isGuestView flag)
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="bg-gradient-to-br from-gray-50 via-white to-gray-50/30 min-h-screen"
@@ -1824,13 +1858,13 @@ function PropertyDetails() {
                   </span>
                 )}
               </div>
-              <img 
-                src={property.images?.[0] || property.image || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200'} 
+              <img
+                src={property.images?.[0] || property.image || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200'}
                 alt={property.title}
                 className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-              
+
               {/* Thumbnail Gallery Preview */}
               <div className="absolute bottom-3 left-3 right-3 flex gap-1.5">
                 {property.images?.slice(0, 4).map((img, idx) => (
@@ -1842,7 +1876,7 @@ function PropertyDetails() {
                   <span className="text-white text-xs font-semibold">+{Math.max(0, (property.images?.length || 0) - 4)}</span>
                 </div>
               </div>
-              
+
               <div className="absolute bottom-20 sm:bottom-24 left-3 right-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Lock size={14} className="text-primary/90" />
@@ -1850,7 +1884,7 @@ function PropertyDetails() {
                     Sign in to see all {property.images?.length || 1} photos
                   </p>
                 </div>
-                <button 
+                <button
                   onClick={openLoginForPropertyDetails}
                   className="px-4 py-2 bg-white/95 backdrop-blur-lg text-gray-900 font-semibold rounded-lg text-sm hover:bg-white transition-all shadow-lg hover:shadow-xl active:scale-95"
                 >
@@ -1891,7 +1925,7 @@ function PropertyDetails() {
 
           {/* View All Photos CTA */}
           <div className="mt-4 text-center">
-            <button 
+            <button
               onClick={() => {
                 if (isGuestView) {
                   openLoginForPropertyDetails();
@@ -1907,26 +1941,25 @@ function PropertyDetails() {
         </div>
         {/* SQUAREYARDS-STYLE STICKY NAVIGATION */}
         {!isGuestView && (
-        <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-gray-200 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 mb-6 hidden lg:block">
-          <div className="flex items-center gap-1 overflow-x-auto py-3 no-scrollbar">
-            {NAV_ITEMS.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setActiveTab(item.id);
-                  document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }}
-                className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-all ${
-                  activeTab === item.id 
-                    ? 'bg-primary text-white shadow-md' 
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
+          <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-gray-200 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 mb-6 hidden lg:block">
+            <div className="flex items-center gap-1 overflow-x-auto py-3 no-scrollbar">
+              {NAV_ITEMS.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-all ${activeTab === item.id
+                      ? 'bg-primary text-white shadow-md'
+                      : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-10">
@@ -1947,31 +1980,43 @@ function PropertyDetails() {
                       </span>
                     )}
                   </div>
+
                   <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 leading-tight mb-2">
                     {property.title}
                   </h1>
+                  {property.developer && (
+                    <p className="text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wide">
+                      By <span className="text-gray-800">{property.developer}</span>
+                    </p>
+                  )}
                   <div className="flex items-center gap-2 text-gray-600 text-base flex-wrap">
-  <MapPin className="text-primary flex-shrink-0" size={18} />
-  <span className="font-medium">{property.location}</span>
-  <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">Rera Details: {property.rera_number || 'N/A'}</span>
-  {property.distance !== null && property.distance !== undefined &&  (
-    <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">
-      <Navigation size={11} />
-      {property.distance < 1
-        ? `${(property.distance * 1000).toFixed(0)}m from you`
-        : `${property.distance.toFixed(1)}km from you`}
-    </span>
-  )}
-</div>
+                    <MapPin className="text-primary flex-shrink-0" size={18} />
+                    <span className="font-medium">{property.location}</span>
+                    <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">Rera Details: {property.rera_number || 'N/A'}</span>
+                    {property.distance !== null && property.distance !== undefined && (
+                      <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">
+                        <Navigation size={11} />
+                        {property.distance < 1
+                          ? `${(property.distance * 1000).toFixed(0)}m from you`
+                          : `${property.distance.toFixed(1)}km from you`}
+                      </span>
+                    )}
+                    {property.rera_number && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 border border-green-200 text-green-800 text-xs font-black rounded-full uppercase tracking-wide">
+                        <ShieldCheck size={11} className="text-green-600" />
+                        RERA: {property.rera_number}
+                      </span>
+                    )}
+                  </div>
+
                 </div>
                 <div className="flex items-center gap-3 lg:flex-col lg:items-end">
                   <button
                     onClick={handleToggleFavorite}
-                    className={`p-3 rounded-xl transition-all duration-300 shadow-lg flex items-center justify-center ${
-                      saved 
-                        ? 'bg-red-50 text-red-500 scale-105 shadow-red-200/50 hover:scale-110' 
+                    className={`p-3 rounded-xl transition-all duration-300 shadow-lg flex items-center justify-center ${saved
+                        ? 'bg-red-50 text-red-500 scale-105 shadow-red-200/50 hover:scale-110'
                         : 'bg-gray-50 text-gray-400 hover:text-red-400 hover:bg-white hover:scale-105 shadow-gray-200/50'
-                    } border border-white`}
+                      } border border-white`}
                     title={saved ? 'Remove from saved' : 'Save property'}
                   >
                     <Heart size={22} className={saved ? 'fill-current' : ''} />
@@ -1991,13 +2036,13 @@ function PropertyDetails() {
               </div>
 
               {/* Key Highlights Row */}
-              <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-5 gap-1 sm:gap-3 mb-6">
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 mb-6">
                 <InfoBadge icon={BedDouble} label="Configuration" value={normalizeBhkLabel(property.bhk)} highlight />
                 <InfoBadge icon={Maximize} label="Carpet Area" value={property.area ? `${property.area} sq.ft` : 'N/A'} />
                 <InfoBadge icon={Home} label="Furnishing" value={property.furnished || 'N/A'} />
                 <InfoBadge icon={Building2} label="Developer" value={property.developer || 'N/A'} />
                 <InfoBadge icon={Calendar} label="Possession" value={formatDateLabel(property.possessionDate) || 'N/A'} />
-                
+
               </div>
 
               <div className="space-y-6">
@@ -2025,7 +2070,7 @@ function PropertyDetails() {
                         <p className="text-xs text-gray-600 mb-2">
                           Get access to full property information, owner contact details, save favorites.
                         </p>
-                        <button 
+                        <button
                           onClick={openLoginForPropertyDetails}
                           className="px-4 py-1.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark transition-all"
                         >
@@ -2040,321 +2085,320 @@ function PropertyDetails() {
             </section>
 
             {!isGuestView && (
-            <>
-            {/* MEDIA GALLERY SECTION */}
-            <section id="media-gallery" className="SectionCard scroll-mt-32">
-              <SectionTitle icon={Eye} title="Media Gallery" />
-              <div className="space-y-5">
-                <GroupedMediaSection
-                  icon={Eye}
-                  title="Property Images"
-                  description="Main listing photos and gallery images."
-                  count={mediaGroups.images.length}
-                  emptyText="No property images uploaded yet"
-                >
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {mediaGroups.images.map((item, idx) => (
-                      <ImageMediaCard key={`${item.url}-${idx}`} item={item} label="Image" />
-                    ))}
-                  </div>
-                </GroupedMediaSection>
-
-                <GroupedMediaSection
-                  icon={Maximize}
-                  title="Floor Plans"
-                  description="Layout images and plan files separated from property photos."
-                  count={mediaGroups.floorPlans.length}
-                  emptyText="No floor plans uploaded yet"
-                  tone="blue"
-                >
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {mediaGroups.floorPlans.map((item, idx) => (
-                      isImageUrl(item.url) ? (
-                        <ImageMediaCard key={`${item.url}-${idx}`} item={item} label="Floor Plan" contain />
-                      ) : (
-                        <DocumentMediaCard key={`${item.url}-${idx}`} item={item} />
-                      )
-                    ))}
-                  </div>
-                </GroupedMediaSection>
-
-                <GroupedMediaSection
-                  icon={Video}
-                  title="Videos / Walkthroughs"
-                  description="Uploaded videos and virtual walkthrough files."
-                  count={mediaGroups.videos.length}
-                  emptyText="No videos available"
-                  tone="purple"
-                >
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    {mediaGroups.videos.map((item, idx) => (
-                      <VideoMediaCard key={`${item.url}-${idx}`} item={item} />
-                    ))}
-                  </div>
-                </GroupedMediaSection>
-
-                <GroupedMediaSection
-                  icon={ExternalLink}
-                  title="YouTube / External Links"
-                  description="Clickable media links that open safely in a new tab."
-                  count={mediaGroups.links.length}
-                  emptyText="No YouTube or external links available"
-                >
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {mediaGroups.links.map((item, idx) => (
-                      <LinkMediaCard key={`${item.url}-${idx}`} item={item} />
-                    ))}
-                  </div>
-                </GroupedMediaSection>
-
-                <GroupedMediaSection
-                  icon={FileText}
-                  title="Brochures / Documents / Other Files"
-                  description="Brochures, approvals, PDFs, and supporting files."
-                  count={mediaGroups.documents.length}
-                  emptyText="No brochures or documents uploaded yet"
-                  tone="green"
-                >
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {mediaGroups.documents.map((item, idx) => (
-                      <DocumentMediaCard key={`${item.url}-${idx}`} item={item} />
-                    ))}
-                  </div>
-                </GroupedMediaSection>
-              </div>
-            </section>
-
-            {/* PRICE CONFIGURATION SECTION */}
-            <section id="floor-plans" className="SectionCard scroll-mt-32">
-              <SectionTitle 
-                icon={IndianRupee} 
-                title="Price List & Configuration" 
-                action={
-                  <div className="flex gap-2">
-                    {['all', '1', '2', '3', '4'].map((bhk) => (
-                      <button
-                        key={bhk}
-                        onClick={() => setActiveBhkTab(bhk)}
-                        className={`px-3 py-1 text-xs font-semibold rounded-full transition-all ${
-                          activeBhkTab === bhk 
-                            ? 'bg-primary text-white' 
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                      >
-                        {bhk === 'all' ? 'All' : `${bhk} BHK`}
-                      </button>
-                    ))}
-                  </div>
-                }
-              />
-              <div className="space-y-3">
-                {priceConfigurations
-                  .filter((item) => activeBhkTab === 'all' || String(item.bhk) === activeBhkTab)
-                  .map((config) => (
-                  <PriceConfigRow 
-                    key={config.id} 
-                    bhk={config.bhk} 
-                    area={config.area} 
-                    price={config.priceLabel}
-                    unit=""
-                    config={config}
-                    isHighlighted={String(property.bhk) === String(config.bhk)}
-                  />
-                ))}
-              </div>
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
-                <div className="flex items-start gap-3">
-                  <Info className="text-blue-600 flex-shrink-0 mt-0.5" size={16} />
-                  <p className="text-sm text-blue-800">
-                    Prices mentioned are indicative and subject to change. Please contact the developer for current pricing and availability.
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            {/* ENHANCED FLOOR PLANS SECTION */}
-            <section className="SectionCard">
-              <SectionTitle icon={Maximize} title="Floor Plans & Unit Types" />
-              {priceConfigurations.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {priceConfigurations.map((config, idx) => (
-                  <div 
-                    key={config.id || idx} 
-                    className={`bg-gray-50 rounded-lg p-4 text-center border-2 transition-all cursor-pointer hover:border-primary/30 ${String(property.bhk) === String(config.bhk) ? 'border-primary bg-primary/5' : 'border-transparent'}`}
-                  >
-                    <div className="h-28 bg-white rounded-lg mb-3 flex items-center justify-center shadow-sm overflow-hidden border border-gray-100">
-                      {config.floorPlan ? (
-                        <img 
-                          src={config.floorPlan} 
-                          alt={`${config.bhk} Floor Plan`} 
-                          className="w-full h-full object-contain p-2 hover:scale-110 transition-transform" 
-                        />
-                      ) : (
-                        <Maximize className="text-gray-300" size={32} />
-                      )}
-                    </div>
-                    <p className="font-bold text-gray-900">{normalizeBhkLabel(config.bhk)}</p>
-                    <div className="flex flex-wrap justify-center gap-1.5 mt-2">
-                      {config.bathrooms > 0 && (
-                        <span className="text-[10px] bg-white px-1.5 py-0.5 rounded border border-gray-100 text-gray-600 font-medium">
-                          {config.bathrooms} Bath
-                        </span>
-                      )}
-                      {config.kitchens > 0 && (
-                        <span className="text-[10px] bg-white px-1.5 py-0.5 rounded border border-gray-100 text-gray-600 font-medium">
-                          {config.kitchens} Kit
-                        </span>
-                      )}
-                      {config.balconies > 0 && (
-                        <span className="text-[10px] bg-white px-1.5 py-0.5 rounded border border-gray-100 text-gray-600 font-medium">
-                          {config.balconies} Balc
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      {config.area || 'Area not provided'}
-                    </p>
-                    <p className="text-sm text-primary font-bold mt-1">
-                      {config.priceLabel || 'Price on request'}
-                    </p>
-                  </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-5 text-sm text-gray-500">
-                  Floor plan and unit configuration data is not available in the backend response yet.
-                </div>
-              )}
-            </section>
-
-            {/* ENHANCED AMENITIES SECTION */}
-            <section id="amenities" className="SectionCard scroll-mt-32">
-              <SectionTitle 
-                icon={Sparkles} 
-                title="Amenities & Features"
-                action={
-                  property.amenities?.length > 8 && (
-                    <button 
-                      onClick={() => setShowAllAmenities(!showAllAmenities)}
-                      className="text-sm text-primary font-semibold hover:underline"
+              <>
+                {/* MEDIA GALLERY SECTION */}
+                <section id="media-gallery" className="SectionCard scroll-mt-32">
+                  <SectionTitle icon={Eye} title="Media Gallery" />
+                  <div className="space-y-5">
+                    <GroupedMediaSection
+                      icon={Eye}
+                      title="Property Images"
+                      description="Main listing photos and gallery images."
+                      count={mediaGroups.images.length}
+                      emptyText="No property images uploaded yet"
                     >
-                      {showAllAmenities ? 'Show Less' : `+${property.amenities.length - 8} More`}
-                    </button>
-                  )
-                }
-              />
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {(showAllAmenities ? property.amenities : property.amenities?.slice(0, 8))?.map((amenity, idx) => {
-                  const displayAmenity = mapAmenityName(amenity);
-                  const AmenityIcon = getAmenityIcon(displayAmenity);
-                  return (
-                    <div key={idx} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                      <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                        <AmenityIcon size={16} className="text-primary" />
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {mediaGroups.images.map((item, idx) => (
+                          <ImageMediaCard key={`${item.url}-${idx}`} item={item} label="Image" />
+                        ))}
                       </div>
-                      <span className="text-sm text-gray-700 font-medium">{displayAmenity}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              {(!property.amenities || property.amenities.length === 0) && (
-                <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-5 text-sm text-gray-500">
-                  Amenities were not provided by the backend for this listing.
-                </div>
-              )}
-            </section>
+                    </GroupedMediaSection>
 
-            {/* LOCATION BENEFITS SECTION - Dynamic from Backend */}
-            <section id="location" className="SectionCard scroll-mt-32">
-              <SectionTitle icon={Navigation} title="Location Benefits & Landmarks" />
-              {parseNearbyLandmarks(property?.nearby)?.length ? (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                {parseNearbyLandmarks(property?.nearby).map((item, idx) => (
-                  <LocationBenefitItem key={idx} name={item.name} distance={item.distance} icon={item.icon} />
-                ))}
-                </div>
-              ) : (
-                <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-5 text-sm text-gray-500 mb-6">
-                  Nearby landmarks are not available in the backend response yet.
-                </div>
-              )}
-              
-              {/* Map */}
-              <div className="rounded-xl overflow-hidden border border-gray-200 h-[300px]">
-                <iframe
-                  title="Property Location"
-                  src={`https://www.google.com/maps?q=${encodeURIComponent(property.location)}&output=embed`}
-                  className="w-full h-full border-0"
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                ></iframe>
-              </div>
-              
-              {/* Social Infrastructure - Dynamic Counts from Backend */}
-              <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <div className="p-3 bg-gray-50 rounded-lg text-center">
-                  <School className="mx-auto mb-1 text-primary" size={18} />
-                  <p className="text-xs text-gray-500">Schools</p>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {countNearbyByType(property?.nearby, 'school') ? `${countNearbyByType(property?.nearby, 'school')} Nearby` : 'Not listed'}
-                  </p>
-                </div>
-                <div className="p-3 bg-gray-50 rounded-lg text-center">
-                  <Hospital className="mx-auto mb-1 text-primary" size={18} />
-                  <p className="text-xs text-gray-500">Hospitals</p>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {countNearbyByType(property?.nearby, 'hospital') ? `${countNearbyByType(property?.nearby, 'hospital')} Nearby` : 'Not listed'}
-                  </p>
-                </div>
-                <div className="p-3 bg-gray-50 rounded-lg text-center">
-                  <ShoppingBag className="mx-auto mb-1 text-primary" size={18} />
-                  <p className="text-xs text-gray-500">Malls</p>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {(countNearbyByType(property?.nearby, 'mall') || countNearbyByType(property?.nearby, 'shopping'))
-                      ? `${countNearbyByType(property?.nearby, 'mall') || countNearbyByType(property?.nearby, 'shopping')} Nearby`
-                      : 'Not listed'}
-                  </p>
-                </div>
-                <div className="p-3 bg-gray-50 rounded-lg text-center">
-                  <Briefcase className="mx-auto mb-1 text-primary" size={18} />
-                  <p className="text-xs text-gray-500">IT Parks</p>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {(countNearbyByType(property?.nearby, 'it park') || countNearbyByType(property?.nearby, 'office') || countNearbyByType(property?.nearby, 'commercial'))
-                      ? `${countNearbyByType(property?.nearby, 'it park') || countNearbyByType(property?.nearby, 'office') || countNearbyByType(property?.nearby, 'commercial')} Nearby`
-                      : 'Not listed'}
-                  </p>
-                </div>
-              </div>
-            </section>
-            </>
+                    <GroupedMediaSection
+                      icon={Maximize}
+                      title="Floor Plans"
+                      description="Layout images and plan files separated from property photos."
+                      count={mediaGroups.floorPlans.length}
+                      emptyText="No floor plans uploaded yet"
+                      tone="blue"
+                    >
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {mediaGroups.floorPlans.map((item, idx) => (
+                          isImageUrl(item.url) ? (
+                            <ImageMediaCard key={`${item.url}-${idx}`} item={item} label="Floor Plan" contain />
+                          ) : (
+                            <DocumentMediaCard key={`${item.url}-${idx}`} item={item} />
+                          )
+                        ))}
+                      </div>
+                    </GroupedMediaSection>
+
+                    <GroupedMediaSection
+                      icon={Video}
+                      title="Videos / Walkthroughs"
+                      description="Uploaded videos and virtual walkthrough files."
+                      count={mediaGroups.videos.length}
+                      emptyText="No videos available"
+                      tone="purple"
+                    >
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        {mediaGroups.videos.map((item, idx) => (
+                          <VideoMediaCard key={`${item.url}-${idx}`} item={item} />
+                        ))}
+                      </div>
+                    </GroupedMediaSection>
+
+                    <GroupedMediaSection
+                      icon={ExternalLink}
+                      title="YouTube / External Links"
+                      description="Clickable media links that open safely in a new tab."
+                      count={mediaGroups.links.length}
+                      emptyText="No YouTube or external links available"
+                    >
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {mediaGroups.links.map((item, idx) => (
+                          <LinkMediaCard key={`${item.url}-${idx}`} item={item} />
+                        ))}
+                      </div>
+                    </GroupedMediaSection>
+
+                    <GroupedMediaSection
+                      icon={FileText}
+                      title="Brochures / Documents / Other Files"
+                      description="Brochures, approvals, PDFs, and supporting files."
+                      count={mediaGroups.documents.length}
+                      emptyText="No brochures or documents uploaded yet"
+                      tone="green"
+                    >
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {mediaGroups.documents.map((item, idx) => (
+                          <DocumentMediaCard key={`${item.url}-${idx}`} item={item} />
+                        ))}
+                      </div>
+                    </GroupedMediaSection>
+                  </div>
+                </section>
+
+                {/* PRICE CONFIGURATION SECTION */}
+                <section id="floor-plans" className="SectionCard scroll-mt-32">
+                  <SectionTitle
+                    icon={IndianRupee}
+                    title="Price List & Configuration"
+                    action={
+                      <div className="flex gap-2">
+                        {['all', '1', '2', '3', '4'].map((bhk) => (
+                          <button
+                            key={bhk}
+                            onClick={() => setActiveBhkTab(bhk)}
+                            className={`px-3 py-1 text-xs font-semibold rounded-full transition-all ${activeBhkTab === bhk
+                                ? 'bg-primary text-white'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                          >
+                            {bhk === 'all' ? 'All' : `${bhk} BHK`}
+                          </button>
+                        ))}
+                      </div>
+                    }
+                  />
+                  <div className="space-y-3">
+                    {priceConfigurations
+                      .filter((item) => activeBhkTab === 'all' || String(item.bhk) === activeBhkTab)
+                      .map((config) => (
+                        <PriceConfigRow
+                          key={config.id}
+                          bhk={config.bhk}
+                          area={config.area}
+                          price={config.priceLabel}
+                          unit=""
+                          config={config}
+                          isHighlighted={String(property.bhk) === String(config.bhk)}
+                        />
+                      ))}
+                  </div>
+                  <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                    <div className="flex items-start gap-3">
+                      <Info className="text-blue-600 flex-shrink-0 mt-0.5" size={16} />
+                      <p className="text-sm text-blue-800">
+                        Prices mentioned are indicative and subject to change. Please contact the developer for current pricing and availability.
+                      </p>
+                    </div>
+                  </div>
+                </section>
+
+                {/* ENHANCED FLOOR PLANS SECTION */}
+                <section className="SectionCard">
+                  <SectionTitle icon={Maximize} title="Floor Plans & Unit Types" />
+                  {priceConfigurations.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {priceConfigurations.map((config, idx) => (
+                        <div
+                          key={config.id || idx}
+                          className={`bg-gray-50 rounded-lg p-4 text-center border-2 transition-all cursor-pointer hover:border-primary/30 ${String(property.bhk) === String(config.bhk) ? 'border-primary bg-primary/5' : 'border-transparent'}`}
+                        >
+                          <div className="h-28 bg-white rounded-lg mb-3 flex items-center justify-center shadow-sm overflow-hidden border border-gray-100">
+                            {config.floorPlan ? (
+                              <img
+                                src={config.floorPlan}
+                                alt={`${config.bhk} Floor Plan`}
+                                className="w-full h-full object-contain p-2 hover:scale-110 transition-transform"
+                              />
+                            ) : (
+                              <Maximize className="text-gray-300" size={32} />
+                            )}
+                          </div>
+                          <p className="font-bold text-gray-900">{normalizeBhkLabel(config.bhk)}</p>
+                          <div className="flex flex-wrap justify-center gap-1.5 mt-2">
+                            {config.bathrooms > 0 && (
+                              <span className="text-[10px] bg-white px-1.5 py-0.5 rounded border border-gray-100 text-gray-600 font-medium">
+                                {config.bathrooms} Bath
+                              </span>
+                            )}
+                            {config.kitchens > 0 && (
+                              <span className="text-[10px] bg-white px-1.5 py-0.5 rounded border border-gray-100 text-gray-600 font-medium">
+                                {config.kitchens} Kit
+                              </span>
+                            )}
+                            {config.balconies > 0 && (
+                              <span className="text-[10px] bg-white px-1.5 py-0.5 rounded border border-gray-100 text-gray-600 font-medium">
+                                {config.balconies} Balc
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-2">
+                            {config.area || 'Area not provided'}
+                          </p>
+                          <p className="text-sm text-primary font-bold mt-1">
+                            {config.priceLabel || 'Price on request'}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-5 text-sm text-gray-500">
+                      Floor plan and unit configuration data is not available in the backend response yet.
+                    </div>
+                  )}
+                </section>
+
+                {/* ENHANCED AMENITIES SECTION */}
+                <section id="amenities" className="SectionCard scroll-mt-32">
+                  <SectionTitle
+                    icon={Sparkles}
+                    title="Amenities & Features"
+                    action={
+                      property.amenities?.length > 8 && (
+                        <button
+                          onClick={() => setShowAllAmenities(!showAllAmenities)}
+                          className="text-sm text-primary font-semibold hover:underline"
+                        >
+                          {showAllAmenities ? 'Show Less' : `+${property.amenities.length - 8} More`}
+                        </button>
+                      )
+                    }
+                  />
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {(showAllAmenities ? property.amenities : property.amenities?.slice(0, 8))?.map((amenity, idx) => {
+                      const displayAmenity = mapAmenityName(amenity);
+                      const AmenityIcon = getAmenityIcon(displayAmenity);
+                      return (
+                        <div key={idx} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                            <AmenityIcon size={16} className="text-primary" />
+                          </div>
+                          <span className="text-sm text-gray-700 font-medium">{displayAmenity}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {(!property.amenities || property.amenities.length === 0) && (
+                    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-5 text-sm text-gray-500">
+                      Amenities were not provided by the backend for this listing.
+                    </div>
+                  )}
+                </section>
+
+                {/* LOCATION BENEFITS SECTION - Dynamic from Backend */}
+                <section id="location" className="SectionCard scroll-mt-32">
+                  <SectionTitle icon={Navigation} title="Location Benefits & Landmarks" />
+                  {parseNearbyLandmarks(property?.nearby)?.length ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                      {parseNearbyLandmarks(property?.nearby).map((item, idx) => (
+                        <LocationBenefitItem key={idx} name={item.name} distance={item.distance} icon={item.icon} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-5 text-sm text-gray-500 mb-6">
+                      Nearby landmarks are not available in the backend response yet.
+                    </div>
+                  )}
+
+                  {/* Map */}
+                  <div className="rounded-xl overflow-hidden border border-gray-200 h-[300px]">
+                    <iframe
+                      title="Property Location"
+                      src={`https://www.google.com/maps?q=${encodeURIComponent(property.location)}&output=embed`}
+                      className="w-full h-full border-0"
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                    ></iframe>
+                  </div>
+
+                  {/* Social Infrastructure - Dynamic Counts from Backend */}
+                  <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="p-3 bg-gray-50 rounded-lg text-center">
+                      <School className="mx-auto mb-1 text-primary" size={18} />
+                      <p className="text-xs text-gray-500">Schools</p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {countNearbyByType(property?.nearby, 'school') ? `${countNearbyByType(property?.nearby, 'school')} Nearby` : 'Not listed'}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg text-center">
+                      <Hospital className="mx-auto mb-1 text-primary" size={18} />
+                      <p className="text-xs text-gray-500">Hospitals</p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {countNearbyByType(property?.nearby, 'hospital') ? `${countNearbyByType(property?.nearby, 'hospital')} Nearby` : 'Not listed'}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg text-center">
+                      <ShoppingBag className="mx-auto mb-1 text-primary" size={18} />
+                      <p className="text-xs text-gray-500">Malls</p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {(countNearbyByType(property?.nearby, 'mall') || countNearbyByType(property?.nearby, 'shopping'))
+                          ? `${countNearbyByType(property?.nearby, 'mall') || countNearbyByType(property?.nearby, 'shopping')} Nearby`
+                          : 'Not listed'}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg text-center">
+                      <Briefcase className="mx-auto mb-1 text-primary" size={18} />
+                      <p className="text-xs text-gray-500">IT Parks</p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {(countNearbyByType(property?.nearby, 'it park') || countNearbyByType(property?.nearby, 'office') || countNearbyByType(property?.nearby, 'commercial'))
+                          ? `${countNearbyByType(property?.nearby, 'it park') || countNearbyByType(property?.nearby, 'office') || countNearbyByType(property?.nearby, 'commercial')} Nearby`
+                          : 'Not listed'}
+                      </p>
+                    </div>
+                  </div>
+                </section>
+              </>
             )}
-            
+
             {/* Beautiful Locked State for Guests */}
             {isGuestView && (
               <div className="relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-xl shadow-gray-200/40 p-8 sm:p-12 text-center group mt-6 mb-8">
                 {/* Decorative background blobs */}
                 <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-all duration-700" />
                 <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl group-hover:bg-blue-500/20 transition-all duration-700" />
-                
+
                 <div className="relative z-10 flex flex-col items-center">
                   <div className="w-20 h-20 mx-auto bg-gradient-to-br from-primary/10 to-blue-500/10 rounded-2xl flex items-center justify-center mb-6 shadow-inner border border-white">
                     <div className="w-12 h-12 bg-white rounded-xl shadow-md flex items-center justify-center text-primary">
                       <Lock size={24} />
                     </div>
                   </div>
-                  
+
                   <h3 className="text-2xl font-bold text-gray-900 mb-3 tracking-tight">Unlock Full Property Details</h3>
                   <p className="text-gray-500 max-w-md mx-auto mb-8 leading-relaxed">
                     Get exclusive access to detailed floor plans, full amenity lists, location insights, and developer information by signing in to your account.
                   </p>
-                  
+
                   <button
                     onClick={openLoginForPropertyDetails}
                     className="w-full sm:w-auto px-8 py-3.5 bg-gradient-to-r from-primary to-primary-dark text-white text-sm font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/30 transition-all hover:-translate-y-0.5 active:translate-y-0"
                   >
                     Sign In to Unlock
                   </button>
-                  
+
                   <div className="mt-6 flex items-center gap-6 text-sm text-gray-400 font-medium">
                     <div className="flex items-center gap-2"><CheckCircle2 size={16} className="text-green-500" /> Free Access</div>
                     <div className="flex items-center gap-2"><CheckCircle2 size={16} className="text-green-500" /> Instant Unlock</div>
@@ -2380,87 +2424,87 @@ function PropertyDetails() {
 
             {/* TOP EXPERTS SECTION - Backend Ready */}
             <section id="experts" className="SectionCard scroll-mt-32">
-              <SectionTitle 
-                icon={Award} 
+              <SectionTitle
+                icon={Award}
                 title={property?.city ? `Top Experts in ${property.city}` : "Top Experts Near You"}
               />
-              
+
               {/* Backend-ready data extraction */}
               <ExpertsCarousel property={property} handleExpertContact={handleExpertContact} />
             </section>
 
             {/* REVIEWS SECTION - LAST SECTION */}
             <section id="reviews" className="SectionCard scroll-mt-32">
-              <SectionTitle 
-                icon={Star} 
+              <SectionTitle
+                icon={Star}
                 title={`${property.title?.split(' ').slice(0, 3).join(' ') || 'Property'} Reviews & Rating`}
               />
               <p className="text-sm text-gray-500 mb-6">
                 Read the reviews about {property.title?.split(' ').slice(0, 3).join(' ') || 'this property'} located at {property.location || 'prime location'} and see what residents and real estate experts have to say about the project.
               </p>
-              
-              {/* Rating Summary */}
-              {/* Rating Summary */}
-{reviews.length === 0 ? (
-  <div className="flex flex-col items-center justify-center py-10 px-6 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-100 mb-6">
-    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-md mb-4">
-      <Star size={28} className="text-amber-300" />
-    </div>
-    <h4 className="text-lg font-bold text-gray-900 mb-1">No reviews yet</h4>
-    <p className="text-sm text-gray-500 text-center max-w-xs mb-4">
-      Be the first to share your experience about this property. Your review helps others make better decisions.
-    </p>
-    <div className="flex gap-1 mb-2">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <Star key={star} size={24} className="text-gray-200" />
-      ))}
-    </div>
-    <p className="text-xs text-gray-400">0 Ratings · 0 Reviews</p>
-  </div>
-) : (
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-    {/* Overall Rating */}
-    <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-6 border border-amber-100">
-      <div className="text-center">
-        <div className="text-5xl font-bold text-gray-900 mb-2">
-          {(reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1)}
-        </div>
-        <div className="flex justify-center gap-1 mb-2">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <Star
-              key={star}
-              size={20}
-              className={star <= Math.round(reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length) ? "text-amber-400 fill-amber-400" : "text-gray-300"}
-            />
-          ))}
-        </div>
-        <p className="text-sm text-gray-600">{reviews.length} Ratings</p>
-      </div>
-    </div>
 
-    {/* Rating Breakdown */}
-    <div className="space-y-2">
-      {[5, 4, 3, 2, 1].map((stars) => {
-        const count = reviews.filter(r => r.rating === stars).length;
-        const total = reviews.length || 1;
-        const percentage = (count / total) * 100;
-        return (
-          <div key={stars} className="flex items-center gap-3">
-            <span className="text-sm font-medium text-gray-600 w-12">{stars} Star</span>
-            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-amber-400 rounded-full transition-all"
-                style={{ width: `${percentage}%` }}
-              />
-            </div>
-            <span className="text-sm font-semibold text-gray-900 w-6">{count}</span>
-          </div>
-        );
-      })}
-    </div>
-  </div>
-)}
-              
+              {/* Rating Summary */}
+              {/* Rating Summary */}
+              {reviews.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 px-6 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-100 mb-6">
+                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-md mb-4">
+                    <Star size={28} className="text-amber-300" />
+                  </div>
+                  <h4 className="text-lg font-bold text-gray-900 mb-1">No reviews yet</h4>
+                  <p className="text-sm text-gray-500 text-center max-w-xs mb-4">
+                    Be the first to share your experience about this property. Your review helps others make better decisions.
+                  </p>
+                  <div className="flex gap-1 mb-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star key={star} size={24} className="text-gray-200" />
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-400">0 Ratings · 0 Reviews</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  {/* Overall Rating */}
+                  <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-6 border border-amber-100">
+                    <div className="text-center">
+                      <div className="text-5xl font-bold text-gray-900 mb-2">
+                        {(reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1)}
+                      </div>
+                      <div className="flex justify-center gap-1 mb-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            size={20}
+                            className={star <= Math.round(reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length) ? "text-amber-400 fill-amber-400" : "text-gray-300"}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-sm text-gray-600">{reviews.length} Ratings</p>
+                    </div>
+                  </div>
+
+                  {/* Rating Breakdown */}
+                  <div className="space-y-2">
+                    {[5, 4, 3, 2, 1].map((stars) => {
+                      const count = reviews.filter(r => r.rating === stars).length;
+                      const total = reviews.length || 1;
+                      const percentage = (count / total) * 100;
+                      return (
+                        <div key={stars} className="flex items-center gap-3">
+                          <span className="text-sm font-medium text-gray-600 w-12">{stars} Star</span>
+                          <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-amber-400 rounded-full transition-all"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                          <span className="text-sm font-semibold text-gray-900 w-6">{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Top Reviews */}
               <div className="space-y-4">
                 <h4 className="font-semibold text-gray-900 mb-3">Top Reviews</h4>
@@ -2476,9 +2520,9 @@ function PropertyDetails() {
                         </div>
                         <div className="flex items-center gap-1 mb-2">
                           {[...Array(5)].map((_, i) => (
-                            <Star 
-                              key={i} 
-                              size={12} 
+                            <Star
+                              key={i}
+                              size={12}
                               className={i < review.rating ? "text-amber-400 fill-amber-400" : "text-gray-300"}
                             />
                           ))}
@@ -2488,13 +2532,13 @@ function PropertyDetails() {
                       </div>
                       {reviewToDelete === review.id ? (
                         <div className="flex items-center gap-1">
-                          <button 
+                          <button
                             onClick={() => handleDeleteReview(review.id)}
                             className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
                           >
                             Yes
                           </button>
-                          <button 
+                          <button
                             onClick={() => setReviewToDelete(null)}
                             className="px-2 py-1 bg-gray-100 text-gray-500 text-xs rounded"
                           >
@@ -2502,7 +2546,7 @@ function PropertyDetails() {
                           </button>
                         </div>
                       ) : (
-                        <button 
+                        <button
                           onClick={() => setReviewToDelete(review.id)}
                           className="p-1 text-gray-300 hover:text-red-500 flex-shrink-0"
                           title="Delete"
@@ -2514,7 +2558,7 @@ function PropertyDetails() {
                   </div>
                 ))}
               </div>
-              
+
               {/* Write a Review */}
               <div className="mt-6">
                 {showReviewForm ? (
@@ -2534,9 +2578,8 @@ function PropertyDetails() {
                                   openLoginForPropertyDetails();
                                 }
                               }}
-                              className={`p-1 rounded transition-all ${
-                                star <= newReview.rating ? 'text-amber-400' : 'text-gray-300'
-                              }`}
+                              className={`p-1 rounded transition-all ${star <= newReview.rating ? 'text-amber-400' : 'text-gray-300'
+                                }`}
                             >
                               <Star size={24} className={star <= newReview.rating ? "fill-current" : ""} />
                             </button>
@@ -2571,7 +2614,7 @@ function PropertyDetails() {
                     </div>
                   </div>
                 ) : (
-                  <button 
+                  <button
                     onClick={() => {
                       if (!isGuestView) {
                         setShowReviewForm(true);
@@ -2593,76 +2636,70 @@ function PropertyDetails() {
           <div className="space-y-4 sm:space-y-6">
             <div className="lg:sticky lg:top-24 space-y-4 sm:space-y-6">
               <ContactSidePanel
-                  property={property}
-                  isLoggedIn={isLoggedIn}
-                  user={user}
-                  onEnquiryClick={() => setShowEnquiryForm(true)}
-                  onCallbackClick={() => {
-                    if (!isLoggedIn) {
-                      openLoginForPropertyDetails();
-                      return;
-                    }
-                    alert('Callback request submitted! We will contact you shortly.');
-                  }}
-                  onBrochureClick={() => {
-                    if (!isLoggedIn) {
-                      openLoginForPropertyDetails();
-                      return;
-                    }
-                    setShowPaymentModal(true);
-                  }}
-                  onLoginClick={openLoginForPropertyDetails}
-                />
+                property={property}
+                isLoggedIn={isLoggedIn}
+                user={user}
+                onEnquiryClick={() => setShowEnquiryForm(true)}
+                onCallbackClick={() => {
+                  if (!isLoggedIn) {
+                    openLoginForPropertyDetails();
+                    return;
+                  }
+                  alert('Callback request submitted! We will contact you shortly.');
+                }}
+                onBrochureClick={handleDownloadDocuments}
+                onLoginClick={openLoginForPropertyDetails}
+              />
 
-                {/* Calculators */}
-                <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-lg shadow-gray-200/50">
-                  <div className="mb-3 flex items-center justify-between">
-                    <h4 className="text-sm font-bold text-gray-900">Smart Tools</h4>
-                    <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-primary">
-                      Quick
-                    </span>
+              {/* Calculators */}
+              <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-lg shadow-gray-200/50">
+                <div className="mb-3 flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-gray-900">Smart Tools</h4>
+                  <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-primary">
+                    Quick
+                  </span>
+                </div>
+                <div className="space-y-2.5">
+                  <div
+                    onClick={() => setShowEMI(true)}
+                    className="group flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-3 py-3 transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-white hover:shadow-md"
+                  >
+                    <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center">
+                      <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-bold text-gray-900">EMI Calculator</h4>
+                      <p className="text-xs text-gray-500">Monthly estimate</p>
+                    </div>
+                    <ChevronRight size={16} className="text-gray-400 group-hover:text-primary" />
                   </div>
-                  <div className="space-y-2.5">
-                    <div
-                      onClick={() => setShowEMI(true)}
-                      className="group flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-3 py-3 transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-white hover:shadow-md"
-                    >
-                      <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center">
-                        <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                        </svg>
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="text-sm font-bold text-gray-900">EMI Calculator</h4>
-                        <p className="text-xs text-gray-500">Monthly estimate</p>
-                      </div>
-                      <ChevronRight size={16} className="text-gray-400 group-hover:text-primary" />
-                    </div>
 
-                    <div
-                      onClick={() => setShowRental(true)}
-                      className="group flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-3 py-3 transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-white hover:shadow-md"
-                    >
-                      <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center">
-                        <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                        </svg>
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="text-sm font-bold text-gray-900">Rental Yield</h4>
-                        <p className="text-xs text-gray-500">Investment return</p>
-                      </div>
-                      <ChevronRight size={16} className="text-gray-400 group-hover:text-primary" />
+                  <div
+                    onClick={() => setShowRental(true)}
+                    className="group flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-3 py-3 transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-white hover:shadow-md"
+                  >
+                    <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center">
+                      <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                      </svg>
                     </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-bold text-gray-900">Rental Yield</h4>
+                      <p className="text-xs text-gray-500">Investment return</p>
+                    </div>
+                    <ChevronRight size={16} className="text-gray-400 group-hover:text-primary" />
                   </div>
                 </div>
-                
+              </div>
+
             </div>
           </div>
         </div>
       </div>
 
-      
+
       {/* CTA Section - Authenticated Only */}
       {!isGuestView && (
         <section className="bg-gray-50 border-t border-gray-200 mt-12">
@@ -2679,7 +2716,7 @@ function PropertyDetails() {
                   <span className="flex items-center gap-1"><Clock size={12} /> 2h response</span>
                 </div>
               </div>
-              
+
               <div className="p-8 sm:p-10">
                 <div className="flex flex-col lg:flex-row items-start gap-8">
                   {/* Left content */}
@@ -2690,7 +2727,7 @@ function PropertyDetails() {
                     <p className="text-gray-600 mb-6 max-w-xl">
                       Get in touch with the owner to schedule a visit or get more information about this premium property
                     </p>
-                    
+
                     {/* Contact buttons */}
                     <div className="flex flex-col sm:flex-row gap-3">
                       <button
@@ -2710,28 +2747,30 @@ function PropertyDetails() {
                       </button>
                     </div>
                   </div>
-                  
+
                   {/* Right - Download Documents */}
-                  <div className="lg:w-auto w-full">
-                    <div className="bg-primary/5 rounded-xl p-5 border border-primary/10">
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 bg-white rounded-lg shadow-sm flex items-center justify-center flex-shrink-0">
-                          <Download size={20} className="text-primary" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900 mb-1">Property Documents</h3>
-                          <p className="text-sm text-gray-500 mb-3">Download complete property details, legal documents & more</p>
-                          <button
-                            onClick={handleDownloadDocuments}
-                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-dark text-white text-sm font-semibold rounded-lg transition-all shadow-md hover:shadow-lg"
-                          >
-                            <IndianRupee size={14} />
-                            49 - Download Documents
-                          </button>
+                  {property?.hasBrochure && (
+                    <div className="lg:w-auto w-full">
+                      <div className="bg-primary/5 rounded-xl p-5 border border-primary/10">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 bg-white rounded-lg shadow-sm flex items-center justify-center flex-shrink-0">
+                            <Download size={20} className="text-primary" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-900 mb-1">Property Documents</h3>
+                            <p className="text-sm text-gray-500 mb-3">Download complete property details, legal documents & more</p>
+                            <button
+                              onClick={handleDownloadDocuments}
+                              className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-dark text-white text-sm font-semibold rounded-lg transition-all shadow-md hover:shadow-lg"
+                            >
+                              <IndianRupee size={14} />
+                              {DOCUMENT_UNLOCK_BASE_INR} + GST — Download Documents
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -2814,95 +2853,95 @@ function PropertyDetails() {
       />
 
       <AnimatePresence>
-  {showEMI && (
-    <motion.div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={() => setShowEMI(false)}
-    >
-      <motion.div
-        className="bg-white/95 backdrop-blur-xl w-full max-w-6xl max-h-[92vh] flex flex-col rounded-3xl shadow-2xl border border-white/60 overflow-hidden"
-        initial={{ opacity: 0, scale: 0.92, y: 24 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.92, y: 24 }}
-        transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100 bg-white/80 flex-shrink-0">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-md shadow-red-200">
-              <IndianRupee size={18} className="text-white" />
-            </div>
-            <div>
-              <h3 className="text-lg font-black text-gray-900 leading-tight">EMI Calculator</h3>
-              <p className="text-xs text-gray-400 font-medium">Estimate your monthly installments</p>
-            </div>
-          </div>
-          <button
+        {showEMI && (
+          <motion.div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             onClick={() => setShowEMI(false)}
-            className="w-9 h-9 rounded-xl bg-gray-100 hover:bg-red-50 hover:text-red-500 text-gray-400 flex items-center justify-center transition-all duration-200 group"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        {/* Scrollable Content */}
-        <div className="overflow-y-auto flex-1 overscroll-contain">
-          <EMICalculator />
-        </div>
-      </motion.div>
-    </motion.div>
-  )}
-</AnimatePresence>
+            <motion.div
+              className="bg-white/95 backdrop-blur-xl w-full max-w-6xl max-h-[92vh] flex flex-col rounded-3xl shadow-2xl border border-white/60 overflow-hidden"
+              initial={{ opacity: 0, scale: 0.92, y: 24 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 24 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100 bg-white/80 flex-shrink-0">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-md shadow-red-200">
+                    <IndianRupee size={18} className="text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-gray-900 leading-tight">EMI Calculator</h3>
+                    <p className="text-xs text-gray-400 font-medium">Estimate your monthly installments</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowEMI(false)}
+                  className="w-9 h-9 rounded-xl bg-gray-100 hover:bg-red-50 hover:text-red-500 text-gray-400 flex items-center justify-center transition-all duration-200 group"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              {/* Scrollable Content */}
+              <div className="overflow-y-auto flex-1 overscroll-contain">
+                <EMICalculator />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <AnimatePresence>
-  {showRental && (
-    <motion.div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={() => setShowRental(false)}
-    >
-      <motion.div
-        className="bg-white/95 backdrop-blur-xl w-full max-w-6xl max-h-[92vh] flex flex-col rounded-3xl shadow-2xl border border-white/60 overflow-hidden"
-        initial={{ opacity: 0, scale: 0.92, y: 24 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.92, y: 24 }}
-        transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100 bg-white/80 flex-shrink-0">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-md shadow-emerald-200">
-              <Building2 size={18} className="text-white" />
-            </div>
-            <div>
-              <h3 className="text-lg font-black text-gray-900 leading-tight">Rental Yield Calculator</h3>
-              <p className="text-xs text-gray-400 font-medium">Analyse your return on investment</p>
-            </div>
-          </div>
-          <button
+        {showRental && (
+          <motion.div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             onClick={() => setShowRental(false)}
-            className="w-9 h-9 rounded-xl bg-gray-100 hover:bg-red-50 hover:text-red-500 text-gray-400 flex items-center justify-center transition-all duration-200"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        {/* Scrollable Content */}
-        <div className="overflow-y-auto flex-1 overscroll-contain">
-          <RentalYieldCalculator />
-        </div>
-      </motion.div>
-    </motion.div>
-  )}
-</AnimatePresence>
+            <motion.div
+              className="bg-white/95 backdrop-blur-xl w-full max-w-6xl max-h-[92vh] flex flex-col rounded-3xl shadow-2xl border border-white/60 overflow-hidden"
+              initial={{ opacity: 0, scale: 0.92, y: 24 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 24 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100 bg-white/80 flex-shrink-0">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-md shadow-emerald-200">
+                    <Building2 size={18} className="text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-gray-900 leading-tight">Rental Yield Calculator</h3>
+                    <p className="text-xs text-gray-400 font-medium">Analyse your return on investment</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowRental(false)}
+                  className="w-9 h-9 rounded-xl bg-gray-100 hover:bg-red-50 hover:text-red-500 text-gray-400 flex items-center justify-center transition-all duration-200"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              {/* Scrollable Content */}
+              <div className="overflow-y-auto flex-1 overscroll-contain">
+                <RentalYieldCalculator />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Payment Modal for Document Download */}
       <AnimatePresence>
@@ -2944,7 +2983,7 @@ function PropertyDetails() {
                   </button>
                 </div>
               </div>
-              
+
               {/* Content */}
               <div className="p-6">
                 <div className="text-center mb-6">
@@ -2956,7 +2995,7 @@ function PropertyDetails() {
                     Get complete property details including legal documents, floor plans, and specifications
                   </p>
                 </div>
-                
+
                 {/* What's Included */}
                 <div className="bg-gray-50 rounded-xl p-4 mb-6">
                   <h5 className="text-sm font-semibold text-gray-700 mb-3">What's included:</h5>
@@ -2979,19 +3018,19 @@ function PropertyDetails() {
                     </li>
                   </ul>
                 </div>
-                
+
                 {/* Price */}
                 <div className="flex items-center justify-between bg-primary/10 rounded-xl p-4 mb-6">
                   <div>
                     <span className="text-gray-600 text-sm">One-time payment</span>
-                    <p className="text-xs text-gray-500 mt-0.5">Instant download after payment</p>
+                    <p className="text-xs text-gray-500 mt-0.5">GST 18% added at PayU checkout · unlocks brochure PDF</p>
                   </div>
                   <div className="text-right">
-                    <span className="text-2xl font-bold text-primary">₹49</span>
-                    <span className="text-gray-400 line-through text-sm ml-2">₹99</span>
+                    <span className="text-2xl font-bold text-primary">₹{DOCUMENT_UNLOCK_BASE_INR}</span>
+                    <p className="text-[11px] text-gray-500 mt-0.5">+ GST</p>
                   </div>
                 </div>
-                
+
                 {/* Pay Button */}
                 <button
                   onClick={initiatePayment}
@@ -3009,11 +3048,11 @@ function PropertyDetails() {
                   ) : (
                     <>
                       <IndianRupee size={18} />
-                      Pay ₹49 & Download
+                      Pay ₹99 & Download
                     </>
                   )}
                 </button>
-                
+
                 <p className="text-center text-xs text-gray-400 mt-4">
                   Secure payment powered by Razorpay
                 </p>

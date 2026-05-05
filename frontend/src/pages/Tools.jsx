@@ -23,6 +23,7 @@ import InteriorDesign from './InteriorDesign';
 import RentAgreement from './RentAgreement';
 import VastuConsultancy from './VastuConsultancy';  
 import HomeConstruction from './Homeconstruction';
+import HomeLoanEligibility from './HomeLoanEligibility';
 
 const SERVICES = [
   {
@@ -145,6 +146,18 @@ const SERVICES = [
   link: '/contact',
   hasComponent: true,
 },
+{
+  id: 'home-loan-eligibility',
+  title: 'Home Loan Eligibility',
+  icon: Calculator,
+  category: 'Finance',
+  description:
+    'Check your home loan eligibility instantly. Understand your borrowing capacity, maximum loan amount, and EMI based on income, credit score, and existing obligations.',
+  features: ['Eligibility Check', 'Max Loan Amount', 'EMI Calculation', 'Credit Score Analysis'],
+  cta: 'Check Eligibility',
+  link: '/tools/home-loan-eligibility',
+  hasComponent: true,
+},
 ];
 
 const CATEGORIES = ['All', ...Array.from(new Set(SERVICES.map((s) => s.category)))];
@@ -162,6 +175,7 @@ function ServiceContent({ service, navigate }) {
     if (service.id === 'rent-agreement') return <div className="bg-white rounded-2xl border border-slate-100 h-auto"><RentAgreement /></div>;
     if (service.id === 'vastu') return <div className="bg-white rounded-2xl border border-slate-100 h-auto"><VastuConsultancy /></div>; 
     if (service.id === 'construction') return <div className="bg-white rounded-2xl border border-slate-100 h-auto"><HomeConstruction /></div>;  
+     if (service.id === 'home-loan-eligibility') return <div className="bg-white rounded-2xl border border-slate-100 h-auto"><HomeLoanEligibility /></div>;
   }
 
   return (

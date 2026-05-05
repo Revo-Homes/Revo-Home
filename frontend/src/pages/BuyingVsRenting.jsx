@@ -643,7 +643,6 @@
 // }
 
 
-
 import React, { useState, useMemo } from 'react';
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -1575,15 +1574,60 @@ export default function BuyVsRentCalculator() {
         </div>{/* end right */}
       </div>{/* end grid */}
       <style>{`
-  @media (max-width: 640px) {
-    .bvr-main-grid { grid-template-columns: 1fr !important; }
-    .bvr-left-panel { position: relative !important; top: auto !important; border-right: none !important; border-bottom: 1px solid #e5e7eb; }
-    .bvr-right-panel { padding: 12px !important; }
-    .bvr-stat-row { grid-template-columns: 1fr 1fr !important; }
-    .bvr-two-col { grid-template-columns: 1fr !important; }
-    .bvr-three-col { grid-template-columns: 1fr !important; }
-    .bvr-tabs { width: 100% !important; flex-wrap: wrap !important; }
-    .bvr-tabs button { flex: 1 1 auto !important; justify-content: center !important; }
+  @media (max-width: 768px) {
+    .bvr-main-grid {
+      grid-template-columns: 1fr !important;
+      width: 100% !important;
+      gap: 0 !important;
+    }
+    .bvr-left-panel,
+    .bvr-right-panel {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+    }
+    .bvr-left-panel {
+      position: relative !important;
+      top: auto !important;
+      border-right: none !important;
+      border-bottom: 1px solid #e5e7eb !important;
+      margin-bottom: 18px !important;
+      padding: 18px !important;
+    }
+    .bvr-right-panel {
+      padding: 12px !important;
+      overflow-x: hidden !important;
+    }
+    .bvr-stat-row,
+    .bvr-two-col,
+    .bvr-three-col {
+      grid-template-columns: 1fr !important;
+    }
+    .bvr-stat-row > *,
+    .bvr-two-col > *,
+    .bvr-three-col > * {
+      min-width: 0 !important;
+    }
+    .bvr-tabs {
+      width: 100% !important;
+      flex-wrap: wrap !important;
+      justify-content: flex-start !important;
+      overflow-x: auto !important;
+      padding: 8px !important;
+      gap: 8px !important;
+    }
+    .bvr-tabs button {
+      flex: 1 1 auto !important;
+      min-width: 0 !important;
+      white-space: nowrap !important;
+      justify-content: center !important;
+    }
+    .bvr-tabs button:first-child {
+      margin-left: 0 !important;
+    }
+    .bvr-tabs > * {
+      min-width: 0 !important;
+    }
   }
 `}</style>
     </div>

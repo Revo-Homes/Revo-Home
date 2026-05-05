@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import RevoUserProfileForm from '../components/RevoUserProfileForm';
 import AvatarUpload from '../components/AvatarUpload';
+import billingApi from '../services/billingApi';
 
 const Settings = () => {
   const { user, updateUserProfile } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const [updateSuccess, setUpdateSuccess] = useState(false);
+  const [subscription, setSubscription] = useState(null);
+  const [loadingSubscription, setLoadingSubscription] = useState(true);
 
   const handleProfileUpdate = async (profileData) => {
     try {
@@ -18,6 +21,26 @@ const Settings = () => {
       // Show error message
     }
   };
+
+  // Fetch active subscription
+  useEffect(() => {
+    const fetchSubscription = async () => {
+      try {
+        setLoadingSubscription(true);
+        const response = await billingApi.getActiveSubscription();
+        console.log('[Settings] Active subscription:', response);
+        if (response?.data) {
+          setSubscription(response.data);
+        }
+      } catch (error) {
+        console.error('[Settings] Failed to fetch subscription:', error);
+      } finally {
+        setLoadingSubscription(false);
+      }
+    };
+
+    fetchSubscription();
+  }, []);
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -45,6 +68,11 @@ const Settings = () => {
               }`}>
                 {user?.status}
               </span>
+              {subscription && (
+                <span className="px-2 py-1 rounded text-xs bg-blue-100 text-blue-800 ml-2">
+                  {subscription.planName || subscription.plan?.name || 'Active Plan'}
+                </span>
+              )}
               <span className="text-gray-500">Member since {user?.created_at ? new Date(user.created_at).getFullYear() : 'N/A'}</span>
             </div>
           </div>
@@ -75,6 +103,16 @@ const Settings = () => {
             >
               Preferences
             </button>
+            <button
+              onClick={() => setActiveTab('subscription')}
+              className={`py-4 border-b-2 font-medium text-sm ${
+                activeTab === 'subscription'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              My Plan
+            </button>
           </nav>
         </div>
 
@@ -89,6 +127,69 @@ const Settings = () => {
               <p className="text-gray-600">
                 Notification preferences and other settings are managed in the Profile Information tab.
               </p>
+            </div>
+          )}
+
+          {activeTab === 'subscription' && (
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Current Subscription Plan</h3>
+              {loadingSubscription ? (
+                <p className="text-gray-600">Loading subscription details...</p>
+              ) : subscription ? (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="text-xl font-bold text-blue-900">
+                        {subscription.planName || subscription.plan?.name || 'Current Plan'}
+                      </h4>
+                      <p className="text-blue-700 mt-1">
+                        Status: <span className="font-semibold capitalize">{subscription.status}</span>
+                      </p>
+                      <p className="text-blue-600 text-sm mt-1">
+                        Category: {subscription.categoryKey || subscription.category || 'N/A'}
+                      </p>
+                      <p className="text-blue-600 text-sm mt-1">
+                        Billing Cycle: {subscription.billingCycle || 'one_time'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-blue-900">
+                        ₹{subscription.totalAmount || subscription.total_amount || subscription.amount || 0}
+                      </p>
+                      <p className="text-blue-600 text-sm">
+                        {subscription.gstRate || subscription.gst_rate || 18}% GST included
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-blue-200">
+                    <p className="text-sm text-blue-700">
+                      <span className="font-semibold">Period:</span>{' '}
+                      {subscription.currentPeriodStart || subscription.current_period_start
+                        ? new Date(subscription.currentPeriodStart || subscription.current_period_start).toLocaleDateString()
+                        : 'N/A'}{' '}
+                      -{' '}
+                      {subscription.currentPeriodEnd || subscription.current_period_end
+                        ? new Date(subscription.currentPeriodEnd || subscription.current_period_end).toLocaleDateString()
+                        : 'N/A'}
+                    </p>
+                    {subscription.paymentProvider || subscription.payment_provider && (
+                      <p className="text-sm text-blue-600 mt-1">
+                        Payment: {subscription.paymentProvider || subscription.payment_provider}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-600 mb-4">No active subscription found.</p>
+                  <a
+                    href="/pricing"
+                    className="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    View Plans
+                  </a>
+                </div>
+              )}
             </div>
           )}
         </div>

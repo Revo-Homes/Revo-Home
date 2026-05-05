@@ -28,6 +28,8 @@ import AdminDashboard from '../pages/AdminDashboard';
 import Subscription from '../pages/Subscription';
 import PropertySubscription from '../pages/PropertySubscription';
 import Checkout from '../pages/Checkout';
+import PaymentSuccess from '../pages/PaymentSuccess';
+import PaymentFailure from '../pages/PaymentFailure';
 import AuthDemo from '../pages/AuthDemo';
 import BecomeBuilder from '../pages/BecomeBuilder';
 
@@ -62,6 +64,8 @@ function AppRoutes() {
           <Route path="/login" element={<Login />} />
           <Route path="/otp-verify" element={<OTPVerify />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/payment/success" element={<PaymentSuccess />} />
+          <Route path="/payment/failure" element={<PaymentFailure />} />
 
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<Dashboard />} />

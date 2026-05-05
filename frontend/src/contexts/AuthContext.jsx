@@ -92,19 +92,18 @@ export function AuthProvider({ children }) {
         const savedUser = typeof window !== 'undefined' ? localStorage.getItem(USER_KEY) : null;
         
         if (token) {
-          if (savedUser) {
-            try {
-              const u = JSON.parse(savedUser);
-              setUser(u);
-              setIsLoggedIn(true);
-              dispatch(loginSuccess({ user: u, token }));
-            } catch (_) {}
-          }
-          
-          // For temporary tokens from phone verification, skip backend sync
-          if (token.startsWith('temp_token_')) {
+          // Check if this is a verification token
+          let isVerificationToken = false;
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            isVerificationToken = payload.type === 'phone_verification';
+          } catch (e) {}
+
+          if (isVerificationToken || token.startsWith('temp_token_')) {
             console.log('📱 Using temporary token from phone verification');
             setIsLoggedIn(true);
+            // Optional: fetch minimal user if possible, but don't logout on failure
+            await syncProfile().catch(() => {});
           } else {
             // Always verify token/sync profile on load for real tokens
             const userData = await syncProfile();
@@ -444,6 +443,31 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const sendEmailVerificationOtp = async (email) => {
+    try {
+      setLoading(true);
+      const response = await authApi.sendOtp({ identifier: email, channel: 'email' });
+      return { success: true, message: response.message || 'OTP sent successfully' };
+    } catch (err) {
+      return { success: false, message: err.message || 'Failed to send OTP' };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyEmailVerificationOtp = async (email, code) => {
+    try {
+      setLoading(true);
+      const response = await authApi.verifyOtp({ identifier: email, code, channel: 'email' });
+      const userData = await syncProfile();
+      return { success: true, user: userData };
+    } catch (err) {
+      return { success: false, message: err.message || 'Verification failed' };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const signup = async (data) => {
     try {
       setLoading(true);
@@ -583,6 +607,7 @@ export function AuthProvider({ children }) {
         login, logout, sendOtp, verifyOtp, signup, updateProfile, subscribeUser,
         forgotPassword, resetPassword, changePassword, verifyEmailToken, verify2fa, oauthCallback,
         sendPhoneVerificationOtp, verifyPhoneVerificationOtp,
+        sendEmailVerificationOtp, verifyEmailVerificationOtp,
         syncProfile, updateUserProfile, updateUserPreferences
       }}
     >

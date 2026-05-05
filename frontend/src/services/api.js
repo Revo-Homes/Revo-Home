@@ -4,10 +4,15 @@
  * All endpoints align with frontend pages: Login, OTP, Signup, Properties, Sell, Dashboard, Tools, Admin
  */
 
-const API_BASE =
+const normalizeApiBase = (value) => {
+  const base = (value || '/api/v1').replace(/\/+$/, '');
+  return base === '/api' ? '/api/v1' : base;
+};
+
+const API_BASE = normalizeApiBase(
   import.meta.env.VITE_API_BASE_URL ||
-  import.meta.env.VITE_CORE_API_URL ||
-  '/api/v1';
+  import.meta.env.VITE_CORE_API_URL
+);
 
 const getAuthHeader = () => {
   const token = localStorage.getItem('authToken');
@@ -44,7 +49,7 @@ const handleResponse = async (res) => {
   } catch (e) {
     data = {};
   }
-  
+
   if (!res.ok) {
     // Log unauthorized specifically to help debugging
     if (res.status === 401) {
@@ -58,7 +63,7 @@ const handleResponse = async (res) => {
 const request = (method, path, body = null, opts = {}) => {
   const url = buildUrl(path, opts.params);
   const headers = {
-    ...getAuthHeader(),
+    ...(opts.auth === false ? {} : getAuthHeader()),
     ...getOrganizationHeaders(),
     ...opts.headers
   };
@@ -66,9 +71,9 @@ const request = (method, path, body = null, opts = {}) => {
   const config = {
     method,
     headers,
-    credentials: 'include', // Support HTTP-only cookies
+    credentials: 'include', // Enable cookies for cross-origin auth
   };
-  
+
   if (body && method !== 'GET') {
     // Add organization_id to body for POST/PUT/PATCH requests
     if (body && typeof body === 'object' && !(body instanceof FormData)) {
@@ -93,20 +98,21 @@ export const post = (path, body) => request('POST', path, body);
 export const put = (path, body) => request('PUT', path, body);
 export const patch = (path, body) => request('PATCH', path, body);
 export const del = (path) => request('DELETE', path);
+export const publicPost = (path, body) => request('POST', path, body, { auth: false });
 
 // -------------------- AUTH (Login, OTP, Signup, Social) --------------------
 export const authApi = {
-  login: (payload) => post('/auth/login', payload),
-  refreshToken: (payload) => post('/auth/refresh-token', payload),
-  forgotPassword: (payload) => post('/auth/forgot-password', payload),
-  resetPassword: (payload) => post('/auth/reset-password', payload),
-  verifyEmailToken: (payload) => post('/auth/verify-email', payload),
-  verify2fa: (payload) => post('/auth/2fa/verify', payload),
-  sendOtp: (payload) => post('/auth/otp/request', payload),
-  verifyOtp: (payload) => post('/auth/otp/verify', payload),
-  oauthCallback: (payload) => post('/auth/oauth/callback', payload),
+  login: (payload) => publicPost('/auth/login', payload),
+  refreshToken: (payload) => publicPost('/auth/refresh-token', payload),
+  forgotPassword: (payload) => publicPost('/auth/forgot-password', payload),
+  resetPassword: (payload) => publicPost('/auth/reset-password', payload),
+  verifyEmailToken: (payload) => publicPost('/auth/verify-email', payload),
+  verify2fa: (payload) => publicPost('/auth/2fa/verify', payload),
+  sendOtp: (payload) => publicPost('/auth/otp/request', payload),
+  verifyOtp: (payload) => publicPost('/auth/otp/verify', payload),
   sendPhoneOtp: (payload) => post('/auth/send-phone-otp', payload),
   verifyPhoneOtp: (payload) => post('/auth/verify-phone-otp', payload),
+  oauthCallback: (payload) => publicPost('/auth/oauth/callback', payload),
   getMe: () => get('/auth/me'),
   logout: () => post('/auth/logout', {}),
   changePassword: (payload) => post('/auth/change-password', payload),
@@ -126,11 +132,11 @@ export const propertyApi = {
   delete: (id) => del(`/properties/${id}`),
   popularCities: () => get('/properties/by-city', { city: 'Mumbai' }), // Fallback to a valid query
   stats: () => get('/properties/stats'),
-  
+
   // Units
   getUnits: (id) => get(`/properties/${id}/units`),
   createUnit: (id, data) => post(`/properties/${id}/units`, data),
-  
+
   // Media
   getMedia: (id) => get(`/properties/${id}/media`),
   uploadImages: (id, formData) => {
@@ -142,7 +148,7 @@ export const propertyApi = {
       credentials: 'include', // Enable cookies for cross-origin requests
     }).then(handleResponse);
   },
-  
+
   // Form Options (property types, categories, etc.)
   getFormOptions: () => get('/properties/form-options'),
 
@@ -161,14 +167,14 @@ export const listingApi = {
   getBySlug: (slug) => get(`/listings/slug/${slug}`),
   update: (id, data) => patch(`/listings/${id}`, data),
   delete: (id) => del(`/listings/${id}`),
-  
+
   publish: (id) => post(`/listings/${id}/publish`),
   unpublish: (id) => post(`/listings/${id}/unpublish`),
   toggleFeatured: (id) => post(`/listings/${id}/feature`),
-  
+
   getFeatured: () => get('/listings/featured'),
   getExclusive: () => get('/listings/exclusive'),
-  
+
   inquiry: (id, data) => post(`/listings/${id}/inquiry`, data),
   favorite: (id) => post(`/listings/${id}/favorite`),
 };
@@ -193,11 +199,11 @@ export const organizationApi = {
   getById: (id) => get(`/organizations/${id}`),
   update: (id, data) => put(`/organizations/${id}`, data),
   delete: (id) => del(`/organizations/${id}`),
-  
+
   getMembers: (id) => get(`/organizations/${id}/members`),
   addMember: (id, data) => post(`/organizations/${id}/members`, data),
   removeMember: (id, userId) => del(`/organizations/${id}/members/${userId}`),
-  
+
   getStats: (id) => get(`/organizations/${id}/stats`),
   getSettings: (id) => get(`/organizations/${id}/settings`),
   updateSettings: (id, data) => post(`/organizations/${id}/settings`, data),

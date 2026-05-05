@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import SmartSearchBar from '../components/SmartSearchBar';
-import PropertyCard from '../components/PropertyCard';
-import { useProperty } from '../contexts/PropertyContext';
+import PropertyCard from '../components/PropertyCard';import CompareModal from '../components/CompareModal';import { useProperty } from '../contexts/PropertyContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from '../contexts/LocationContext';
 import { MapPin, Navigation } from 'lucide-react';
 
@@ -187,10 +187,33 @@ function ServiceIcon({ name }) {
 
 function Home() {
   const { listings, featured } = useProperty();
+  const { isLoggedIn, openLogin } = useAuth();
   const { location, formatLocation } = useLocation();
   const filters = useSelector((state) => state.properties.filters);
   const [activeServiceIndex, setActiveServiceIndex] = useState(0);
   const [heroIndex, setHeroIndex] = useState(0);
+  const [compareProperties, setCompareProperties] = useState([]);
+  const [isCompareOpen, setIsCompareOpen] = useState(false);
+
+  const toggleCompare = useCallback((property) => {
+    setCompareProperties(prev => {
+      const id = property.id || property.propertyId;
+      const exists = prev.find(p => (p.id || p.propertyId) === id);
+      if (exists) return prev.filter(p => (p.id || p.propertyId) !== id);
+      if (prev.length >= 3) return prev;
+      return [...prev, property];
+    });
+  }, []);
+
+  const isCompared = useCallback((id) =>
+    compareProperties.some(p => (p.id || p.propertyId) === id),
+  [compareProperties]);
+
+  const featuredProperties = useMemo(() => {
+    if (featured && featured.length > 0) return featured;
+    if (!listings || listings.length === 0) return [];
+    return [...listings].sort(() => Math.random() - 0.5).slice(0, 8);
+  }, [featured, listings]);
 
   const filteredResults = useMemo(() => {
     if (!listings || listings.length === 0) return [];
@@ -334,7 +357,13 @@ const [isPaused, setIsPaused] = useState(false);
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     {filteredResults.map((prop) => (
-                      <PropertyCard key={prop.id} {...prop} />
+                      <PropertyCard
+                        key={prop.id}
+                        {...prop}
+                        showCompare={true}
+                        isCompared={isCompared(prop.id)}
+                        onCompareToggle={() => toggleCompare(prop)}
+                      />
                     ))}
                   </div>
                 </>
@@ -379,12 +408,15 @@ const [isPaused, setIsPaused] = useState(false);
             {listings && listings.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {nearbyListings.slice(0, 8).map((prop) => (
-                  <PropertyCard 
-                    key={prop.id} 
-                    {...prop} 
+                  <PropertyCard
+                    key={prop.id}
+                    {...prop}
                     showDistance={true}
-                    showVerifiedImage={true} 
-                    viewsAtBottomRight={true} 
+                    showVerifiedImage={true}
+                    viewsAtBottomRight={true}
+                    showCompare={true}
+                    isCompared={isCompared(prop.id)}
+                    onCompareToggle={() => toggleCompare(prop)}
                   />
                 ))}
               </div>
@@ -424,33 +456,17 @@ const [isPaused, setIsPaused] = useState(false);
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Show featured listings if available, otherwise show random listings */}
-            {(featured && featured.length > 0 ? featured : 
-              // Fallback: get 8 random listings from all listings
-              listings && listings.length > 0 
-                ? [...listings].sort(() => Math.random() - 0.5).slice(0, 8)
-                : []
-            ).map((prop) => (
+            {featuredProperties.map((prop) => (
               <PropertyCard 
                 key={prop.id} 
                 {...prop} 
                 showVerifiedImage={true} 
                 viewsAtBottomRight={true} 
+                showCompare={true}
+                isCompared={isCompared(prop.id)}
+                onCompareToggle={() => toggleCompare(prop)}
               />
             ))}
-            
-            {/* Show placeholder cards if no listings available */}
-            {(!featured || featured.length === 0) && (!listings || listings.length === 0) && 
-              Array.from({ length: 8 }).map((_, index) => (
-                <div key={index} className="bg-white rounded-xl shadow-lg overflow-hidden animate-pulse">
-                  <div className="h-48 bg-gray-200"></div>
-                  <div className="p-4">
-                    <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-3/4 mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                  </div>
-                </div>
-              ))
-            }
           </div>
           <div className="text-center mt-12">
             <Link
@@ -781,6 +797,95 @@ const [isPaused, setIsPaused] = useState(false);
           </div>
         </div>
       </section>
+
+      {/* Floating Compare Bar */}
+      <AnimatePresence>
+        {compareProperties.length >= 1 && (
+          <motion.div
+            initial={{ y: 120, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 120, opacity: 0 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900/95 backdrop-blur-xl border border-white/10 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 max-w-2xl"
+          >
+            {/* Mini Thumbnails */}
+            <div className="flex items-center gap-2">
+              {compareProperties.map((prop, idx) => (
+                <div key={prop.id || prop.propertyId} className="relative group">
+                  <img
+                    src={prop.image || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=600'}
+                    alt={prop.title}
+                    className="w-10 h-10 rounded-lg object-cover"
+                  />
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleCompare(prop);
+                    }}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                    title="Remove from compare"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              {/* Empty Slots */}
+              {compareProperties.length < 3 && (
+                Array.from({ length: 3 - compareProperties.length }).map((_, idx) => (
+                  <div key={`empty-${idx}`} className="w-10 h-10 rounded-lg border-2 border-dashed border-white/30" />
+                ))
+              )}
+            </div>
+
+            {/* Divider */}
+            <div className="w-px h-12 bg-white/10" />
+
+            {/* Info and Actions */}
+            <div className="flex-1">
+              <div className="font-bold text-sm">{compareProperties.length}/3 selected</div>
+              <div className="text-xs text-white/60">
+                {compareProperties.length < 2 ? `Select ${2 - compareProperties.length} more to compare` : compareProperties.length === 2 ? 'Select 1 more to compare' : 'Ready to compare!'}
+              </div>
+            </div>
+
+            {/* Compare Button */}
+            {compareProperties.length >= 2 && (
+  <button
+    onClick={() => {
+      if (!isLoggedIn) { openLogin(); return; }
+      setIsCompareOpen(true);
+    }}
+    className="px-4 py-2 bg-cta text-white rounded-lg font-semibold text-sm hover:opacity-90 transition-opacity flex items-center gap-1.5"
+  >
+    {!isLoggedIn && (
+      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+      </svg>
+    )}
+    {isLoggedIn ? 'Compare Details' : 'Login to Compare'}
+  </button>
+)}
+
+            {/* Clear Button */}
+            <button
+              onClick={() => setCompareProperties([])}
+              className="text-white/60 hover:text-white text-xs font-medium transition-colors"
+            >
+              Clear
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Compare Modal */}
+      <CompareModal
+        isOpen={isCompareOpen}
+        onClose={() => {
+          setIsCompareOpen(false);
+          setCompareProperties([]);
+        }}
+        properties={compareProperties}
+      />
     </div>
   );
 }

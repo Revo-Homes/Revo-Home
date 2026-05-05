@@ -38,27 +38,25 @@ function SignupModal({ isOpen, onClose, onLoginClick }) {
     }
 
     setLoading(true);
-    setError('');
     try {
-      // Store signup data for post-verification profile update
-      const signupData = {
-        first_name: formData.name.split(' ')[0] || formData.name,
-        last_name: formData.name.split(' ').slice(1).join(' ') || '',
-        phone: formData.phone,
-        email: formData.email || null
-      };
-      sessionStorage.setItem('signup_data', JSON.stringify(signupData));
+      sessionStorage.setItem('signup_data', JSON.stringify({
+        first_name: formData.name.trim().split(' ')[0],
+        last_name: formData.name.trim().split(' ').slice(1).join(' '),
+        email: formData.email.trim() || undefined,
+        phone: formData.phone
+      }));
 
-      // Send OTP with signup mode to trigger auto-provisioning
-      const result = await sendOtp(formData.phone, 'sms', 'signup');
+      const result = await sendOtp(formData.phone, 'sms');
       if (result.success) {
         setStep('otp');
       } else {
         setError(result.message || 'Failed to send OTP. Please try again.');
+        sessionStorage.removeItem('signup_data');
       }
     } catch (err) {
       console.error('Signup OTP error:', err);
-      setError(err.message || 'Something went wrong. Please try again.');
+      setError('Something went wrong. Please try again.');
+      sessionStorage.removeItem('signup_data');
     } finally {
       setLoading(false);
     }
@@ -73,20 +71,19 @@ function SignupModal({ isOpen, onClose, onLoginClick }) {
     }
 
     setLoading(true);
-    setError('');
     try {
-      const result = await verifyOtp(formData.phone, otpValue, 'sms');
+      const result = await verifyOtp(formData.phone, otp.join(''), 'sms');
       if (result.success) {
         setSuccess(true);
         setTimeout(() => {
-          closeAuthModal();
-        }, 1500);
+          onClose();
+        }, 1000);
       } else {
         setError(result.message || 'Invalid OTP. Please try again.');
       }
     } catch (err) {
-      console.error('OTP verification error:', err);
-      setError(err.message || 'Invalid OTP. Please try again.');
+      console.error('Signup OTP verification error:', err);
+      setError('Invalid OTP. Please try again.');
     } finally {
       setLoading(false);
     }

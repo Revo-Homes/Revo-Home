@@ -93,7 +93,6 @@ function LoginModal({ isOpen, onClose }) {
 
       if (result.success) {
         onClose();
-        handlePhoneVerified(phone);
       } else {
         setError(result.message || 'Invalid OTP. Please try again.');
       }
