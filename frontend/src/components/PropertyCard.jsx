@@ -70,6 +70,8 @@ function PropertyCard({
   showCompare = false,
   isCompared = false,
   onCompareToggle,
+  organization_name = '', // New prop for organization name
+  organization_type = '', // New prop for organization type
 }) {
   const { toggleFavorite, isSaved } = useProperty();
   const { isLoggedIn, openLogin, user } = useAuth();
@@ -79,6 +81,8 @@ function PropertyCard({
   const normalizedId = idValue ? (isNaN(Number(idValue)) ? idValue : Number(idValue)) : null;
   const favoriteId = rawPropertyId || rawId;
   const normalizedFavoriteId = favoriteId ? (isNaN(Number(favoriteId)) ? favoriteId : Number(favoriteId)) : null;
+  const postedByName = (organization_name || developer || '').trim();
+  const showPostedBy = Boolean(postedByName);
 
   const [localFavorite, setLocalFavorite] = useState(false);
   
@@ -350,10 +354,10 @@ function PropertyCard({
             </div>
             <div className="min-w-0">
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">
-                {developer ? 'Builder' : 'Posted by'}
+                Posted by
               </span>
               <span className="text-xs font-black text-gray-700 truncate block">
-                {developer || (owner?.name && owner.name !== 'Property Owner' ? owner.name : 'Owner')}
+                {organization_name && organization_name.trim() ? organization_name : 'property owner'}
               </span>
             </div>
           </div>

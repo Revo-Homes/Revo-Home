@@ -1992,7 +1992,7 @@ function PropertyDetails() {
                   <div className="flex items-center gap-2 text-gray-600 text-base flex-wrap">
                     <MapPin className="text-primary flex-shrink-0" size={18} />
                     <span className="font-medium">{property.location}</span>
-                    <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">Rera Details: {property.rera_number || 'N/A'}</span>
+                    
                     {property.distance !== null && property.distance !== undefined && (
                       <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">
                         <Navigation size={11} />
