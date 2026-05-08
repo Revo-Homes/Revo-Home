@@ -139,6 +139,7 @@ export const propertyApi = {
 
   // Media
   getMedia: (id) => get(`/properties/${id}/media`),
+   getPropertyTags: (id) => get(`/properties/${id}/tags`),
   uploadImages: (id, formData) => {
     const url = buildUrl(`/properties/${id}/images`);
     return fetch(url, {

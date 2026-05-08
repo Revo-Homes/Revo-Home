@@ -344,40 +344,42 @@ function PropertyCard({
           )}
         </div>
         {/* Owner + RERA Strip — like MagicBricks/99acres */}
-        {(owner?.verified || rera_number || (owner?.name && owner.name !== 'Property Owner')) && (
-        <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <svg className="w-3.5 h-3.5 text-primary" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 12c2.66 0 4.8-2.14 4.8-4.8S14.66 2.4 12 2.4 7.2 4.54 7.2 7.2 9.34 12 12 12zm0 2.4c-3.2 0-9.6 1.61-9.6 4.8v2.4h19.2v-2.4c0-3.19-6.4-4.8-9.6-4.8z"/>
-              </svg>
-            </div>
-            <div className="min-w-0">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">
-                Posted by
-              </span>
-              <span className="text-xs font-black text-gray-700 truncate block">
-                {organization_name && organization_name.trim() ? organization_name : 'property owner'}
-              </span>
-            </div>
-          </div>
-{rera_number ? (
-  <span className="flex items-center gap-1 px-2.5 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-black uppercase tracking-wide flex-shrink-0 border border-green-100">
-    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-    </svg>
-    RERA Verified
-  </span>
-) : owner?.verified ? (
-  <span className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-black uppercase tracking-wide flex-shrink-0 border border-blue-100">
-    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-    </svg>
-    Verified
-  </span>
+        {(organization_name && organization_name.trim()) || rera_number || owner?.verified ? (
+<div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between gap-2">
+  {organization_name && organization_name.trim() && (
+    <div className="flex items-center gap-2 min-w-0">
+      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+        <svg className="w-3.5 h-3.5 text-primary" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 12c2.66 0 4.8-2.14 4.8-4.8S14.66 2.4 12 2.4 7.2 4.54 7.2 7.2 9.34 12 12 12zm0 2.4c-3.2 0-9.6 1.61-9.6 4.8v2.4h19.2v-2.4c0-3.19-6.4-4.8-9.6-4.8z"/>
+        </svg>
+      </div>
+      <div className="min-w-0">
+        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">
+          Posted by
+        </span>
+        <span className="text-xs font-black text-gray-700 truncate block">
+          {organization_name}
+        </span>
+      </div>
+    </div>
+  )}
+  {rera_number ? (
+    <span className="flex items-center gap-1 px-2.5 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-black uppercase tracking-wide flex-shrink-0 border border-green-100">
+      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+      </svg>
+      RERA Verified
+    </span>
+  ) : owner?.verified ? (
+    <span className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-black uppercase tracking-wide flex-shrink-0 border border-blue-100">
+      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+      </svg>
+      Verified
+    </span>
+  ) : null}
+</div>
 ) : null}
-        </div>
-        )}
         
         {footerActions && (
   <div
