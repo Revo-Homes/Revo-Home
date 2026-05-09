@@ -105,18 +105,50 @@ const Step5Location = ({
             </div>
           </div>
 
-          {/* Full Address */}
+          {/* Address Line 1 */}
           <div className="md:col-span-2 lg:col-span-3 space-y-2">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Full Address / Landmark *</label>
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Address Line 1 *</label>
             <div className="relative group">
-              <MapPinned className="absolute left-5 top-5 text-gray-400 group-focus-within:text-primary transition-colors w-6 h-6" />
-              <textarea
-                name="full_address"
-                value={formData.full_address}
+              <MapPinned className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors w-5 h-5" />
+              <input
+                type="text"
+                name="address_line1"
+                value={formData.address_line1}
                 onChange={handleChange}
-                placeholder="Building name, street, floor, landmark..."
-                rows={3}
-                className="w-full pl-14 pr-6 py-5 bg-gray-50/50 border-2 border-transparent rounded-[32px] focus:bg-white focus:border-primary outline-none text-sm font-bold text-gray-900 transition-all resize-none shadow-inner"
+                placeholder="Building name, street address..."
+                className="w-full pl-12 pr-4 py-4 bg-gray-50/50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-primary outline-none text-sm font-bold text-gray-900 transition-all shadow-inner"
+              />
+            </div>
+          </div>
+
+          {/* Address Line 2 */}
+          <div className="md:col-span-2 lg:col-span-3 space-y-2">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Address Line 2</label>
+            <div className="relative group">
+              <MapPinned className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors w-5 h-5" />
+              <input
+                type="text"
+                name="address_line2"
+                value={formData.address_line2}
+                onChange={handleChange}
+                placeholder="Floor, apartment number, etc."
+                className="w-full pl-12 pr-4 py-4 bg-gray-50/50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-primary outline-none text-sm font-bold text-gray-900 transition-all shadow-inner"
+              />
+            </div>
+          </div>
+
+          {/* Landmark */}
+          <div className="md:col-span-2 lg:col-span-3 space-y-2">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Landmark</label>
+            <div className="relative group">
+              <Navigation className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors w-5 h-5" />
+              <input
+                type="text"
+                name="landmark"
+                value={formData.landmark}
+                onChange={handleChange}
+                placeholder="Near... behind..."
+                className="w-full pl-12 pr-4 py-4 bg-gray-50/50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-primary outline-none text-sm font-bold text-gray-900 transition-all shadow-inner"
               />
             </div>
           </div>
@@ -205,8 +237,8 @@ const Step5Location = ({
               <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">RERA Number *</label>
               <input
                 type="text"
-                name="rera_id"
-                value={formData.rera_id}
+                name="rera_number"
+                value={formData.rera_number}
                 onChange={handleChange}
                 placeholder={reraPlaceholder}
                 className="w-full px-6 py-5 bg-white border-2 border-primary/20 rounded-[24px] focus:border-primary outline-none text-base font-black text-gray-900 transition-all shadow-xl shadow-primary/5"

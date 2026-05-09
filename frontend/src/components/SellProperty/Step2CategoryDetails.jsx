@@ -410,20 +410,59 @@ const Step2CategoryDetails = ({
             </div>
           </div>
 
-          {/* Age of Property */}
+          {/* Year Built */}
           <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Property Age</label>
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Year Built</label>
             <div className="relative group">
-              <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors w-5 h-5 z-10" />
+              <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors w-5 h-5" />
+              <input
+                type="number"
+                name="year_built"
+                value={formData.year_built}
+                onChange={handleChange}
+                placeholder="e.g. 2015"
+                className="w-full pl-12 pr-4 py-4 bg-white border-2 border-gray-100 rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/5 outline-none text-sm font-bold text-gray-900 transition-all shadow-sm"
+              />
+            </div>
+          </div>
+          {/* Furnishing Status */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Furnishing</label>
+            <div className="relative group">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors w-5 h-5 z-10">
+                <Home size={20} />
+              </div>
               <select
-                name="age_of_property"
-                value={formData.age_of_property}
+                name="furnishing_status"
+                value={formData.furnishing_status}
                 onChange={handleChange}
                 className="w-full pl-12 pr-4 py-4 bg-white border-2 border-gray-100 rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/5 outline-none text-sm font-bold text-gray-900 transition-all appearance-none cursor-pointer shadow-sm relative z-0"
               >
-                <option value="">Select Age</option>
-                {(formOptions.property_age || []).map((age) => (
-                  <option key={age.value || age} value={age.value || age}>{age.label || age}</option>
+                <option value="">Select Furnishing</option>
+                {(formOptions.furnishing_status || []).map((f) => (
+                  <option key={f.value || f} value={f.value || f}>{f.label || f}</option>
+                ))}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+              </div>
+            </div>
+          </div>
+
+          {/* Facing Direction */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Facing</label>
+            <div className="relative group">
+              <Navigation className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors w-5 h-5 z-10" />
+              <select
+                name="facing_direction"
+                value={formData.facing_direction}
+                onChange={handleChange}
+                className="w-full pl-12 pr-4 py-4 bg-white border-2 border-gray-100 rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/5 outline-none text-sm font-bold text-gray-900 transition-all appearance-none cursor-pointer shadow-sm relative z-0"
+              >
+                <option value="">Select Facing</option>
+                {(formOptions.facing_direction || []).map((d) => (
+                  <option key={d.value || d} value={d.value || d}>{d.label || d}</option>
                 ))}
               </select>
               <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">

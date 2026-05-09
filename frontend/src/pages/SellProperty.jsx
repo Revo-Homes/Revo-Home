@@ -54,55 +54,123 @@ function SellProperty() {
 
   const [formData, setFormData] = useState({
     name: "",
-    property_title_tagline: "",
-    description: "",
-    propertyType: "",
-    propertySubType: "",
+    slug: "",
     property_type_id: "",
+    property_type_slug: "",
     property_category_id: "",
+    property_category_slug: "",
+    property_subcategory_id: "",
+    property_subcategory_slug: "",
     listingType: "Sale",
+    listing_type: "sale",
     property_condition: "",
-    sale_urgency: "",
-    status: "draft",
+    sale_urgency: "Normal",
+    description: "",
+    status: "active",
+    is_featured: false,
+    is_verified: false,
+    is_published: false,
     is_builder_listed: false,
     builder_id: "",
-    builder_name: "",
+    listed_by_type: "owner", // Default to owner for revo-home additions
+    listed_by_id: "",
+    listed_by_name: "",
+
+    address_line1: "",
+    address_line2: "",
+    city: "",
+    state: "Maharashtra",
+    country: "IN",
+    zip_code: "",
+    locality: "",
+    landmark: "",
+    near_metro_distance: "",
+    near_metro_distance_custom: "",
+    near_busstand_distance: "",
+    near_busstand_distance_custom: "",
+    near_railway_distance: "",
+    near_railway_distance_custom: "",
+    near_airport_distance: "",
+    near_airport_distance_custom: "",
+    near_highway_distance: "",
+    near_highway_distance_custom: "",
+    near_auto_taxi_distance: "",
+    near_auto_taxi_distance_custom: "",
+    near_hospital_distance: "",
+    near_hospital_distance_custom: "",
+    near_school_distance: "",
+    near_school_distance_custom: "",
+    near_market_distance: "",
+    near_market_distance_custom: "",
+    latitude: "",
+    longitude: "",
+
+    // Property Details
     selectedBHKs: [],
     bhkDetails: [],
-    total_area: "",
+    bhk: "",
+    bathrooms: "",
+    unit_name: "",
+    carpet_area: "",
     builtup_area: "",
-    area_unit: "sqft",
-    total_floors: "",
+    super_builtup_area: "",
     floor_number: "",
-    age_of_property: "",
+    furnishing_status: "",
+    water_source: "",
+    construction_quality: "",
+    parking_type: "",
+    parking_spaces: "",
+    power_backup: false,
+    lift_available: false,
+    rainwater_harvesting: false,
+    security_24x7: false,
+    pet_friendly: false,
+    vegan_friendly: false,
+    is_corner_unit: false,
+    vaastu_compliance: false,
+    smart_home_features: false,
+    otherFeatureEnabled: false,
+    otherFeature: "",
+
+    // Specifications
+    total_units: "0",
+    total_floors: "0",
+    total_area: "",
+    area_unit: "sqft",
+    year_built: "",
+    possession_date: "",
+    facing_direction: "",
+
+    features: [],
+    features_text: "",
+
     price_min: "",
     price_max: "",
+    price_per_sqft: "",
     rent_amount: "",
     security_deposit: "",
     maintenance_charges: "",
-    maintenance_charges_frequency: "monthly",
     price_on_request: false,
     negotiable: true,
-    available_from: "",
-    lock_in_period: "",
-    lease_appreciation: "",
-    city: "",
-    locality: "",
-    zip_code: "",
-    full_address: "",
-    state: "Maharashtra",
-    latitude: "",
-    longitude: "",
-    rera_registered: false,
-    rera_id: "",
-    rera_state: "",
-    features: [],
-    metaTitle: "",
-    metaDescription: "",
-    metaKeywords: "",
-    images: [],
-    imagePreviews: [],
-    documents: [],
+    currency: "INR",
+
+    rera_number: "",
+    rera_expiry_date: "",
+
+    meta_title: "",
+    meta_description: "",
+    meta_text: "{}",
+
+    media_items: [],
+    imagePreviews: [], // Used for UI previews
+
+    // Resale Property Documents
+    resale_documents: [],
+
+    // Tags/Labels
+    selectedTags: [],
+
+    terms_accepted: false,
   });
 
   const [errors, setErrors] = useState({});
@@ -153,15 +221,49 @@ function SellProperty() {
         try {
           const p = await getProperty(editId);
           if (p) {
-            // Map backend data to formData
+            console.log('[SellProperty] Loading property for edit:', p);
+
+            // Map backend data to formData with proper field mapping
             setFormData(prev => ({
               ...prev,
               ...p,
+
+              // Basic property info
               listingType: p.listing_type ? p.listing_type.charAt(0).toUpperCase() + p.listing_type.slice(1) : prev.listingType,
               propertyType: p.property_type?.name || p.propertyType,
               propertySubType: p.property_category?.name || p.propertySubType,
-              bhkDetails: p.bhk_details || [],
-              selectedBHKs: (p.bhk_details || []).map(d => d.type_slug || d.type),
+
+              // BHK details
+              bhkDetails: p.bhk_details || p.meta?.bhk_details || [],
+              selectedBHKs: (p.bhk_details || p.meta?.bhk_details || []).map(d => d.type_slug || d.type),
+
+              // Fix: Property condition and urgency
+              property_condition: p.property_condition || '',
+              sale_urgency: p.sale_urgency || '',
+
+              // Fix: RERA fields mapping
+              // Backend returns: rera_number, rera_state (mapped from property state)
+              // Frontend form uses: rera_registered, rera_id, rera_state
+              rera_registered: !!(p.rera_number || p.rera_id),
+              rera_id: p.rera_number || p.rera_id || '',
+              rera_state: p.rera_state || p.state || '',
+
+              // Fix: State field
+              state: p.state || '',
+
+              // Fix: Floor numbers
+              total_floors: p.total_floors || '',
+              floor_number: p.unit_floor_number || p.floor_number || '',
+
+              // Fix: Floor images / floor plans
+              floorImages: p.floor_plans || p.floorImages || [],
+
+              // Fix: Images - handle both formats
+              images: p.images || p.imagePreviews || [],
+              imagePreviews: p.images || p.imagePreviews || p.primary_image_url ? [p.primary_image_url] : [],
+
+              // Fix: Nearby locations
+              nearby_locations: p.nearby || p.nearby_locations || [],
             }));
           }
         } catch (err) {
@@ -355,12 +457,129 @@ function SellProperty() {
 
     setSubmitting(true);
     try {
+      // Helper to safely convert to number
+      const toNumber = (val) => {
+        if (val == null || val === "") return null;
+        const num = Number(val);
+        return isNaN(num) ? null : num;
+      };
+      
+      const toISOString = (dateVal) => {
+        if (!dateVal) return null;
+        try {
+          const date = new Date(dateVal);
+          return isNaN(date.getTime()) ? null : date.toISOString();
+        } catch {
+          return null;
+        }
+      };
+
+      // Extract plain text from description if it's HTML
+      const getPlainText = (html) => {
+        if (!html) return "";
+        return html.replace(/<[^>]+>/g, "").trim();
+      };
+
       const payload = {
-        ...formData,
-        listing_type: formData.listingType.toLowerCase(),
-        property_kind: propertyKind,
-        nearby_locations: nearbyLocations,
-        amenities: formData.features
+        organization_id: 1, // Revo Homes
+        created_by: user?.id,
+        property: {
+          name: formData.name?.trim() || "",
+          slug: formData.slug || formData.name?.toLowerCase().replace(/\s+/g, '-'),
+          property_type_id: toNumber(formData.property_type_id),
+          property_category_id: toNumber(formData.property_category_id),
+          listing_type: formData.listing_type.toLowerCase(),
+          property_condition: formData.property_condition || undefined,
+          sale_urgency: formData.sale_urgency || "Normal",
+          description: getPlainText(formData.description),
+          
+          // Role logic: Default to owner for additions via Home frontend
+          listed_by_type: "owner",
+          listed_by_id: user?.id,
+          listed_by_name: `${user?.first_name || ""} ${user?.last_name || ""}`.trim(),
+
+          // Detailed configurations
+          bhk: formData.bhk || undefined,
+          bhk_details: formData.bhkDetails.map(d => ({
+            ...d,
+            price: toNumber(d.price),
+            carpet_area: toNumber(d.carpet_area)
+          })),
+          bathrooms: toNumber(formData.bathrooms),
+          unit_name: formData.unit_name || undefined,
+          floor_number: toNumber(formData.floor_number),
+          furnishing_status: formData.furnishing_status || undefined,
+          water_source: formData.water_source || undefined,
+          parking_type: formData.parking_type || undefined,
+
+          address: {
+            line1: formData.address_line1 || formData.full_address || "",
+            line2: formData.address_line2 || "",
+            city: formData.city || "",
+            state: formData.state || "",
+            country: formData.country || "IN",
+            zip_code: formData.zip_code || "",
+            locality: formData.locality || "",
+            landmark: formData.landmark || "",
+            latitude: toNumber(formData.latitude),
+            longitude: toNumber(formData.longitude),
+          },
+
+          dimensions: {
+            total_units: toNumber(formData.total_units) || 0,
+            total_floors: toNumber(formData.total_floors) || 0,
+            total_area: toNumber(formData.total_area),
+            builtup_area: toNumber(formData.builtup_area),
+            carpet_area: toNumber(formData.carpet_area),
+            area_unit: formData.area_unit || "sqft",
+          },
+
+          construction: {
+            year_built: toNumber(formData.year_built),
+            possession_date: toISOString(formData.possession_date),
+            facing_direction: formData.facing_direction || undefined,
+          },
+
+          location_insights: {
+            distance_from_key_locations: {
+              near_metro: formData.near_metro_distance || undefined,
+              near_busstand: formData.near_busstand_distance || undefined,
+              near_railway: formData.near_railway_distance || undefined,
+              near_airport: formData.near_airport_distance || undefined,
+              near_highway: formData.near_highway_distance || undefined,
+              near_hospital: formData.near_hospital_distance || undefined,
+              near_school: formData.near_school_distance || undefined,
+              near_market: formData.near_market_distance || undefined,
+            },
+          },
+
+          pricing: {
+            price_min: toNumber(formData.price_min),
+            price_max: toNumber(formData.price_max),
+            price_on_request: Boolean(formData.price_on_request),
+            currency: formData.currency || "INR",
+            rent_amount: toNumber(formData.rent_amount),
+            security_deposit: toNumber(formData.security_deposit),
+            maintenance_charge: toNumber(formData.maintenance_charges),
+          },
+
+          status: {
+            status: formData.status || "active",
+            is_featured: Boolean(formData.is_featured),
+            is_verified: Boolean(formData.is_verified),
+            is_published: Boolean(formData.is_published),
+          },
+
+          meta: {
+            title: formData.meta_title || formData.name,
+            description: formData.meta_description || getPlainText(formData.description).substring(0, 160),
+            keywords: formData.metaKeywords || "",
+          },
+
+          features: {
+            amenities: formData.features || []
+          }
+        }
       };
 
       let result;
@@ -370,7 +589,7 @@ function SellProperty() {
         result = await createProperty(payload);
       }
 
-      if (result && formData.images.length > 0) {
+      if (result && formData.images && formData.images.length > 0) {
         const uploadId = result.propertyId || result.id || result.data?.id;
         await uploadPropertyImages(uploadId, formData.images);
       }

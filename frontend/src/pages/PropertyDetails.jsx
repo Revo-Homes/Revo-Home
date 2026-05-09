@@ -1951,8 +1951,8 @@ function PropertyDetails() {
                     document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                   }}
                   className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-all ${activeTab === item.id
-                      ? 'bg-primary text-white shadow-md'
-                      : 'text-gray-600 hover:bg-gray-100'
+                    ? 'bg-primary text-white shadow-md'
+                    : 'text-gray-600 hover:bg-gray-100'
                     }`}
                 >
                   {item.label}
@@ -1992,7 +1992,7 @@ function PropertyDetails() {
                   <div className="flex items-center gap-2 text-gray-600 text-base flex-wrap">
                     <MapPin className="text-primary flex-shrink-0" size={18} />
                     <span className="font-medium">{property.location}</span>
-                    <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">Rera Details: {property.rera_number || 'N/A'}</span>
+
                     {property.distance !== null && property.distance !== undefined && (
                       <span className="inline-flex items-center gap-2 px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">
                         <Navigation size={11} />
@@ -2014,8 +2014,8 @@ function PropertyDetails() {
                   <button
                     onClick={handleToggleFavorite}
                     className={`p-3 rounded-xl transition-all duration-300 shadow-lg flex items-center justify-center ${saved
-                        ? 'bg-red-50 text-red-500 scale-105 shadow-red-200/50 hover:scale-110'
-                        : 'bg-gray-50 text-gray-400 hover:text-red-400 hover:bg-white hover:scale-105 shadow-gray-200/50'
+                      ? 'bg-red-50 text-red-500 scale-105 shadow-red-200/50 hover:scale-110'
+                      : 'bg-gray-50 text-gray-400 hover:text-red-400 hover:bg-white hover:scale-105 shadow-gray-200/50'
                       } border border-white`}
                     title={saved ? 'Remove from saved' : 'Save property'}
                   >
@@ -2181,8 +2181,8 @@ function PropertyDetails() {
                             key={bhk}
                             onClick={() => setActiveBhkTab(bhk)}
                             className={`px-3 py-1 text-xs font-semibold rounded-full transition-all ${activeBhkTab === bhk
-                                ? 'bg-primary text-white'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              ? 'bg-primary text-white'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                               }`}
                           >
                             {bhk === 'all' ? 'All' : `${bhk} BHK`}

@@ -350,7 +350,9 @@ function PropertyCard({
             </div>
             <div className="min-w-0">
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">
-                {developer ? 'Builder' : 'Posted by'}
+                {owner?.type === 'organisation' 
+                  ? (owner?.organization_type === 'builder' ? 'Builder' : 'Agency') 
+                  : (developer ? 'Builder' : 'Posted by')}
               </span>
               <span className="text-xs font-black text-gray-700 truncate block">
                 {developer || (owner?.name && owner.name !== 'Property Owner' ? owner.name : 'Owner')}

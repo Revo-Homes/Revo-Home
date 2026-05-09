@@ -55,14 +55,18 @@ function Signup({ isModal = false }) {
     
     try {
       // For Revo Homes users, use Phone OTP for Signup
-      const result = await useAuth().sendOtp(cleanPhone, 'sms');
+      const result = await useAuth().sendOtp(cleanPhone, 'sms', 'signup');
       
       if (result.success) {
+        if (!result.is_new_user) {
+          setError('An account already exists with this mobile number. Please Login.');
+          return;
+        }
+        
         // Redirect to OTP verify with Signup data context
-        // Note: For now we'll just open the modal or navigate
         openOtp('sms', cleanPhone);
         
-        // Optional: Store registration info in session storage to use after verification
+        // Store registration info in session storage to use after verification
         sessionStorage.setItem('signup_data', JSON.stringify({
           first_name: formData.name.split(' ')[0],
           last_name: formData.name.split(' ').slice(1).join(' '),

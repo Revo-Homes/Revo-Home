@@ -7,9 +7,9 @@ const Step4Pricing = ({
   handleChange,
   propertyKind
 }) => {
-  const isSale = formData.listingType === 'Sale';
-  const isRent = formData.listingType === 'Rent';
-  const isLease = formData.listingType === 'Lease';
+  const isSale = formData.listing_type === 'sale';
+  const isRent = formData.listing_type === 'rent';
+  const isLease = formData.listing_type === 'lease';
 
   return (
     <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">

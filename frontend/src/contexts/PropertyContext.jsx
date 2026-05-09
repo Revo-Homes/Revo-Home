@@ -387,13 +387,20 @@ const bhk = bhkFromMeta
     developer: item.developer || item.organization_name || '',
     possessionDate: item.possession_date || item.available_from || '',
     rera_number: item.rera_number || item.rera_no || item.rera || meta?.rera_number || meta?.rera_no || '',
+    rera_state: item.rera_state || item.state || '',
+    property_condition: item.property_condition || '',
+    sale_urgency: item.sale_urgency || '',
     floorNumber: item.unit_floor_number || meta?.floor_number || null,
     totalFloors: item.total_floors || meta?.dimensions?.total_floors || null,
     constructionQuality: item.unit_construction_quality || meta?.construction?.construction_quality || '',
+    floor_plans: item.floor_plans || [],
+    floors: item.floors || [],
     owner: {
-      name: item.owner_name || item.organization_name || 'Property Owner',
+      name: item.owner_name || item.listed_by_name || meta.listed_by_name || item.organization_name || 'Property Owner',
       phone: item.owner_phone || item.organization_phone || '',
       email: item.owner_email || item.organization_email || '',
+      type: item.listed_by_type || meta.listed_by_type || (item.organization_name ? 'organisation' : 'owner'),
+      organization_type: item.organization_type,
       verified: Boolean(item.is_verified || item.property_is_verified),
     },
     owner_id: item.owner_id || item.created_by || null,
@@ -477,7 +484,7 @@ export function PropertyProvider({ children }) {
     do {
       const response = await listingApi.search({
         ...params,
-        organization_id: 1, // Restrict to Revo Homes organization
+        // organization_id: 1, // Removed hardcoded restriction to allow all organizations
         status: params.status || 'active', // Only show active properties by default
         page: currentPage,
         limit: params.limit || LISTINGS_PAGE_SIZE,

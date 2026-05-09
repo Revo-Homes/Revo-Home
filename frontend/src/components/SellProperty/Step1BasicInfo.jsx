@@ -53,17 +53,17 @@ const Step1BasicInfo = ({
           </div>
         </div>
 
-        {/* Tagline */}
+        {/* Meta Title / Tagline */}
         <div className="space-y-2">
           <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-            Property Tagline / Title
+            Property Title / Tagline
           </label>
           <div className="relative group">
             <Sparkles className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors w-5 h-5" />
             <input
               type="text"
-              name="property_title_tagline"
-              value={formData.property_title_tagline}
+              name="meta_title"
+              value={formData.meta_title}
               onChange={handleChange}
               placeholder="e.g. Luxury Living at its Best"
               className="w-full pl-12 pr-4 py-4 bg-white border-2 border-gray-100 rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/5 outline-none text-sm font-bold text-gray-900 transition-all placeholder:text-gray-300 shadow-sm"
@@ -79,19 +79,25 @@ const Step1BasicInfo = ({
           <div className="relative group">
             <LayoutDashboard className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors w-5 h-5 z-10" />
             <select
-              name="propertyType"
-              value={formData.propertyType}
+              name="property_type_id"
+              value={formData.property_type_id}
               onChange={(e) => {
-                const val = e.target.value;
-                const selectedType = (formOptions.property_types || []).find((type) => getOptionLabel(type) === val);
-                const id = selectedType?.id ?? selectedType?.value ?? '';
+                const id = e.target.value;
+                const selectedType = (formOptions.property_types || []).find((type) => String(type.id || type.value) === String(id));
+                const typeName = getOptionLabel(selectedType);
+                const typeSlug = getOptionValue(selectedType);
+
                 setFormData(prev => ({
                   ...prev,
-                  propertyType: getOptionLabel(selectedType) || val,
+                  propertyType: typeName,
                   property_type_id: id,
+                  property_type_slug: typeSlug,
                   property_category_id: '',
+                  property_category_slug: '',
                   propertySubType: '',
                   property_subtype: '',
+                  property_subcategory_id: '',
+                  property_subcategory_slug: '',
                   selectedBHKs: [],
                   bhkDetails: []
                 }));
@@ -100,9 +106,10 @@ const Step1BasicInfo = ({
             >
               <option value="">Select Type</option>
               {(formOptions.property_types || []).map((type) => {
+                const typeId = type.id || type.value;
                 const typeName = getOptionLabel(type);
                 return (
-                  <option key={type.id || type.value || typeName} value={typeName}>{typeName}</option>
+                  <option key={typeId} value={typeId}>{typeName}</option>
                 );
               })}
             </select>
@@ -112,46 +119,47 @@ const Step1BasicInfo = ({
           </div>
         </div>
 
-        {/* Property Sub-type */}
+        {/* Property Sub-type / Category */}
         <div className="space-y-2">
           <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-            Property Sub-type
+            Property Category
           </label>
           <div className="relative group">
             <Tag className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors w-5 h-5 z-10" />
             <select
-              name="propertySubType"
-              value={formData.propertySubType}
+              name="property_category_id"
+              value={formData.property_category_id}
               onChange={(e) => {
-                const val = e.target.value;
-                const selectedCategory = (formOptions.property_categories || []).find((category) => getOptionLabel(category) === val);
-                const subTypeLabel = getOptionLabel(selectedCategory) || val;
-                const subTypeSlug = getOptionValue(selectedCategory) || val;
+                const id = e.target.value;
+                const selectedCategory = (formOptions.property_categories || []).find((category) => String(category.id || category.value) === String(id));
+                const categoryLabel = getOptionLabel(selectedCategory);
+                const categorySlug = getOptionValue(selectedCategory);
 
                 setFormData(prev => {
                   let updatedSelectedBHKs = [...prev.selectedBHKs];
                   let updatedBhkDetails = [...prev.bhkDetails];
 
-                  // If previous sub-type was a BHK, remove it to keep in sync with new selection
+                  // If previous category was a BHK, remove it to keep in sync with new selection
                   const prevIsBhk = prev.propertySubType?.toLowerCase().includes('bhk') || prev.propertySubType?.toLowerCase().includes('rk');
-                  if (prevIsBhk && prev.propertySubType !== subTypeLabel) {
+                  if (prevIsBhk && prev.propertySubType !== categoryLabel) {
                     updatedSelectedBHKs = updatedSelectedBHKs.filter(s => s !== prev.propertySubType);
                     updatedBhkDetails = updatedBhkDetails.filter(d => (d.type_slug || d.type) !== prev.propertySubType);
                   }
 
                   const newState = {
                     ...prev,
-                    propertySubType: subTypeLabel,
-                    property_subtype: subTypeSlug,
-                    property_category_id: selectedCategory?.id ?? selectedCategory?.value ?? '',
+                    propertySubType: categoryLabel,
+                    property_subtype: categorySlug,
+                    property_category_id: id,
+                    property_category_slug: categorySlug,
                     selectedBHKs: updatedSelectedBHKs,
                     bhkDetails: updatedBhkDetails
                   };
 
-                  // Auto-sync new BHK configuration if sub-type is a BHK type
-                  const isBhk = subTypeLabel.toLowerCase().includes('bhk') || subTypeLabel.toLowerCase().includes('rk');
+                  // Auto-sync new BHK configuration if category is a BHK type
+                  const isBhk = categoryLabel.toLowerCase().includes('bhk') || categoryLabel.toLowerCase().includes('rk');
                   if (isBhk) {
-                    const bhkValue = subTypeLabel;
+                    const bhkValue = categoryLabel;
                     // Check if already selected to avoid duplicates
                     if (!newState.selectedBHKs.includes(bhkValue)) {
                       newState.selectedBHKs = [...newState.selectedBHKs, bhkValue];
@@ -159,7 +167,7 @@ const Step1BasicInfo = ({
                         ...newState.bhkDetails,
                         {
                           type: bhkValue,
-                          type_slug: subTypeSlug,
+                          type_slug: categorySlug,
                           bathrooms: '1',
                           kitchens: '1',
                           carpet_area: '',
@@ -172,16 +180,20 @@ const Step1BasicInfo = ({
                   return newState;
                 });
               }}
-              disabled={!formData.propertyType}
+              disabled={!formData.property_type_id}
               className="w-full pl-12 pr-4 py-4 bg-white border-2 border-gray-100 rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/5 outline-none text-sm font-bold text-gray-900 transition-all appearance-none cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed shadow-sm relative z-0"
             >
-              <option value="">Select Sub-type</option>
-              {formData.propertyType && getCategoriesForSelectedType(formData, formOptions)
-                .map((category) => (
-                  <option key={category.value || category.id || category.slug} value={getOptionLabel(category)}>
-                    {getOptionLabel(category)}
-                  </option>
-                ))}
+              <option value="">Select Category</option>
+              {formData.property_type_id && getCategoriesForSelectedType(formData, formOptions)
+                .map((category) => {
+                  const catId = category.id || category.value || category.slug;
+                  const catName = getOptionLabel(category);
+                  return (
+                    <option key={catId} value={catId}>
+                      {catName}
+                    </option>
+                  );
+                })}
             </select>
             <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
               <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
@@ -202,7 +214,7 @@ const Step1BasicInfo = ({
                 <button
                   key={type}
                   type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, listingType: type }))}
+                  onClick={() => setFormData(prev => ({ ...prev, listingType: type, listing_type: type.toLowerCase() }))}
                   className={`flex-1 py-3 text-sm font-black uppercase tracking-widest rounded-xl transition-all ${isSelected
                       ? 'bg-white text-primary shadow-md border-2 border-primary/10'
                       : 'text-gray-400 hover:text-gray-600'
@@ -303,7 +315,7 @@ const Step1BasicInfo = ({
               setFormData(prev => ({
                 ...prev,
                 description: val,
-                metaDescription: newMeta
+                meta_description: newMeta
               }));
             }}
           />

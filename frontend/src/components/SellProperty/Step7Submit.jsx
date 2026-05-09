@@ -51,16 +51,16 @@ const Step7Submit = ({
               <Globe className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors w-5 h-5" />
               <input
                 type="text"
-                name="metaTitle"
-                value={formData.metaTitle}
+                name="meta_title"
+                value={formData.meta_title}
                 onChange={handleChange}
                 placeholder="e.g. Luxury 3BHK Apartment in Andheri West | Revo Homes"
                 className="w-full pl-14 pr-6 py-5 bg-gray-50/50 border-2 border-transparent rounded-[24px] focus:bg-white focus:border-primary outline-none text-base font-black text-gray-900 transition-all shadow-inner"
               />
             </div>
             <div className="flex justify-end pr-2">
-              <span className={`text-[9px] font-black uppercase ${formData.metaTitle?.length > 60 ? 'text-red-500' : 'text-gray-400'}`}>
-                {formData.metaTitle?.length || 0} / 60
+              <span className={`text-[9px] font-black uppercase ${formData.meta_title?.length > 60 ? 'text-red-500' : 'text-gray-400'}`}>
+                {formData.meta_title?.length || 0} / 60
               </span>
             </div>
           </div>
@@ -71,8 +71,8 @@ const Step7Submit = ({
             <div className="relative group">
               <Info className="absolute left-6 top-6 text-gray-400 group-focus-within:text-primary transition-colors w-6 h-6" />
               <textarea
-                name="metaDescription"
-                value={formData.metaDescription}
+                name="meta_description"
+                value={formData.meta_description}
                 onChange={handleChange}
                 placeholder="Briefly describe the property, amenities, and location benefits..."
                 rows={4}
@@ -80,8 +80,8 @@ const Step7Submit = ({
               />
             </div>
             <div className="flex justify-end pr-2">
-              <span className={`text-[9px] font-black uppercase ${formData.metaDescription?.length > 160 ? 'text-red-500' : 'text-gray-400'}`}>
-                {formData.metaDescription?.length || 0} / 160
+              <span className={`text-[9px] font-black uppercase ${formData.meta_description?.length > 160 ? 'text-red-500' : 'text-gray-400'}`}>
+                {formData.meta_description?.length || 0} / 160
               </span>
             </div>
           </div>
@@ -91,8 +91,8 @@ const Step7Submit = ({
             <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Keywords (Comma separated)</label>
             <input
               type="text"
-              name="metaKeywords"
-              value={formData.metaKeywords}
+              name="meta_keywords"
+              value={formData.meta_keywords}
               onChange={handleChange}
               placeholder="3BHK, Luxury, Apartment, Mumbai, Real Estate..."
               className="w-full px-8 py-5 bg-gray-50/50 border-2 border-transparent rounded-[24px] focus:bg-white focus:border-primary outline-none text-sm font-bold text-gray-900 transition-all shadow-inner"

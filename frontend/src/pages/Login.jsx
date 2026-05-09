@@ -30,15 +30,16 @@ function Login({ isModal = false, isPropertyDetails = false }) {
     setLoading(true);
     try {
       // Send OTP to the backend
-      const result = await sendOtp(identifier, 'sms');
+      const result = await sendOtp(identifier, 'sms', 'login');
       if (result.success) {
+        if (result.is_new_user) {
+          setError('No account found with this mobile number. Please Sign Up first.');
+          return;
+        }
         openOtp('sms', identifier);
-        
-        // Note: Don't simulate login success here
-        // Let the user go through proper OTP verification flow
         console.log('OTP sent successfully, waiting for verification');
       } else {
-        navigate('/otp-verify', { state: { method: 'sms', identifier } });
+        setError(result.message || 'Failed to send OTP. Please try again.');
       }
     } catch (err) {
       console.error('Login error:', err);
