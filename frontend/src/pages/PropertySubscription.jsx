@@ -22,25 +22,14 @@ const FALLBACK_PLANS = [
     slug: 'owner-simple-sell',
     name: 'Simple Plan',
     displayName: 'Simple Plan',
-    priceLabel: '₹15,000',
+    priceLabel: 'Rs. 15,000',
     basePrice: 15000,
     billingCycle: 'one_time',
     maxProperties: 1,
     maxListings: null,
     serviceValidityDays: 60,
     features: {
-      guaranteedSell: false,
-      propertyShowcaseVideo: true,
-      propertyListing: true,
-      brokerNetworkPromotion: true,
-      filteredInquiries: false,
-      whatsappMarketing: false,
-      negotiationSupport: false,
-      siteVisitSupport: false,
-      landingPageSupport: false,
-      classifiedAds: false,
-      relationshipManager: false,
-      closingManager: false
+      included_features: ['Paid upfront', 'Privacy of phone number', 'Property showcase video', 'Property listing', 'Broker network promotion', 'Raw inquiries', 'Prompt reply to inquiries', 'Property agreement service']
     },
     quotaConfig: { properties: 1 },
     isPopular: false,
@@ -53,25 +42,14 @@ const FALLBACK_PLANS = [
     slug: 'owner-advance-sell',
     name: 'Advance Plan',
     displayName: 'Advance Plan',
-    priceLabel: '₹50,000',
+    priceLabel: 'Rs. 50,000',
     basePrice: 50000,
     billingCycle: 'one_time',
     maxProperties: 1,
     maxListings: null,
     serviceValidityDays: 120,
     features: {
-      guaranteedSell: true,
-      propertyShowcaseVideo: true,
-      propertyListing: true,
-      brokerNetworkPromotion: true,
-      filteredInquiries: true,
-      whatsappMarketing: true,
-      negotiationSupport: true,
-      siteVisitSupport: false,
-      landingPageSupport: false,
-      classifiedAds: false,
-      relationshipManager: true,
-      closingManager: true
+      included_features: ['Guaranteed Sell', 'Instagram Reels', 'Privacy of phone number', 'Property showcase video', 'Property listing', 'Filtered inquiries', 'WhatsApp marketing', 'Negotiation support', 'Progress reports', 'Relationship manager', 'Closing manager', 'Money-back guarantee']
     },
     quotaConfig: { properties: 1 },
     isPopular: true,
@@ -85,25 +63,14 @@ const FALLBACK_PLANS = [
     slug: 'owner-master-sell',
     name: 'Master Plan',
     displayName: 'Master Plan',
-    priceLabel: '₹1,00,000',
+    priceLabel: 'Rs. 1,00,000',
     basePrice: 100000,
     billingCycle: 'one_time',
     maxProperties: 1,
     maxListings: null,
     serviceValidityDays: 150,
     features: {
-      guaranteedSell: true,
-      propertyShowcaseVideo: true,
-      propertyListing: true,
-      brokerNetworkPromotion: true,
-      filteredInquiries: true,
-      whatsappMarketing: true,
-      negotiationSupport: true,
-      siteVisitSupport: true,
-      landingPageSupport: true,
-      classifiedAds: true,
-      relationshipManager: true,
-      closingManager: true
+      included_features: ['Guaranteed Sell', '0 percent closure commission', 'Instagram Reels', 'Property showcase video', 'Property listing', 'Filtered inquiries', 'WhatsApp marketing', 'Negotiation support', 'Site visit support', 'Landing page support', 'Newspaper classified ad', 'Relationship manager', 'Closing manager', 'Money-back guarantee']
     },
     quotaConfig: { properties: 1 },
     isPopular: false,
@@ -114,8 +81,77 @@ const FALLBACK_PLANS = [
   }
 ];
 
+const RENT_FALLBACK_PLANS = [
+  {
+    id: 'rent-basic',
+    slug: 'rent-basic',
+    name: 'Basic Rent Plan',
+    displayName: 'Basic Rent Plan',
+    priceLabel: 'Rs. 10,000',
+    basePrice: 10000,
+    billingCycle: 'one_time',
+    maxProperties: 1,
+    serviceValidityDays: 60,
+    features: {
+      included_features: ['Paid upfront', 'Privacy of phone number', 'Property showcase video', 'Property listing', 'Rental agreement support', 'Inquiry management', 'Raw leads', 'Relationship manager', 'Residential segment']
+    },
+    quotaConfig: { properties: 1 },
+    isPopular: false,
+    isRecommended: false,
+    hasGuarantee: false,
+    commissionPercent: null
+  },
+  {
+    id: 'rent-premium',
+    slug: 'rent-premium',
+    name: 'Premium Rent Plan',
+    displayName: 'Premium Rent Plan',
+    priceLabel: 'Rs. 25,000',
+    basePrice: 25000,
+    billingCycle: 'one_time',
+    maxProperties: 1,
+    serviceValidityDays: 90,
+    features: {
+      included_features: ['2 Instagram Reels', 'Privacy of phone number', 'Property showcase video', 'Property listing', 'Filtered leads', 'WhatsApp marketing', 'Broker promotion', 'Progress reports', 'Relationship manager', 'Closing manager', 'Residential + Commercial segments']
+    },
+    quotaConfig: { properties: 1 },
+    isPopular: true,
+    isRecommended: true,
+    hasGuarantee: false,
+    commissionPercent: null,
+    badgeText: 'Premium'
+  }
+];
+
+function formatPriceLabel(value) {
+  const amount = Number(value || 0);
+  if (!amount) return 'Free';
+  return `Rs. ${amount.toLocaleString('en-IN')}`;
+}
+
+function extractPlanFeatures(plan) {
+  const source = plan?.features;
+  if (Array.isArray(source)) return source;
+  if (Array.isArray(source?.included_features)) return source.included_features;
+  if (typeof source === 'string') {
+    try {
+      const parsed = JSON.parse(source);
+      return Array.isArray(parsed?.included_features) ? parsed.included_features : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function cycleSuffix(cycle) {
+  if (cycle === 'monthly') return '/month';
+  if (cycle === 'yearly') return '/year';
+  return '';
+}
+
 export default function PropertySubscription() {
-  const { user, isLoggedIn, subscribeUser } = useAuth();
+  const { user, isLoggedIn } = useAuth();
   const { getUserProperties } = useProperty();
   const navigate = useNavigate();
   const [userProperties, setUserProperties] = useState([]);
@@ -124,13 +160,16 @@ export default function PropertySubscription() {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [plans, setPlans] = useState([]);
   const [apiError, setApiError] = useState(null);
+  const [categoryKey, setCategoryKey] = useState('property_owner_sell');
 
   // Fetch plans from API
   useEffect(() => {
     const fetchPlans = async () => {
       try {
         setApiLoading(true);
-        const response = await billingApi.getPlans({ categoryKey: 'property_owner_sell' });
+        setApiError(null);
+        setSelectedPlan(null);
+        const response = await billingApi.getPlans({ categoryKey });
         const apiPlans = response?.plans || response || [];
         
         if (apiPlans.length > 0) {
@@ -140,13 +179,14 @@ export default function PropertySubscription() {
             slug: plan.slug,
             name: plan.name || plan.displayName,
             displayName: plan.displayName || plan.name,
-            priceLabel: plan.basePrice === 0 ? '₹0' : `₹${plan.basePrice?.toLocaleString('en-IN')}`,
+            priceLabel: formatPriceLabel(plan.basePrice),
             basePrice: plan.basePrice,
             billingCycle: plan.billingCycle || 'one_time',
             maxProperties: plan.maxProperties ?? plan.quotaConfig?.properties ?? plan.quotaConfig?.maxProperties,
             maxListings: plan.maxListings ?? plan.quotaConfig?.maxListings,
-            serviceValidityDays: plan.serviceValidityDays,
+            serviceValidityDays: plan.totalValidityDays || plan.serviceValidityDays,
             features: plan.features || {},
+            featureToggles: plan.featureToggles || {},
             quotaConfig: plan.quotaConfig || {},
             isPopular: plan.isPopular || plan.isRecommended,
             isRecommended: plan.isRecommended,
@@ -158,19 +198,19 @@ export default function PropertySubscription() {
           }));
           setPlans(transformedPlans);
         } else {
-          setPlans(FALLBACK_PLANS);
+          setPlans(categoryKey === 'property_rent' ? RENT_FALLBACK_PLANS : FALLBACK_PLANS);
         }
       } catch (error) {
         console.error('Failed to fetch plans from API:', error);
         setApiError('Using fallback plans due to API error');
-        setPlans(FALLBACK_PLANS);
+        setPlans(categoryKey === 'property_rent' ? RENT_FALLBACK_PLANS : FALLBACK_PLANS);
       } finally {
         setApiLoading(false);
       }
     };
 
     fetchPlans();
-  }, []);
+  }, [categoryKey]);
 
   useEffect(() => {
     const fetchUserProperties = async () => {
@@ -210,23 +250,17 @@ export default function PropertySubscription() {
       return;
     }
     
-    // Subscribe user
     try {
-      const success = await subscribeUser(planSlug);
-      
-      if (success) {
-        // Redirect to checkout with full plan data from API
-        navigate('/checkout', { 
-          state: { 
-            plan,
-            planId: plan.id,
-            planSlug: plan.slug,
-            categoryKey: 'property_owner_sell',
-            type: 'property_subscription',
-            from: '/sell' 
-          } 
-        });
-      }
+      navigate('/checkout', {
+        state: {
+          plan,
+          planId: plan.id,
+          planSlug: plan.slug,
+          categoryKey,
+          type: 'property_subscription',
+          from: '/sell'
+        }
+      });
     } catch (error) {
       console.error('Subscription failed:', error);
       setSelectedPlan(null);
@@ -270,6 +304,24 @@ export default function PropertySubscription() {
             List your properties and reach thousands of potential buyers and renters. 
             Start with our free plan and upgrade as needed.
           </p>
+
+          <div className="inline-flex bg-white border border-gray-200 rounded-2xl p-1 shadow-sm mb-8">
+            {[
+              { key: 'property_owner_sell', label: 'Sell Plans' },
+              { key: 'property_rent', label: 'Rent Plans' }
+            ].map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setCategoryKey(item.key)}
+                className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${
+                  categoryKey === item.key ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
 
           {/* Current Status */}
           {isLoggedIn && (
@@ -343,7 +395,7 @@ export default function PropertySubscription() {
                       <span className={`text-sm font-medium ${
                         isPopular ? 'text-white/80' : 'text-gray-500'
                       }`}>
-                        /month
+                        {cycleSuffix(plan.billingCycle)}
                       </span>
                     )}
                   </div>
@@ -369,16 +421,13 @@ export default function PropertySubscription() {
                 {/* Features */}
                 <div className="p-6">
                   <ul className="space-y-3 mb-8">
-                    {Object.entries(plan.features || {}).slice(0, 6).map(([key, value], index) => (
+                    {extractPlanFeatures(plan).map((feature, index) => (
                       <li key={index} className="flex items-start gap-3">
                         <CheckCircle2 className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
                           isPopular ? 'text-primary' : 'text-green-500'
                         }`} />
                         <span className="text-sm font-medium text-gray-700">
-                          {typeof value === 'boolean' 
-                            ? `${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}: ${value ? 'Yes' : 'No'}`
-                            : `${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}: ${value}`
-                          }
+                          {feature}
                         </span>
                       </li>
                     ))}

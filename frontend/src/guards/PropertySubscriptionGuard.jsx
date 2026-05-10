@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useProperty } from '../contexts/PropertyContext';
+import { billingApi } from '../services/billingApi';
 import { 
   Crown, 
   Lock, 
@@ -17,6 +18,8 @@ export default function PropertySubscriptionGuard({ children }) {
   const navigate = useNavigate();
   
   const [userProperties, setUserProperties] = useState([]);
+  const [entitlements, setEntitlements] = useState(null);
+  const [rentEntitlements, setRentEntitlements] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
@@ -28,8 +31,19 @@ export default function PropertySubscriptionGuard({ children }) {
       }
 
       try {
-        const properties = await getUserProperties();
+        const organizationId = user?.organization_id || user?.organizationId || user?.organization?.id;
+        const [properties, sellEntitlementData, rentEntitlementData] = await Promise.all([
+          getUserProperties(),
+          organizationId
+            ? billingApi.getEntitlements(organizationId, { categoryKey: 'property_owner_sell' }).catch(() => null)
+            : Promise.resolve(null),
+          organizationId
+            ? billingApi.getEntitlements(organizationId, { categoryKey: 'property_rent' }).catch(() => null)
+            : Promise.resolve(null)
+        ]);
         setUserProperties(properties || []);
+        setEntitlements(sellEntitlementData?.entitlements || sellEntitlementData || null);
+        setRentEntitlements(rentEntitlementData?.entitlements || rentEntitlementData || null);
       } catch (error) {
         console.error('Failed to fetch user properties:', error);
         setUserProperties([]);
@@ -39,13 +53,21 @@ export default function PropertySubscriptionGuard({ children }) {
     };
 
     checkSubscriptionStatus();
-  }, [isLoggedIn, user?.id, getUserProperties]);
+  }, [isLoggedIn, user?.id, user?.organization_id, user?.organizationId, user?.organization?.id, getUserProperties]);
 
   const getPropertyCount = () => userProperties.length;
-  const hasSubscription = () => user?.isSubscribed;
+  const hasSubscription = () => Boolean(entitlements?.subscription?.id || rentEntitlements?.subscription?.id || user?.isSubscribed);
+  const limitFromEntitlements = (value) => {
+    const quotaLimit = value?.quotas?.properties?.limit ?? value?.quotaConfig?.properties;
+    const planLimit = value?.subscription?.plan?.maxProperties ?? value?.plan?.maxProperties;
+    return Number(quotaLimit ?? planLimit ?? 0);
+  };
+  const planPropertyLimit = () => {
+    return Math.max(limitFromEntitlements(entitlements), limitFromEntitlements(rentEntitlements), 1);
+  };
   const canListMoreProperties = () => {
-    if (hasSubscription()) return true;
-    return getPropertyCount() < 1; // Free users can list 1 property
+    const limit = hasSubscription() ? planPropertyLimit() : 1;
+    return getPropertyCount() < limit;
   };
 
   const handleUpgradePlan = () => {
@@ -135,7 +157,7 @@ export default function PropertySubscriptionGuard({ children }) {
                 <div className="flex items-center gap-2">
                   <Lock className="w-5 h-5 text-orange-500" />
                   <span className="text-sm font-medium text-orange-600">
-                    Free Limit: 1
+                    Limit: {hasSubscription() ? planPropertyLimit() : 1}
                   </span>
                 </div>
               </div>
@@ -182,7 +204,7 @@ export default function PropertySubscriptionGuard({ children }) {
                 </button>
               </div>
 
-              {/* Upgrade to Premium */}
+              {/* Upgrade */}
               <div className="relative bg-gradient-to-br from-primary/5 to-primary/10 border-2 border-primary rounded-2xl p-6 hover:shadow-lg transition-all">
                 <div className="absolute top-3 right-3">
                   <div className="flex items-center gap-1 px-2 py-1 bg-primary text-white text-xs font-bold rounded-full">
@@ -193,8 +215,8 @@ export default function PropertySubscriptionGuard({ children }) {
                 
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-lg font-bold text-primary">Premium Plan</h3>
-                    <p className="text-2xl font-black text-primary">₹2,999<span className="text-sm font-medium text-primary/70">/month</span></p>
+                    <h3 className="text-lg font-bold text-primary">Sell-my-property Plans</h3>
+                    <p className="text-2xl font-black text-primary">From Rs. 15,000</p>
                   </div>
                   <Crown className="w-6 h-6 text-primary" />
                 </div>
@@ -202,19 +224,19 @@ export default function PropertySubscriptionGuard({ children }) {
                 <ul className="space-y-2 mb-4">
                   <li className="flex items-center gap-2 text-sm text-gray-600">
                     <CheckCircle2 className="w-4 h-4 text-primary" />
-                    5 Property Listings
+                    Property listing workflow
                   </li>
                   <li className="flex items-center gap-2 text-sm text-gray-600">
                     <CheckCircle2 className="w-4 h-4 text-primary" />
-                    Premium Features
+                    Showcase video and portal promotion
                   </li>
                   <li className="flex items-center gap-2 text-sm text-gray-600">
                     <CheckCircle2 className="w-4 h-4 text-primary" />
-                    Priority Support
+                    Broker network promotion
                   </li>
                   <li className="flex items-center gap-2 text-sm text-gray-600">
                     <CheckCircle2 className="w-4 h-4 text-primary" />
-                    Better Visibility
+                    RM, filtering, and guarantees on higher plans
                   </li>
                 </ul>
                 

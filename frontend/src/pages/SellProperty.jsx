@@ -358,6 +358,7 @@ function SellProperty() {
       const payload = {
         ...formData,
         listing_type: formData.listingType.toLowerCase(),
+        subscription_category: formData.listingType === 'Rent' ? 'property_rent' : 'property_owner_sell',
         property_kind: propertyKind,
         nearby_locations: nearbyLocations,
         amenities: formData.features

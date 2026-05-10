@@ -819,13 +819,13 @@ function MyPlanPanel({ subscription, loadingSubscription, onRefreshSubscription 
   const status = subscription?.status || 'unknown';
   
   // Extract plan features and quotas
-  const planFeatures = subscription?.plan_features || subscription?.features || {};
-  const planQuotas = subscription?.plan_quota_config || subscription?.quota_config || {};
-  const planDescription = subscription?.plan_description || subscription?.description || '';
-  const maxProperties = subscription?.plan_max_properties || planQuotas?.max_properties || 0;
-  const maxUsers = subscription?.plan_max_users || planQuotas?.max_users || 0;
-  const maxTeamSize = subscription?.plan_max_team_size || planQuotas?.max_team_size || 0;
-  const maxFeaturedProperties = subscription?.plan_max_featured_properties || planQuotas?.max_featured_properties || 0;
+  const planFeatures = subscription?.features || subscription?.plan_features || {};
+  const planQuotas = subscription?.quota_config || subscription?.plan_quota_config || {};
+  const planDescription = subscription?.description || subscription?.plan_description || '';
+  const maxProperties = subscription?.max_properties || subscription?.plan_max_properties || planQuotas?.max_properties || 0;
+  const maxUsers = subscription?.max_users || subscription?.plan_max_users || planQuotas?.max_users || 0;
+  const maxTeamSize = subscription?.max_team_size || subscription?.plan_max_team_size || planQuotas?.max_team_size || 0;
+  const maxFeaturedProperties = subscription?.max_featured_properties || subscription?.plan_max_featured_properties || planQuotas?.max_featured_properties || 0;
   
   return (
     <div className="bg-white rounded-2xl shadow-md shadow-gray-100/80 border border-gray-100 p-8">

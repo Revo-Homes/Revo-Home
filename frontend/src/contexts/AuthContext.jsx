@@ -49,13 +49,18 @@ export function AuthProvider({ children }) {
       const response = await userApi.getMe();
       const userData = response.data?.user || response.user || response;
       
-      // Add Revo Homes organization context (ID: 1)
+      // Preserve backend organization context and fall back to Revo Homes when older
+      // auth responses do not include one.
       if (userData) {
+        const organizationId = userData.organization_id || userData.organizationId || userData.organization?.id || 1;
+        userData.organization_id = organizationId;
         userData.organization = {
-          id: 1,
-          name: 'Revo Homes',
-          slug: 'revo_homes'
+          id: organizationId,
+          name: userData.organization_name || 'Revo Homes',
+          slug: userData.organization_slug || 'revo_homes',
+          ...(userData.organization || {})
         };
+        userData.organization.id = userData.organization.id || organizationId;
       }
       
       setUser(userData);

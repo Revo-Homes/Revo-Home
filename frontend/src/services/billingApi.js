@@ -10,11 +10,22 @@ const API_BASE = normalizeApiBase(
   import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_CORE_API_URL || 'http://localhost:3000/api/v1'
 );
 
+const getCurrentOrganizationId = () => {
+  try {
+    const savedUser = localStorage.getItem('authUser');
+    if (!savedUser) return '1';
+    const user = JSON.parse(savedUser);
+    return String(user?.organization_id || user?.organizationId || user?.organization?.id || '1');
+  } catch {
+    return '1';
+  }
+};
+
 const authHeaders = () => {
   // Revo-Home uses cookie-based auth (session_token cookie set by backend)
   // The browser automatically sends cookies with credentials: 'include'
   // We only need to add the Organization ID header
-  return { 'X-Organization-ID': '1' };
+  return { 'X-Organization-ID': getCurrentOrganizationId() };
 };
 
 /** Backend returns `{ success, data, message? }` — unwrap `data` for callers. */
@@ -85,6 +96,17 @@ export const billingApi = {
     const path = orgId
       ? `/subscriptions/active-any/${orgId}${query(params)}`
       : `/subscriptions/active-any${query(params)}`;
+    return apiClient(path);
+  },
+
+  getCurrentSubscription: async () => {
+    return apiClient('/subscriptions/current');
+  },
+
+  getEntitlements: async (orgId, params = {}) => {
+    const path = orgId
+      ? `/subscriptions/entitlements/${orgId}${query(params)}`
+      : `/subscriptions/entitlements${query(params)}`;
     return apiClient(path);
   },
   
