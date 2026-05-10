@@ -385,6 +385,8 @@ const bhk = bhkFromMeta
     nearby,
     pricePerSqft: toNumber(item.price_per_sqft),
     developer: item.developer || item.organization_name || '',
+    organization_name: item.organization_type === 'builder' ? (item.organization_name || '') : '',
+    organization_type: item.organization_type || '',
     possessionDate: item.possession_date || item.available_from || '',
     rera_number: item.rera_number || item.rera_no || item.rera || meta?.rera_number || meta?.rera_no || '',
     rera_state: item.rera_state || item.state || '',
@@ -516,6 +518,56 @@ export function PropertyProvider({ children }) {
 
       currentPage += 1;
     } while (currentPage <= totalPages && currentPage <= LISTINGS_MAX_PAGES);
+
+    // Fetch media for properties missing images
+    const propertiesWithoutImages = collected.filter(
+      item => !item.image || item.image === DEFAULT_IMAGE
+    );
+
+    await Promise.all(
+      propertiesWithoutImages.map(async (item) => {
+        try {
+          const propertyId = item.propertyId || item.property_id;
+          if (!propertyId) return;
+          const mediaResponse = await propertyApi.getMedia(propertyId);
+          const mediaList = mediaResponse?.data || mediaResponse || [];
+          if (Array.isArray(mediaList) && mediaList.length > 0) {
+  const imageOnly = mediaList.filter(m => 
+    !m.media_type || m.media_type === 'image'
+  );
+  const floorPlans = mediaList.filter(m => m.media_type === 'floor_plan');
+  
+  const primaryList = imageOnly.length > 0 ? imageOnly : mediaList;
+  const primary = primaryList.find(m => m.is_primary) || primaryList[0];
+  
+  if (primary?.url) {
+    item.image = primary.url;
+    item.images = imageOnly.map(m => m.url).filter(Boolean);
+    item.floorPlans = floorPlans.map(m => m.url).filter(Boolean);
+  }
+}
+        } catch (err) {
+          // silently fail per property
+        }
+      })
+    );
+    // Fetch tags for all properties
+    await Promise.all(
+      collected.map(async (item) => {
+        try {
+          const propertyId = item.propertyId || item.property_id;
+          if (!propertyId) return;
+          const tagsResponse = await propertyApi.getPropertyTags(propertyId);
+          const tagList = Array.isArray(tagsResponse) ? tagsResponse : (tagsResponse?.data || []);
+          if (tagList.length > 0) {
+            const slugs = tagList.map(t => t.slug || t.tag_slug).filter(Boolean);
+            item.labels = slugs.includes('sold_out') ? ['sold_out'] : slugs.slice(0, 2);
+          }
+        } catch (err) { /* silent */ }
+      })
+    );
+
+   
 
     return collected;
   }, [userLocation]);
@@ -999,6 +1051,19 @@ if (cached) {
     normalized.is_exclusive = cached.is_exclusive;
   }
 }
+// Fetch tags
+    try {
+      const propId = normalized.propertyId || normalized.property_id;
+      if (propId) {
+        const tagsResponse = await propertyApi.getPropertyTags(propId);
+        const tagList = Array.isArray(tagsResponse) ? tagsResponse : (tagsResponse?.data || []);
+        if (tagList.length > 0) {
+          const slugs = tagList.map(t => t.slug || t.tag_slug).filter(Boolean);
+          normalized.labels = slugs.includes('sold_out') ? ['sold_out'] : slugs.slice(0, 2);
+        }
+      }
+    } catch (tagErr) { /* silent */ }
+
 
 return normalized;
   }

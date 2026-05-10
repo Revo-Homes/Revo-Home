@@ -70,6 +70,8 @@ function PropertyCard({
   showCompare = false,
   isCompared = false,
   onCompareToggle,
+  organization_name = '', // New prop for organization name
+  organization_type = '', // New prop for organization type
 }) {
   const { toggleFavorite, isSaved } = useProperty();
   const { isLoggedIn, openLogin, user } = useAuth();
@@ -79,24 +81,26 @@ function PropertyCard({
   const normalizedId = idValue ? (isNaN(Number(idValue)) ? idValue : Number(idValue)) : null;
   const favoriteId = rawPropertyId || rawId;
   const normalizedFavoriteId = favoriteId ? (isNaN(Number(favoriteId)) ? favoriteId : Number(favoriteId)) : null;
+  const postedByName = (organization_name || developer || '').trim();
+  const showPostedBy = Boolean(postedByName);
 
   const [localFavorite, setLocalFavorite] = useState(false);
-  
+
   // Process labels with priority: sold_out overrides everything
   const processedLabels = (() => {
     const labelSlugs = labels || [];
-    
+
     // If sold_out is present, only show that
     if (labelSlugs.includes('sold_out')) {
       return ['sold_out'];
     }
-    
+
     // Sort by priority and take max 2
     return labelSlugs
       .sort((a, b) => LABEL_PRIORITY.indexOf(a) - LABEL_PRIORITY.indexOf(b))
       .slice(0, 2);
   })();
-  
+
   // Legacy badge support (for backward compatibility)
   const badgeConfig = badge ? LABEL_CONFIG[badge] : null;
 
@@ -120,7 +124,7 @@ function PropertyCard({
 
     const targetState = !localFavorite;
     setLocalFavorite(targetState); // Optimistic update
-    
+
     const success = await toggleFavorite(normalizedFavoriteId, targetState);
     if (!success) {
       setLocalFavorite(!targetState); // Revert on failure
@@ -131,7 +135,7 @@ function PropertyCard({
   // Handle property card click with lead generation (EVERY click)
   const handleCardClick = async (e) => {
     e.preventDefault();
-    
+
     if (isLoggedIn && user && normalizedId) {
       // Generate lead on EVERY click for logged-in users
       await handlePropertyClick(normalizedId, user?.id, {
@@ -161,7 +165,7 @@ function PropertyCard({
         });
       }
     }
-    
+
     // Always navigate — restriction handled in PropertyDetails
     if (normalizedId) {
       navigate(buildPropertyUrl(normalizedId, title, location));
@@ -195,7 +199,7 @@ function PropertyCard({
             loading="lazy"
           />
         </div>
-        
+
         {/* Overlay Badges - Top Left */}
         <div className="absolute top-4 left-4 flex flex-col gap-2 pointer-events-none">
           {!showVerifiedImage && (
@@ -238,9 +242,8 @@ function PropertyCard({
         {showFavorite && (
           <button
             onClick={handleFavoriteClick}
-            className={`absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md transition-all duration-300 shadow-lg ${
-              localFavorite ? 'bg-black/60 text-red-500 scale-110' : 'bg-black/60 text-white hover:bg-black/80 hover:text-red-400'
-            }`}
+            className={`absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md transition-all duration-300 shadow-lg ${localFavorite ? 'bg-black/60 text-red-500 scale-110' : 'bg-black/60 text-white hover:bg-black/80 hover:text-red-400'
+              }`}
           >
             <svg className={`w-4 h-4 ${localFavorite ? 'fill-current' : 'none'}`} fill={localFavorite ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -257,11 +260,10 @@ function PropertyCard({
               onCompareToggle?.();
             }}
             title={isCompared ? 'Remove from compare' : 'Add to compare'}
-            className={`absolute top-14 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg ${
-              isCompared
+            className={`absolute top-14 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg ${isCompared
                 ? 'bg-primary text-white scale-110 ring-2 ring-primary/30'
                 : 'bg-black/60 text-white hover:bg-black/80 hover:text-primary'
-            }`}
+              }`}
           >
             {isCompared ? (
               <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
@@ -294,7 +296,7 @@ function PropertyCard({
           {(showVerifiedImage || owner?.verified) && (
             <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center shadow-md border-2 border-white">
               <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
               </svg>
             </div>
           )}
@@ -305,10 +307,10 @@ function PropertyCard({
             {title}
           </h3>
         </div>
-        
+
         <p className="text-gray-500 text-sm font-medium flex items-center gap-1.5 mb-5 uppercase tracking-wide text-[11px]">
           <svg className="w-3.5 h-3.5 text-primary" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
           </svg>
           {location}
           {/* {distance !== null && distance !== undefined && (
@@ -319,14 +321,14 @@ function PropertyCard({
         </p>
 
         <div className="mt-auto flex items-center gap-x-6 gap-y-3 border-t border-gray-100 pt-5 text-left flex-wrap">
-         {bhk && String(bhk).trim() && (
+          {bhk && String(bhk).trim() && (
             <div className="flex flex-col">
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Config</span>
               <span className="text-sm font-black text-gray-900">
                 {String(bhk).includes('BHK') || String(bhk).includes('RK') ? bhk : `${bhk} BHK`}
               </span>
             </div>
-          )} 
+          )}
 
           {Number(area) > 0 && (
             <div className="flex flex-col">
@@ -340,51 +342,51 @@ function PropertyCard({
           )}
         </div>
         {/* Owner + RERA Strip — like MagicBricks/99acres */}
-        {(owner?.verified || rera_number || (owner?.name && owner.name !== 'Property Owner')) && (
-        <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <svg className="w-3.5 h-3.5 text-primary" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 12c2.66 0 4.8-2.14 4.8-4.8S14.66 2.4 12 2.4 7.2 4.54 7.2 7.2 9.34 12 12 12zm0 2.4c-3.2 0-9.6 1.61-9.6 4.8v2.4h19.2v-2.4c0-3.19-6.4-4.8-9.6-4.8z"/>
-              </svg>
-            </div>
-            <div className="min-w-0">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">
-                {owner?.type === 'organisation' 
-                  ? (owner?.organization_type === 'builder' ? 'Builder' : 'Agency') 
-                  : (developer ? 'Builder' : 'Posted by')}
+        {(organization_name && organization_name.trim()) || rera_number || owner?.verified ? (
+          <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between gap-2">
+            {organization_name && organization_name.trim() && (
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-3.5 h-3.5 text-primary" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 12c2.66 0 4.8-2.14 4.8-4.8S14.66 2.4 12 2.4 7.2 4.54 7.2 7.2 9.34 12 12 12zm0 2.4c-3.2 0-9.6 1.61-9.6 4.8v2.4h19.2v-2.4c0-3.19-6.4-4.8-9.6-4.8z" />
+                  </svg>
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">
+                    Posted by
+                  </span>
+                  <span className="text-xs font-black text-gray-700 truncate block">
+                    {organization_name}
+                  </span>
+                </div>
+              </div>
+            )}
+            {rera_number ? (
+              <span className="flex items-center gap-1 px-2.5 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-black uppercase tracking-wide flex-shrink-0 border border-green-100">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                </svg>
+                RERA Verified
               </span>
-              <span className="text-xs font-black text-gray-700 truncate block">
-                {developer || (owner?.name && owner.name !== 'Property Owner' ? owner.name : 'Owner')}
+            ) : owner?.verified ? (
+              <span className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-black uppercase tracking-wide flex-shrink-0 border border-blue-100">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                </svg>
+                Verified
               </span>
-            </div>
+            ) : null}
           </div>
-{rera_number ? (
-  <span className="flex items-center gap-1 px-2.5 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-black uppercase tracking-wide flex-shrink-0 border border-green-100">
-    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-    </svg>
-    RERA Verified
-  </span>
-) : owner?.verified ? (
-  <span className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-black uppercase tracking-wide flex-shrink-0 border border-blue-100">
-    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-    </svg>
-    Verified
-  </span>
-) : null}
-        </div>
-        )}
-        
+        ) : null}
+
         {footerActions && (
-  <div
-    className="mt-5 pt-5 border-t border-gray-100"
-    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-  >
-    {footerActions}
-  </div>
-)}
+          <div
+            className="mt-5 pt-5 border-t border-gray-100"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          >
+            {footerActions}
+          </div>
+        )}
       </div>
     </motion.div>
   );

@@ -291,13 +291,13 @@ function SellProperty() {
     const subType = (data.propertySubType || '').toLowerCase();
 
     if (
-      type.includes('residential') || 
-      type.includes('flat') || 
+      type.includes('residential') ||
+      type.includes('flat') ||
       type.includes('apartment') ||
       subType.includes('flat') ||
       subType.includes('apartment')
     ) return 'Residential';
-    
+
     if (type.includes('commercial')) return 'Commercial';
     if (type.includes('land')) return 'Land';
     if (type.includes('industrial')) return 'Industrial';
@@ -310,7 +310,7 @@ function SellProperty() {
   const getCategoriesForSelectedType = (data, options) => {
     const categories = options.property_categories || [];
     if (!data.property_type_id) return categories;
-    return categories.filter(cat => 
+    return categories.filter(cat =>
       String(cat.type_id || cat.property_type_id) === String(data.property_type_id)
     );
   };
@@ -330,7 +330,7 @@ function SellProperty() {
       const selected = prev.selectedBHKs.includes(slug)
         ? prev.selectedBHKs.filter(s => s !== slug)
         : [...prev.selectedBHKs, slug];
-      
+
       const details = prev.selectedBHKs.includes(slug)
         ? prev.bhkDetails.filter(d => (d.type_slug || d.type) !== slug)
         : [...prev.bhkDetails, { type: slug, type_slug: slug, bathrooms: '1', kitchens: '1', carpet_area: '', price: '' }];
@@ -463,7 +463,7 @@ function SellProperty() {
         const num = Number(val);
         return isNaN(num) ? null : num;
       };
-      
+
       const toISOString = (dateVal) => {
         if (!dateVal) return null;
         try {
@@ -481,105 +481,12 @@ function SellProperty() {
       };
 
       const payload = {
-        organization_id: 1, // Revo Homes
-        created_by: user?.id,
-        property: {
-          name: formData.name?.trim() || "",
-          slug: formData.slug || formData.name?.toLowerCase().replace(/\s+/g, '-'),
-          property_type_id: toNumber(formData.property_type_id),
-          property_category_id: toNumber(formData.property_category_id),
-          listing_type: formData.listing_type.toLowerCase(),
-          property_condition: formData.property_condition || undefined,
-          sale_urgency: formData.sale_urgency || "Normal",
-          description: getPlainText(formData.description),
-          
-          // Role logic: Default to owner for additions via Home frontend
-          listed_by_type: "owner",
-          listed_by_id: user?.id,
-          listed_by_name: `${user?.first_name || ""} ${user?.last_name || ""}`.trim(),
-
-          // Detailed configurations
-          bhk: formData.bhk || undefined,
-          bhk_details: formData.bhkDetails.map(d => ({
-            ...d,
-            price: toNumber(d.price),
-            carpet_area: toNumber(d.carpet_area)
-          })),
-          bathrooms: toNumber(formData.bathrooms),
-          unit_name: formData.unit_name || undefined,
-          floor_number: toNumber(formData.floor_number),
-          furnishing_status: formData.furnishing_status || undefined,
-          water_source: formData.water_source || undefined,
-          parking_type: formData.parking_type || undefined,
-
-          address: {
-            line1: formData.address_line1 || formData.full_address || "",
-            line2: formData.address_line2 || "",
-            city: formData.city || "",
-            state: formData.state || "",
-            country: formData.country || "IN",
-            zip_code: formData.zip_code || "",
-            locality: formData.locality || "",
-            landmark: formData.landmark || "",
-            latitude: toNumber(formData.latitude),
-            longitude: toNumber(formData.longitude),
-          },
-
-          dimensions: {
-            total_units: toNumber(formData.total_units) || 0,
-            total_floors: toNumber(formData.total_floors) || 0,
-            total_area: toNumber(formData.total_area),
-            builtup_area: toNumber(formData.builtup_area),
-            carpet_area: toNumber(formData.carpet_area),
-            area_unit: formData.area_unit || "sqft",
-          },
-
-          construction: {
-            year_built: toNumber(formData.year_built),
-            possession_date: toISOString(formData.possession_date),
-            facing_direction: formData.facing_direction || undefined,
-          },
-
-          location_insights: {
-            distance_from_key_locations: {
-              near_metro: formData.near_metro_distance || undefined,
-              near_busstand: formData.near_busstand_distance || undefined,
-              near_railway: formData.near_railway_distance || undefined,
-              near_airport: formData.near_airport_distance || undefined,
-              near_highway: formData.near_highway_distance || undefined,
-              near_hospital: formData.near_hospital_distance || undefined,
-              near_school: formData.near_school_distance || undefined,
-              near_market: formData.near_market_distance || undefined,
-            },
-          },
-
-          pricing: {
-            price_min: toNumber(formData.price_min),
-            price_max: toNumber(formData.price_max),
-            price_on_request: Boolean(formData.price_on_request),
-            currency: formData.currency || "INR",
-            rent_amount: toNumber(formData.rent_amount),
-            security_deposit: toNumber(formData.security_deposit),
-            maintenance_charge: toNumber(formData.maintenance_charges),
-          },
-
-          status: {
-            status: formData.status || "active",
-            is_featured: Boolean(formData.is_featured),
-            is_verified: Boolean(formData.is_verified),
-            is_published: Boolean(formData.is_published),
-          },
-
-          meta: {
-            title: formData.meta_title || formData.name,
-            description: formData.meta_description || getPlainText(formData.description).substring(0, 160),
-            keywords: formData.metaKeywords || "",
-          },
-
-          features: {
-            amenities: formData.features || []
-          }
-        }
+        ...formData,
+        listing_type: formData.listingType.toLowerCase(),
+        subscription_category: formData.listingType === 'Rent' ? 'property_rent' : 'property_owner_sell',
+        property_kind: propertyKind,
+        nearby_locations: nearbyLocations,
+        amenities: formData.features
       };
 
       let result;
@@ -611,7 +518,7 @@ function SellProperty() {
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
             <div className="flex items-center gap-4">
-              <button 
+              <button
                 onClick={() => navigate(-1)}
                 className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-gray-400 hover:text-primary hover:shadow-lg transition-all"
               >
@@ -624,16 +531,15 @@ function SellProperty() {
                 <p className="text-gray-500 font-medium mt-1">Transform your property into a premium listing.</p>
               </div>
             </div>
-            
+
             {/* Simple Step Counter */}
             <div className="flex items-center gap-3 bg-white px-6 py-3 rounded-2xl shadow-sm border border-gray-100">
               <div className="flex -space-x-2">
                 {STEPS.map((s) => (
-                  <div 
+                  <div
                     key={s.id}
-                    className={`w-3 h-3 rounded-full border-2 border-white transition-all duration-500 ${
-                      s.id < step ? 'bg-green-500' : s.id === step ? 'bg-primary scale-125' : 'bg-gray-200'
-                    }`}
+                    className={`w-3 h-3 rounded-full border-2 border-white transition-all duration-500 ${s.id < step ? 'bg-green-500' : s.id === step ? 'bg-primary scale-125' : 'bg-gray-200'
+                      }`}
                   ></div>
                 ))}
               </div>
@@ -645,7 +551,7 @@ function SellProperty() {
           <div className="bg-white rounded-[48px] shadow-2xl shadow-gray-200/50 border border-gray-100 overflow-hidden">
             {/* Progress Bar */}
             <div className="h-1.5 w-full bg-gray-50">
-              <div 
+              <div
                 className="h-full bg-primary transition-all duration-700 ease-out"
                 style={{ width: `${(step / STEPS.length) * 100}%` }}
               ></div>
@@ -654,10 +560,10 @@ function SellProperty() {
             <div className="p-8 md:p-16">
               <form onSubmit={(e) => e.preventDefault()}>
                 {step === 1 && (
-                  <Step1BasicInfo 
-                    formData={formData} 
-                    setFormData={setFormData} 
-                    formOptions={formOptions} 
+                  <Step1BasicInfo
+                    formData={formData}
+                    setFormData={setFormData}
+                    formOptions={formOptions}
                     loadingFormOptions={loadingFormOptions}
                     handleChange={handleChange}
                     builders={builders}
@@ -669,7 +575,7 @@ function SellProperty() {
                   />
                 )}
                 {step === 2 && (
-                  <Step2CategoryDetails 
+                  <Step2CategoryDetails
                     formData={formData}
                     setFormData={setFormData}
                     formOptions={formOptions}
@@ -686,7 +592,7 @@ function SellProperty() {
                   />
                 )}
                 {step === 3 && (
-                  <Step3Amenities 
+                  <Step3Amenities
                     formData={formData}
                     setFormData={setFormData}
                     formOptions={formOptions}
@@ -700,7 +606,7 @@ function SellProperty() {
                   />
                 )}
                 {step === 4 && (
-                  <Step4Pricing 
+                  <Step4Pricing
                     formData={formData}
                     setFormData={setFormData}
                     handleChange={handleChange}
@@ -708,7 +614,7 @@ function SellProperty() {
                   />
                 )}
                 {step === 5 && (
-                  <Step5Location 
+                  <Step5Location
                     formData={formData}
                     setFormData={setFormData}
                     handleChange={handleChange}
@@ -721,7 +627,7 @@ function SellProperty() {
                   />
                 )}
                 {step === 6 && (
-                  <Step6Media 
+                  <Step6Media
                     formData={formData}
                     setFormData={setFormData}
                     handleImageUpload={handleImageUpload}
@@ -731,7 +637,7 @@ function SellProperty() {
                   />
                 )}
                 {step === 7 && (
-                  <Step7Submit 
+                  <Step7Submit
                     formData={formData}
                     setFormData={setFormData}
                     handleChange={handleChange}
@@ -748,11 +654,10 @@ function SellProperty() {
                     type="button"
                     onClick={prevStep}
                     disabled={step === 1 || submitting}
-                    className={`flex items-center gap-2 px-8 py-4 rounded-2xl text-sm font-black uppercase tracking-widest transition-all ${
-                      step === 1 
-                        ? 'text-gray-300 cursor-not-allowed' 
+                    className={`flex items-center gap-2 px-8 py-4 rounded-2xl text-sm font-black uppercase tracking-widest transition-all ${step === 1
+                        ? 'text-gray-300 cursor-not-allowed'
                         : 'text-gray-400 hover:text-gray-900 hover:bg-gray-50'
-                    }`}
+                      }`}
                   >
                     <ArrowLeft size={18} />
                     Back

@@ -81,6 +81,7 @@ function Checkout() {
   const navigate = useNavigate();
   const { user, isLoggedIn } = useAuth();
   const plan = location.state?.plan;
+  const categoryKey = location.state?.categoryKey || plan?.categoryKey || plan?.category_key || 'property_owner_sell';
   const from = location.state?.from;
   const returnTo = location.state?.returnTo;
   const savedStep = location.state?.savedStep;
@@ -150,9 +151,9 @@ function Checkout() {
 
       const subscriptionPayload = {
         planId: plan.id,
-        categoryKey: 'property_owner_sell',
+        categoryKey,
         billingCycle: plan.billingCycle || 'one_time',
-        advancePaymentPercent: 100,
+        advancePaymentPercent: ['property_owner_sell', 'property_rent', 'developer_plans'].includes(categoryKey) ? 100 : 0,
         organizationId,
         replaceExisting: true,
       };

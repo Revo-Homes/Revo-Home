@@ -625,7 +625,8 @@ const buildGroupedMedia = (property = {}) => {
     addItem('images', item, `Property Image ${idx + 1}`, 'Image');
   });
 
-  toArray(source.floor_plans).forEach((item, idx) => {
+  // Check both floor_plans and floorPlans (from media fetch)
+  [...toArray(source.floor_plans), ...toArray(source.floorPlans)].forEach((item, idx) => {
     addItem('floorPlans', item, `Floor Plan ${idx + 1}`, 'Floor Plan');
   });
 

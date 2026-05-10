@@ -23,8 +23,19 @@ const getAuthHeader = () => {
   return headers;
 };
 
+const getCurrentOrganizationId = () => {
+  try {
+    const savedUser = localStorage.getItem('authUser');
+    if (!savedUser) return '1';
+    const user = JSON.parse(savedUser);
+    return String(user?.organization_id || user?.organizationId || user?.organization?.id || '1');
+  } catch {
+    return '1';
+  }
+};
+
 const getOrganizationHeaders = () => ({
-  'X-Organization-ID': '1',
+  'X-Organization-ID': getCurrentOrganizationId(),
 });
 
 const buildUrl = (path, params) => {
@@ -79,7 +90,7 @@ const request = (method, path, body = null, opts = {}) => {
     if (body && typeof body === 'object' && !(body instanceof FormData)) {
       body = {
         ...body,
-        organization_id: 1  // Always Revo Homes (ID: 1)
+        organization_id: Number(getCurrentOrganizationId()) || 1
       };
     }
     if (body instanceof FormData) {
@@ -139,6 +150,7 @@ export const propertyApi = {
 
   // Media
   getMedia: (id) => get(`/properties/${id}/media`),
+   getPropertyTags: (id) => get(`/properties/${id}/tags`),
   uploadImages: (id, formData) => {
     const url = buildUrl(`/properties/${id}/images`);
     return fetch(url, {
