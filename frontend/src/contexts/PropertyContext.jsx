@@ -44,6 +44,12 @@ const extractSingle = (response, keys = []) => {
   return preferred || response?.data || response || null;
 };
 
+const getMediaUrl = (item) => {
+  if (!item) return '';
+  if (typeof item === 'string') return item;
+  return item.url || item.file_url || item.fileUrl || item.image_url || item.video_url || item.document_url || item.path || item.src || '';
+};
+
 const extractPagination = (response) => {
   const pagination = response?.data?.pagination
     || response?.pagination
@@ -396,6 +402,7 @@ const bhk = bhkFromMeta
     totalFloors: item.total_floors || meta?.dimensions?.total_floors || null,
     constructionQuality: item.unit_construction_quality || meta?.construction?.construction_quality || '',
     floor_plans: item.floor_plans || [],
+    floorPlans: item.floorPlans || [],
     floors: item.floors || [],
     owner: {
       name: item.owner_name || item.listed_by_name || meta.listed_by_name || item.organization_name || 'Property Owner',
@@ -454,6 +461,27 @@ export function PropertyProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [propertyTypes, setPropertyTypes] = useState({}); // { id: name } mapping
+  const [reraAuthorities, setReraAuthorities] = useState({});
+
+  useEffect(() => {
+    const fetchReraAuthorities = async () => {
+      try {
+        const response = await propertyApi.getFormOptions();
+const data = response?.data || response;
+const list = data?.states || [];
+const map = {};
+list.forEach(item => {
+  if (item.value && item.rera_website) {
+    map[item.value.trim().toLowerCase()] = item.rera_website;
+  }
+});
+        setReraAuthorities(map);
+      } catch (err) {
+        console.error('Failed to fetch RERA authorities:', err);
+      }
+    };
+    fetchReraAuthorities();
+  }, []);
 
   // Fetch property types from database
   useEffect(() => {
@@ -1064,6 +1092,62 @@ if (cached) {
       }
     } catch (tagErr) { /* silent */ }
 
+    try {
+      const propId = normalized.propertyId || normalized.property_id;
+      const hasFloorPlans =
+        (Array.isArray(normalized.floor_plans) && normalized.floor_plans.length > 0) ||
+        (Array.isArray(normalized.floorPlans) && normalized.floorPlans.length > 0) ||
+        Boolean(normalized.floor_plan_url);
+
+      if (propId && !hasFloorPlans) {
+        const mediaResponse = await propertyApi.getMedia(propId);
+        const mediaList = Array.isArray(mediaResponse?.data)
+          ? mediaResponse.data
+          : Array.isArray(mediaResponse)
+          ? mediaResponse
+          : [];
+
+        if (mediaList.length > 0) {
+          const floorPlanUrls = mediaList
+            .filter((m) => m && (m.media_type === 'floor_plan' || /floor|plan/i.test(String(m.media_type || m.plan_type || m.document_type || m.type || ''))))
+            .map(getMediaUrl)
+            .filter(Boolean);
+
+          if (floorPlanUrls.length > 0) {
+            normalized.floorPlans = Array.isArray(normalized.floorPlans)
+              ? [...new Set([...(normalized.floorPlans || []), ...floorPlanUrls])]
+              : [...new Set(floorPlanUrls)];
+            normalized.floor_plans = normalized.floorPlans;
+          }
+        }
+      }
+    } catch (mediaErr) { /* silent */ }
+    // Fetch resale documents and regular documents
+    try {
+      const propId = normalized.propertyId || normalized.property_id;
+      if (propId) {
+        const [docsResponse, resaleDocsResponse] = await Promise.all([
+          propertyApi.getDocuments(propId).catch(() => null),
+          propertyApi.getResaleDocuments(propId).catch(() => null),
+        ]);
+
+        const docs = Array.isArray(docsResponse?.data) ? docsResponse.data
+          : Array.isArray(docsResponse) ? docsResponse : [];
+
+        const resaleDocs = Array.isArray(resaleDocsResponse?.data) ? resaleDocsResponse.data
+          : Array.isArray(resaleDocsResponse) ? resaleDocsResponse : [];
+
+        const allDocs = [...docs, ...resaleDocs];
+
+        if (allDocs.length > 0) {
+          normalized.hasBrochure = true;
+          normalized.documents = [
+            ...toArray(normalized.documents),
+            ...allDocs.map(d => d.file_url || d.url || d.document_url).filter(Boolean),
+          ];
+        }
+      }
+    } catch (docErr) { /* silent */ }
 
 return normalized;
   }
@@ -1285,6 +1369,7 @@ return normalized;
         addEnquiry,
         deleteEnquiry,
         isSaved: (id) => savedIds.has(Number(id)),
+        reraAuthorities,
       }}
     >
       {children}

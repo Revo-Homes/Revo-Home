@@ -768,12 +768,10 @@ const LinkMediaCard = ({ item }) => (
   </a>
 );
 
-const DocumentMediaCard = ({ item }) => (
-  <a
-    href={item.url}
-    target="_blank"
-    rel="noopener noreferrer"
-    className="group flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-gray-50 hover:shadow-lg hover:shadow-gray-200/70"
+const DocumentMediaCard = ({ item, onOpen }) => (
+  <div
+    onClick={onOpen}
+    className="group flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-gray-50 hover:shadow-lg hover:shadow-gray-200/70 cursor-pointer"
   >
     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
       <FileText size={20} />
@@ -786,7 +784,7 @@ const DocumentMediaCard = ({ item }) => (
       Open
       <Download size={14} />
     </span>
-  </a>
+  </div>
 );
 
 const GroupedMediaSection = ({ icon, title, description, count, emptyText, children, tone }) => (
@@ -1471,7 +1469,7 @@ function PropertyDetails() {
   const { slug } = useParams();
   const listingIdentifier = extractIdFromSlug(slug);
   const { isLoggedIn, isSubscribed, openLoginForPropertyDetails, user } = useAuth();
-  const { getProperty, addEnquiry, isSaved, toggleFavorite, listings = [] } = useProperty();
+  const { getProperty, addEnquiry, isSaved, toggleFavorite, listings = [], reraAuthorities = {}  } = useProperty();
   const { generateLead } = useRevoLeadTracker();
 
   const [property, setProperty] = useState(null);
@@ -2002,12 +2000,21 @@ function PropertyDetails() {
                           : `${property.distance.toFixed(1)}km from you`}
                       </span>
                     )}
-                    {property.rera_number && (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 border border-green-200 text-green-800 text-xs font-black rounded-full uppercase tracking-wide">
-                        <ShieldCheck size={11} className="text-green-600" />
-                        RERA: {property.rera_number}
-                      </span>
-                    )}
+                    {property.rera_number && (() => {
+                      const reraUrl = reraAuthorities[(property.rera_state || property.state || '').trim().toLowerCase()];
+                      const badge = (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 border border-green-200 text-green-800 text-xs font-black rounded-full uppercase tracking-wide">
+                          <ShieldCheck size={11} className="text-green-600" />
+                          RERA: {property.rera_number}
+                          {reraUrl && <ExternalLink size={10} className="text-green-500 ml-0.5" />}
+                        </span>
+                      );
+                      return reraUrl ? (
+                        <a href={reraUrl} target="_blank" rel="noopener noreferrer" title="Verify on official RERA portal" className="hover:opacity-75 transition-opacity">
+                          {badge}
+                        </a>
+                      ) : badge;
+                    })()}
                   </div>
 
                 </div>
@@ -2038,7 +2045,7 @@ function PropertyDetails() {
 
               {/* Key Highlights Row */}
               <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 mb-6">
-                <InfoBadge icon={BedDouble} label="Configuration" value={normalizeBhkLabel(property.bhk)} highlight />
+                <InfoBadge icon={BedDouble} label="Configuration" value={normalizeBhkLabel(property.bhk || property.configuration || property.config)} highlight />
                 <InfoBadge icon={Maximize} label="Carpet Area" value={property.area ? `${property.area} sq.ft` : 'N/A'} />
                 <InfoBadge icon={Home} label="Furnishing" value={property.furnished || 'N/A'} />
                 <InfoBadge icon={Building2} label="Developer" value={property.developer || 'N/A'} />
@@ -2163,8 +2170,8 @@ function PropertyDetails() {
                     >
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         {mediaGroups.documents.map((item, idx) => (
-                          <DocumentMediaCard key={`${item.url}-${idx}`} item={item} />
-                        ))}
+  <DocumentMediaCard key={`${item.url}-${idx}`} item={item} onOpen={handleDownloadDocuments} />
+))}
                       </div>
                     </GroupedMediaSection>
                   </div>

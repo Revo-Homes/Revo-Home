@@ -150,6 +150,8 @@ export const propertyApi = {
 
   // Media
   getMedia: (id) => get(`/properties/${id}/media`),
+  getDocuments: (id) => get(`/properties/${id}/documents`),
+getResaleDocuments: (id) => get(`/properties/${id}/resale-documents`),
    getPropertyTags: (id) => get(`/properties/${id}/tags`),
   uploadImages: (id, formData) => {
     const url = buildUrl(`/properties/${id}/images`);
@@ -283,6 +285,10 @@ export const toolsApi = {
   calculateEmi: (payload) => post('/tools/emi', payload),
   homeLoanAssistance: (payload) => post('/tools/home-loan-assistance', payload),
 };
+// -------------------- RERA AUTHORITIES --------------------
+export const reraApi = {
+  getAuthorities: () => get('/rera-authorities'),
+};
 
 // -------------------- ADMIN --------------------
 export const adminApi = {
@@ -304,4 +310,5 @@ export default {
   visit: visitApi,
   tools: toolsApi,
   admin: adminApi,
+  rera: reraApi,
 };
