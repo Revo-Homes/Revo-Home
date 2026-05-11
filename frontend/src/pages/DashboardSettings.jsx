@@ -1063,6 +1063,12 @@ function DashboardSettings() {
       if (subData && (subData.id || subData.planId)) {
         console.log('[DashboardSettings] Setting subscription:', subData);
         setSubscription(subData);
+        try {
+          const orgId = user?.organization_id || user?.organizationId || user?.organization?.id || 'org-unknown';
+          localStorage.setItem(`revo_current_subscription:${orgId}:${user.id}`, JSON.stringify(subData));
+        } catch {
+          // ignore
+        }
       } else {
         console.log('[DashboardSettings] No active subscription found');
         setSubscription(null);
@@ -1073,7 +1079,7 @@ function DashboardSettings() {
     } finally {
       setLoadingSubscription(false);
     }
-  }, [user?.id]);
+  }, [user?.id, user?.organization_id, user?.organizationId, user?.organization?.id]);
 
   useEffect(() => {
     fetchSubscription();

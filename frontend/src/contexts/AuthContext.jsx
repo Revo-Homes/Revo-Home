@@ -35,6 +35,12 @@ export function AuthProvider({ children }) {
         localStorage.removeItem(USER_KEY);
         localStorage.removeItem('phoneVerified'); // Clear phone verification on logout
         localStorage.removeItem('userPhoneNumber'); // Clear phone number on logout
+        // Clear per-user cached subscription snapshots (avoid cross-account bleed)
+        Object.keys(localStorage).forEach((key) => {
+          if (key.startsWith('revo_current_subscription:')) {
+            localStorage.removeItem(key);
+          }
+        });
       }
     } catch (error) {
       console.error('Error clearing localStorage:', error);

@@ -194,7 +194,7 @@ function SubscriptionSkeleton() {
 }
 
 export default function SubscriptionPage() {
-  const { isLoggedIn, openLogin } = useAuth();
+  const { isLoggedIn, openLogin, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [plans, setPlans] = useState([]);
@@ -204,12 +204,20 @@ export default function SubscriptionPage() {
   const [expandedFeatures, setExpandedFeatures] = useState({});
   const [expandedFAQ, setExpandedFAQ] = useState({});
 
+  const subscriptionCacheKey = useMemo(() => {
+    const userId = user?.id ? String(user.id) : "anon";
+    const orgId = user?.organization_id || user?.organizationId || user?.organization?.id;
+    const orgPart = orgId ? String(orgId) : "org-unknown";
+    return `revo_current_subscription:${orgPart}:${userId}`;
+  }, [user?.id, user?.organization_id, user?.organizationId, user?.organization?.id]);
+
   // Enhanced data fetching with current subscription
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
+        setCurrentSubscription(null);
 
         // Fetch plans and current subscription in parallel
         const [plansResponse, subscriptionResponse] = await Promise.allSettled([
@@ -368,10 +376,10 @@ export default function SubscriptionPage() {
             // silent fail
           }
         }
-        // Final fallback: check localStorage cached subscription
+        // Final fallback: check localStorage cached subscription (scoped per user/org)
         if (!subscriptionData) {
           try {
-            const cached = localStorage.getItem('revo_current_subscription');
+            const cached = localStorage.getItem(subscriptionCacheKey);
             if (cached) subscriptionData = JSON.parse(cached);
           } catch (e) {
             // ignore parse error
@@ -384,6 +392,11 @@ export default function SubscriptionPage() {
           if (normalized?.subscription) normalized = normalized.subscription;
           if (normalized) {
             setCurrentSubscription(normalized);
+            try {
+              localStorage.setItem(subscriptionCacheKey, JSON.stringify(normalized));
+            } catch {
+              // ignore quota errors
+            }
             if (import.meta.env.DEV) {
               console.log('[SubscriptionPage] Detected subscription:', normalized);
             }
@@ -399,7 +412,7 @@ export default function SubscriptionPage() {
     };
 
     fetchData();
-  }, []);
+  }, [subscriptionCacheKey]);
 
   const handleSubscribe = (planId) => {
     if (!isLoggedIn) return openLogin();

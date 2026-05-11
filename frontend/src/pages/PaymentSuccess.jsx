@@ -100,7 +100,7 @@ function PaymentSuccess() {
       const timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
-            navigate('/dashboard', { replace: true });
+            navigate('/dashboard/settings', { replace: true });
             return 0;
           }
           return prev - 1;
@@ -160,7 +160,7 @@ function PaymentSuccess() {
             {status === 'error' && (
               <>
                 <button
-                  onClick={() => navigate('/dashboard', { replace: true })}
+                  onClick={() => navigate('/dashboard/settings', { replace: true })}
                   className="flex-1 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 font-black rounded-lg transition-colors"
                 >
                   Go to Dashboard
@@ -175,7 +175,7 @@ function PaymentSuccess() {
             )}
             {status === 'success' && (
               <button
-                onClick={() => navigate('/dashboard', { replace: true })}
+                onClick={() => navigate('/dashboard/settings', { replace: true })}
                 className="w-full px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-black rounded-lg transition-colors"
               >
                 Go to Dashboard Now
