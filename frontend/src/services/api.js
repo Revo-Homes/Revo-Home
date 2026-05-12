@@ -153,6 +153,7 @@ export const propertyApi = {
   getDocuments: (id) => get(`/properties/${id}/documents`),
 getResaleDocuments: (id) => get(`/properties/${id}/resale-documents`),
    getPropertyTags: (id) => get(`/properties/${id}/tags`),
+   getAgents: (id) => get(`/properties/${id}/agents`),
   uploadImages: (id, formData) => {
     const url = buildUrl(`/properties/${id}/images`);
     return fetch(url, {

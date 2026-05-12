@@ -88,17 +88,20 @@ function PropertyCard({
 
   // Process labels with priority: sold_out overrides everything
   const processedLabels = (() => {
-    const labelSlugs = labels || [];
+    const labelSlugs = Array.isArray(labels) ? [...new Set(labels)] : [];
 
     // If sold_out is present, only show that
     if (labelSlugs.includes('sold_out')) {
       return ['sold_out'];
     }
 
-    // Sort by priority and take max 2
-    return labelSlugs
-      .sort((a, b) => LABEL_PRIORITY.indexOf(a) - LABEL_PRIORITY.indexOf(b))
-      .slice(0, 2);
+    const getPriorityIndex = (slug) => {
+      const idx = LABEL_PRIORITY.indexOf(slug);
+      return idx === -1 ? LABEL_PRIORITY.length : idx;
+    };
+
+    // Sort by priority and show all available labels
+    return labelSlugs.sort((a, b) => getPriorityIndex(a) - getPriorityIndex(b));
   })();
 
   // Legacy badge support (for backward compatibility)

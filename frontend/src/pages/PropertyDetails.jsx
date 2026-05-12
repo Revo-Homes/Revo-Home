@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { jsPDF } from 'jspdf';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useProperty } from '../contexts/PropertyContext';
@@ -13,6 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   MapPin,
   BedDouble,
+  Bath,
   Maximize,
   Home,
   Lock,
@@ -440,6 +442,12 @@ const buildPriceConfigurations = (property) => {
     []
   );
 
+  const floorPlanImages = Array.isArray(property?.floorPlans)
+    ? property.floorPlans
+        .map((item) => (typeof item === 'string' ? item : getMediaUrl(item)))
+        .filter(Boolean)
+    : [];
+
   const normalizedUnits = unitSources
     .map((unit, index) => {
       if (typeof unit !== 'object' || unit === null) return null;
@@ -460,7 +468,7 @@ const buildPriceConfigurations = (property) => {
         kitchens: parseInt(unit.kitchens || unit.configuration?.kitchens || 0),
         balconies: parseInt(unit.balconies || unit.configuration?.balconies || 0),
         halls: parseInt(unit.halls || unit.configuration?.halls || 0),
-        floorPlan: unit.floorPlan || unit.floor_plan_url || unit.url
+        floorPlan: unit.floorPlan || unit.floor_plan_url || unit.url || floorPlanImages[index] || floorPlanImages[0] || null
       };
     })
     .filter(Boolean);
@@ -476,6 +484,7 @@ const buildPriceConfigurations = (property) => {
         property.price_min !== property.price_max
         ? `${formatShortPrice(property.price_min)} - ${formatShortPrice(property.price_max)}`
         : formatShortPrice(property?.price || property?.price_min),
+    floorPlan: floorPlanImages[0] || null,
   }];
 };
 
@@ -484,6 +493,14 @@ const normalizeBhkLabel = (value) => {
   const text = String(value).trim();
   if (!text) return 'N/A';
   return /bhk/i.test(text) ? text : `${text} BHK`;
+};
+
+const formatFurnishingStatus = (value) => {
+  if (!value && value !== 0) return null;
+  return String(value)
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .trim();
 };
 
 const formatCompactCurrency = (value) => {
@@ -501,6 +518,40 @@ const formatDateLabel = (value) => {
     month: 'short',
     year: 'numeric',
   });
+};
+
+const buildConfigLabel = (property) => {
+  const configs = property?.unitConfigurations || [];
+  if (configs.length > 1) {
+    const bhks = [...new Set(configs.map(c => normalizeBhkLabel(c.bhk)).filter(Boolean))];
+    if (bhks.length > 1) return bhks.join(', ');
+  }
+  return normalizeBhkLabel(property?.bhk || property?.configuration || property?.config);
+};
+
+const buildAreaLabel = (property) => {
+  const configs = property?.unitConfigurations || [];
+  const areas = configs.map(c => Number(c.area)).filter(n => n > 0);
+  if (areas.length > 1) {
+    const min = Math.min(...areas);
+    const max = Math.max(...areas);
+    if (min !== max) return `${min} - ${max} sq.ft`;
+  }
+  return property?.area ? `${property.area} sq.ft` : null;
+};
+
+const buildBathLabel = (property) => {
+  const configs = property?.unitConfigurations || [];
+  const baths = configs.map(c => Number(c.bathrooms)).filter(n => n > 0);
+  if (baths.length > 1) {
+    const min = Math.min(...baths);
+    const max = Math.max(...baths);
+    if (min !== max) return `${min}-${max} Baths`;
+    return `${min} Bath${min !== 1 ? 's' : ''}`;
+  }
+  const single = baths[0] || Number(property?.bathrooms);
+  if (!single) return null;
+  return `${single} Bath${single !== 1 ? 's' : ''}`;
 };
 
 const buildSimilarProperties = (allListings, currentProperty) => {
@@ -814,29 +865,42 @@ const SectionTitle = ({ icon: Icon, title, action }) => (
   </div>
 );
 
-const InfoBadge = ({ icon: Icon, label, value, highlight = false }) => (
-  <div className={`flex flex-col items-center text-center gap-2 rounded-xl px-2 py-3 min-w-0 ${highlight ? 'bg-primary/5 border border-primary/10' : 'bg-gray-50'
-    }`}>
-    {Icon && (
-      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${highlight ? 'bg-primary/15' : 'bg-white shadow-sm border border-gray-100'
-        }`}>
-        <Icon size={18} className={highlight ? 'text-primary' : 'text-gray-500'} />
+const InfoBadge = ({ icon: Icon, label, value, highlight = false, title }) => {
+  const normalizedValue = value === null || value === undefined ? '' : value;
+  const shouldHide =
+    normalizedValue === '' ||
+    (typeof normalizedValue === 'string' && normalizedValue.trim().toUpperCase() === 'N/A');
+
+  if (shouldHide) {
+    return null;
+  }
+
+  const normalizedTitle = title ?? (typeof normalizedValue === 'string' || typeof normalizedValue === 'number' ? String(normalizedValue) : '');
+
+  return (
+    <div className={`flex flex-col items-center text-center gap-2 rounded-xl px-2 py-3 min-w-0 ${highlight ? 'bg-primary/5 border border-primary/10' : 'bg-gray-50'
+      }`}>
+      {Icon && (
+        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${highlight ? 'bg-primary/15' : 'bg-white shadow-sm border border-gray-100'
+          }`}>
+          <Icon size={18} className={highlight ? 'text-primary' : 'text-gray-500'} />
+        </div>
+      )}
+      <div className="w-full min-w-0">
+        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide leading-tight mb-0.5">
+          {label}
+        </p>
+        <p
+          className={`text-xs font-bold leading-tight truncate w-full ${highlight ? 'text-primary' : 'text-gray-900'
+            }`}
+          title={normalizedTitle}
+        >
+          {value}
+        </p>
       </div>
-    )}
-    <div className="w-full min-w-0">
-      <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide leading-tight mb-0.5">
-        {label}
-      </p>
-      <p
-        className={`text-xs font-bold leading-tight truncate w-full ${highlight ? 'text-primary' : 'text-gray-900'
-          }`}
-        title={value}
-      >
-        {value}
-      </p>
     </div>
-  </div>
-);
+  );
+};
 
 const HighlightCard = ({ icon: Icon, text }) => (
   <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
@@ -1503,7 +1567,6 @@ function PropertyDetails() {
   const isGuestView = !isLoggedIn;
   const priceConfigurations = buildPriceConfigurations(property);
   const similarProperties = buildSimilarProperties(listings, property);
-  const mediaGroups = buildGroupedMedia(property);
 
   // Load reviews from localStorage and merge with backend reviews
   useEffect(() => {
@@ -1620,7 +1683,7 @@ function PropertyDetails() {
 
   const generateAndDownloadDocument = () => {
     // Create a comprehensive property document using jsPDF
-    const { jsPDF } = require('jspdf');
+  
     const doc = new jsPDF();
 
     // Header
@@ -1836,26 +1899,22 @@ function PropertyDetails() {
                 <span className="px-3 py-1.5 bg-white/95 backdrop-blur-lg text-gray-900 rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg border border-white/50">
                   {property.propertyType}
                 </span>
-                {(!!property.is_featured || (property.labels || []).includes('featured')) && (
-                  <span className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg flex items-center gap-1">
-                    <Star size={10} className="fill-current" /> Featured
-                  </span>
-                )}
-                {(!!property.is_exclusive || (property.labels || []).includes('exclusive')) && (
-                  <span className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg flex items-center gap-1">
-                    <Award size={10} /> Exclusive
-                  </span>
-                )}
-                {(property.labels || []).includes('hot_sale') && (
-                  <span className="px-3 py-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg flex items-center gap-1">
-                    <Flame size={10} /> Hot Sale
-                  </span>
-                )}
-                {(property.labels || []).includes('few_units_left') && (
-                  <span className="px-3 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg">
-                    Few Units Left
-                  </span>
-                )}
+                {(property.labels || []).map((slug) => {
+                  const badgeConfig = {
+                    featured: { text: 'Featured', classes: 'bg-amber-500 text-white' },
+                    exclusive: { text: 'Exclusive', classes: 'bg-purple-500 text-white' },
+                    hot_sale: { text: 'Hot Sale', classes: 'bg-red-500 text-white' },
+                    few_units_left: { text: 'Few Units Left', classes: 'bg-orange-500 text-white' },
+                    top_selling: { text: 'Top Selling', classes: 'bg-blue-500 text-white' },
+                    sold_out: { text: 'Sold Out', classes: 'bg-gray-500 text-white' },
+                  }[slug] || { text: slug.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()), classes: 'bg-gray-800 text-white' };
+
+                  return (
+                    <span key={slug} className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg flex items-center gap-1 ${badgeConfig.classes}`}>
+                      {badgeConfig.text}
+                    </span>
+                  );
+                })}
               </div>
               <img
                 src={property.images?.[0] || property.image || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200'}
@@ -1897,26 +1956,22 @@ function PropertyDetails() {
                 <span className="px-3 py-1.5 bg-white/95 backdrop-blur-lg text-gray-900 rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg border border-white/50">
                   {property.propertyType}
                 </span>
-                {(!!property.is_featured || (property.labels || []).includes('featured')) && (
-                  <span className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg flex items-center gap-1">
-                    <Star size={10} className="fill-current" /> Featured
-                  </span>
-                )}
-                {(!!property.is_exclusive || (property.labels || []).includes('exclusive')) && (
-                  <span className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg flex items-center gap-1">
-                    <Award size={10} /> Exclusive
-                  </span>
-                )}
-                {(property.labels || []).includes('hot_sale') && (
-                  <span className="px-3 py-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg flex items-center gap-1">
-                    <Flame size={10} /> Hot Sale
-                  </span>
-                )}
-                {(property.labels || []).includes('few_units_left') && (
-                  <span className="px-3 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg">
-                    Few Units Left
-                  </span>
-                )}
+                {(property.labels || []).map((slug) => {
+                  const badgeConfig = {
+                    featured: { text: 'Featured', classes: 'bg-amber-500 text-white' },
+                    exclusive: { text: 'Exclusive', classes: 'bg-purple-500 text-white' },
+                    hot_sale: { text: 'Hot Sale', classes: 'bg-red-500 text-white' },
+                    few_units_left: { text: 'Few Units Left', classes: 'bg-orange-500 text-white' },
+                    top_selling: { text: 'Top Selling', classes: 'bg-blue-500 text-white' },
+                    sold_out: { text: 'Sold Out', classes: 'bg-gray-500 text-white' },
+                  }[slug] || { text: slug.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()), classes: 'bg-gray-800 text-white' };
+
+                  return (
+                    <span key={slug} className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide shadow-lg flex items-center gap-1 ${badgeConfig.classes}`}>
+                      {badgeConfig.text}
+                    </span>
+                  );
+                })}
               </div>
               <ImageGallery images={property.images} title={property.title} />
             </div>
@@ -2042,29 +2097,56 @@ function PropertyDetails() {
                   </div>
                 </div>
               </div>
-
               {/* Key Highlights Row */}
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 mb-6">
-                <InfoBadge icon={BedDouble} label="Configuration" value={normalizeBhkLabel(property.bhk || property.configuration || property.config)} highlight />
-                <InfoBadge icon={Maximize} label="Carpet Area" value={property.area ? `${property.area} sq.ft` : 'N/A'} />
-                <InfoBadge icon={Home} label="Furnishing" value={property.furnished || 'N/A'} />
-                <InfoBadge icon={Building2} label="Developer" value={property.developer || 'N/A'} />
-                <InfoBadge icon={Calendar} label="Possession" value={formatDateLabel(property.possessionDate) || 'N/A'} />
-
-              </div>
+<div className="flex flex-wrap gap-3 mb-6">
+  {[
+    { icon: BedDouble, label: 'Configuration', value: buildConfigLabel(property), highlight: true },
+    { icon: Maximize, label: 'Carpet Area', value: buildAreaLabel(property) },
+    { icon: Home, label: 'Furnishing', value: formatFurnishingStatus(property.furnished) },
+    { icon: Bath, label: 'Bathrooms', value: buildBathLabel(property) },
+    ...(property.organization_type === 'builder' && property.developer ? [{
+      icon: Building2,
+      label: 'Developer',
+      value: property.developer,
+      isLink: true,
+    }] : []),
+    { icon: Calendar, label: 'Possession', value: formatDateLabel(property.possessionDate) },
+  ].filter(item => item.value).map((item, idx) => (
+    <div key={idx} className="flex-1 min-w-[120px]">
+      <InfoBadge
+        icon={item.icon}
+        highlight={item.highlight}
+        label={item.label}
+        title={typeof item.value === 'string' ? item.value : item.label}
+        value={
+          item.isLink ? (
+            <Link
+              to={`/properties?developer=${encodeURIComponent(item.value)}`}
+              className="text-primary underline"
+            >
+              {item.value}
+            </Link>
+          ) : item.value
+        }
+      />
+    </div>
+  ))}
+</div>
 
               <div className="space-y-6">
-                <div>
-                  <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <FileText className="text-primary" size={18} />
-                    Description
-                  </h3>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-gray-700 leading-relaxed text-sm">
-                      {property.description || 'No description available'}
-                    </p>
+                {property.description && (
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <FileText className="text-primary" size={18} />
+                      Description
+                    </h3>
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <p className="text-gray-700 leading-relaxed text-sm">
+                        {property.description}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Guest Login Prompt Banner */}
                 {isGuestView && (
@@ -2094,89 +2176,6 @@ function PropertyDetails() {
 
             {!isGuestView && (
               <>
-                {/* MEDIA GALLERY SECTION */}
-                <section id="media-gallery" className="SectionCard scroll-mt-32">
-                  <SectionTitle icon={Eye} title="Media Gallery" />
-                  <div className="space-y-5">
-                    <GroupedMediaSection
-                      icon={Eye}
-                      title="Property Images"
-                      description="Main listing photos and gallery images."
-                      count={mediaGroups.images.length}
-                      emptyText="No property images uploaded yet"
-                    >
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        {mediaGroups.images.map((item, idx) => (
-                          <ImageMediaCard key={`${item.url}-${idx}`} item={item} label="Image" />
-                        ))}
-                      </div>
-                    </GroupedMediaSection>
-
-                    <GroupedMediaSection
-                      icon={Maximize}
-                      title="Floor Plans"
-                      description="Layout images and plan files separated from property photos."
-                      count={mediaGroups.floorPlans.length}
-                      emptyText="No floor plans uploaded yet"
-                      tone="blue"
-                    >
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        {mediaGroups.floorPlans.map((item, idx) => (
-                          isImageUrl(item.url) ? (
-                            <ImageMediaCard key={`${item.url}-${idx}`} item={item} label="Floor Plan" contain />
-                          ) : (
-                            <DocumentMediaCard key={`${item.url}-${idx}`} item={item} />
-                          )
-                        ))}
-                      </div>
-                    </GroupedMediaSection>
-
-                    <GroupedMediaSection
-                      icon={Video}
-                      title="Videos / Walkthroughs"
-                      description="Uploaded videos and virtual walkthrough files."
-                      count={mediaGroups.videos.length}
-                      emptyText="No videos available"
-                      tone="purple"
-                    >
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        {mediaGroups.videos.map((item, idx) => (
-                          <VideoMediaCard key={`${item.url}-${idx}`} item={item} />
-                        ))}
-                      </div>
-                    </GroupedMediaSection>
-
-                    <GroupedMediaSection
-                      icon={ExternalLink}
-                      title="YouTube / External Links"
-                      description="Clickable media links that open safely in a new tab."
-                      count={mediaGroups.links.length}
-                      emptyText="No YouTube or external links available"
-                    >
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        {mediaGroups.links.map((item, idx) => (
-                          <LinkMediaCard key={`${item.url}-${idx}`} item={item} />
-                        ))}
-                      </div>
-                    </GroupedMediaSection>
-
-                    <GroupedMediaSection
-                      icon={FileText}
-                      title="Brochures / Documents / Other Files"
-                      description="Brochures, approvals, PDFs, and supporting files."
-                      count={mediaGroups.documents.length}
-                      emptyText="No brochures or documents uploaded yet"
-                      tone="green"
-                    >
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        {mediaGroups.documents.map((item, idx) => (
-  <DocumentMediaCard key={`${item.url}-${idx}`} item={item} onOpen={handleDownloadDocuments} />
-))}
-                      </div>
-                    </GroupedMediaSection>
-                  </div>
-                </section>
-
                 {/* PRICE CONFIGURATION SECTION */}
                 <section id="floor-plans" className="SectionCard scroll-mt-32">
                   <SectionTitle
@@ -2236,12 +2235,14 @@ function PropertyDetails() {
                         >
                           <div className="h-28 bg-white rounded-lg mb-3 flex items-center justify-center shadow-sm overflow-hidden border border-gray-100">
                             {config.floorPlan ? (
-                              <img
-                                src={config.floorPlan}
-                                alt={`${config.bhk} Floor Plan`}
-                                className="w-full h-full object-contain p-2 hover:scale-110 transition-transform"
-                              />
-                            ) : (
+  <a href={config.floorPlan} target="_blank" rel="noopener noreferrer" className="w-full h-full flex items-center justify-center">
+    <img
+      src={config.floorPlan}
+      alt={`${config.bhk} Floor Plan`}
+      className="w-full h-full object-contain p-2 hover:scale-110 transition-transform"
+    />
+  </a>
+) : (
                               <Maximize className="text-gray-300" size={32} />
                             )}
                           </div>
@@ -2430,16 +2431,16 @@ function PropertyDetails() {
               )}
             </section>
 
-            {/* TOP EXPERTS SECTION - Backend Ready */}
-            <section id="experts" className="SectionCard scroll-mt-32">
-              <SectionTitle
-                icon={Award}
-                title={property?.city ? `Top Experts in ${property.city}` : "Top Experts Near You"}
-              />
-
-              {/* Backend-ready data extraction */}
-              <ExpertsCarousel property={property} handleExpertContact={handleExpertContact} />
-            </section>
+            {/* TOP EXPERTS SECTION - Only shown if agents are assigned */}
+{Array.isArray(property?.experts) && property.experts.length > 0 && (
+  <section id="experts" className="SectionCard scroll-mt-32">
+    <SectionTitle
+      icon={Award}
+      title={property?.city ? `Top Experts in ${property.city}` : "Top Experts Near You"}
+    />
+    <ExpertsCarousel property={property} handleExpertContact={handleExpertContact} />
+  </section>
+)}
 
             {/* REVIEWS SECTION - LAST SECTION */}
             <section id="reviews" className="SectionCard scroll-mt-32">

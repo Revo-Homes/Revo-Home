@@ -302,6 +302,7 @@ const bhk = bhkFromMeta
     item.unit_furnished_status ||
     item.furnished_status ||
     item.furnished ||
+    (Array.isArray(bhkDetails) ? bhkDetails[0]?.furnishing_status : null) ||
     meta?.furnishing_status ||
     '';
 
@@ -333,13 +334,17 @@ const bhk = bhkFromMeta
     }
     let result = [];
     if (Array.isArray(tags)) {
-      const slugs = tags
+      const uniqueSlugs = [...new Set(tags
         .filter(Boolean)
         .map(t => t?.slug || t?.tag_slug || t)
-        .filter(s => typeof s === 'string');
-      if (slugs.includes('sold_out')) return ['sold_out'];
+        .filter(s => typeof s === 'string'))];
+      if (uniqueSlugs.includes('sold_out')) return ['sold_out'];
       const priority = ['sold_out', 'few_units_left', 'hot_sale', 'featured', 'top_selling', 'exclusive'];
-      result = slugs.sort((a, b) => priority.indexOf(a) - priority.indexOf(b)).slice(0, 2);
+      const priorityIndex = (slug) => {
+        const idx = priority.indexOf(slug);
+        return idx === -1 ? priority.length : idx;
+      };
+      result = uniqueSlugs.sort((a, b) => priorityIndex(a) - priorityIndex(b));
     } else if (typeof item.tags === 'string' && item.tags.trim()) {
       result = [item.tags.trim().toLowerCase().replace(/\s+/g, '_')];
     }
@@ -1086,11 +1091,35 @@ if (cached) {
         const tagsResponse = await propertyApi.getPropertyTags(propId);
         const tagList = Array.isArray(tagsResponse) ? tagsResponse : (tagsResponse?.data || []);
         if (tagList.length > 0) {
-          const slugs = tagList.map(t => t.slug || t.tag_slug).filter(Boolean);
-          normalized.labels = slugs.includes('sold_out') ? ['sold_out'] : slugs.slice(0, 2);
+          const slugs = [...new Set(tagList
+            .map(t => (typeof t === 'string' ? t : t?.slug || t?.tag_slug))
+            .filter(Boolean))];
+          normalized.labels = slugs.includes('sold_out') ? ['sold_out'] : slugs;
         }
       }
     } catch (tagErr) { /* silent */ }
+    try {
+  const propId = normalized.propertyId || normalized.property_id;
+  if (propId) {
+    const agentsResponse = await propertyApi.getAgents(propId);
+    const agentList = Array.isArray(agentsResponse?.data)
+      ? agentsResponse.data
+      : Array.isArray(agentsResponse)
+      ? agentsResponse
+      : [];
+    normalized.experts = agentList.map((agent) => ({
+      id: agent.agent_id,
+      name: `${agent.first_name || ''} ${agent.last_name || ''}`.trim() || 'Agent',
+      role: agent.role || 'Property Expert',
+      phone: agent.phone || '',
+      email: agent.email || '',
+      totalProperties: 0,
+      languages: ['English'],
+    }));
+  }
+} catch (agentErr) {
+  normalized.experts = [];
+}
 
     try {
       const propId = normalized.propertyId || normalized.property_id;

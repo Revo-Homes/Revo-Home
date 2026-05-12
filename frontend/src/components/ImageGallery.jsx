@@ -16,48 +16,44 @@ const ImageGallery = ({ images = [], title }) => {
   };
 
   return (
-    <div className="space-y-4">
-      {/* Main Gallery Layout */}
-      <div className="flex gap-4 h-[400px] md:h-[550px]">
-        {/* Main Large Image - moved to the right */}
-        <div className="flex-1 relative order-2 md:order-1">
-          <motion.div 
-            className="w-full h-full relative group cursor-pointer overflow-hidden rounded-2xl"
-            whileHover={{ scale: 1.01 }}
-            onClick={() => openLightbox(0)}
-          >
-            <img 
-              src={images[0]} 
-              alt={title} 
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              loading="lazy"
-            />
-            <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors" />
-            <button className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
-              <Maximize2 size={20} className="text-gray-800" />
-            </button>
-          </motion.div>
-        </div>
+    <div className="space-y-3">
+      {/* Main Large Image */}
+      <div className="relative h-[340px] md:h-[480px]">
+        <motion.div
+          className="w-full h-full relative group cursor-pointer overflow-hidden rounded-2xl"
+          whileHover={{ scale: 1.01 }}
+          onClick={() => openLightbox(0)}
+        >
+          <img
+            src={images[0]}
+            alt={title}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            loading="lazy"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+          <button className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+            <Maximize2 size={20} className="text-gray-800" />
+          </button>
 
-        {/* Thumbnail Strip - horizontal scrolling */}
-        <div className="w-24 md:w-32 order-1 md:order-2">
-          <div className="h-full overflow-y-auto overflow-x-hidden space-y-2 custom-scrollbar">
+          {/* Thumbnails overlaid at bottom */}
+          <div className="absolute bottom-3 left-3 right-3 flex gap-2 overflow-x-auto no-scrollbar"
+            onClick={(e) => e.stopPropagation()}
+          >
             {images.map((img, idx) => (
-              <motion.div 
+              <motion.div
                 key={idx}
-                className={`relative group cursor-pointer overflow-hidden rounded-xl flex-shrink-0 ${
-                  idx === 0 ? 'ring-2 ring-primary' : ''
+                className={`relative group/thumb cursor-pointer overflow-hidden rounded-xl flex-shrink-0 ${
+                  idx === activeIndex ? 'ring-2 ring-primary' : 'ring-1 ring-white/40'
                 }`}
-                whileHover={{ scale: 1.02 }}
+                whileHover={{ scale: 1.05 }}
                 onClick={() => openLightbox(idx)}
               >
-                <img 
-                  src={img} 
-                  alt={`${title} - ${idx + 1}`} 
-                  className="w-full h-20 md:h-24 object-cover transition-transform duration-500 group-hover:scale-110"
+                <img
+                  src={img}
+                  alt={`${title} - ${idx + 1}`}
+                  className="w-14 h-12 md:w-20 md:h-16 object-cover transition-transform duration-500 group-hover/thumb:scale-110"
                   loading="lazy"
                 />
-                <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors" />
                 {idx === 0 && (
                   <div className="absolute top-1 left-1 bg-primary text-white text-xs px-1 py-0.5 rounded">
                     Main
@@ -66,7 +62,7 @@ const ImageGallery = ({ images = [], title }) => {
               </motion.div>
             ))}
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Fullscreen Lightbox */}
