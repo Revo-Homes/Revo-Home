@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { billingApi } from '../services/billingApi';
@@ -27,171 +27,243 @@ import {
   Lock,
   RefreshCw,
   AlertTriangle,
+  ChevronUp,
+  Target,
+  Sparkles,
+  ShieldCheck,
+  Play,
+  Briefcase,
+  Smartphone,
+  Globe,
+  Share2,
+  PieChart,
+  MessageSquare
 } from 'lucide-react';
 
-// Plan hierarchy for upgrade logic
+// --- Constants & Data ---
+
 const PLAN_HIERARCHY = {
   simple: 1,
+  basic: 1,
   advance: 2,
+  advanced: 2,
+  pro: 2,
   master: 3,
+  elite: 3,
+  luxury: 3,
+  enterprise: 3
 };
 
-// Normalize any plan name/ID into a lowercase hierarchy key
+const PLAN_TAGLINES = {
+  simple: "Perfect for independent property sellers",
+  advance: "Most preferred plan for faster deal closure",
+  master: "Full-service enterprise property selling solution"
+};
+
+const PLAN_HIGHLIGHTS = {
+  simple: ["Direct inquiry access", "Portal promotion", "Property showcase support"],
+  advance: ["Guaranteed sales support", "Filtered buyer leads", "Dedicated manager"],
+  master: ["Zero commission closure", "Broker network amplification", "Priority deal handling"]
+};
+
+const FEATURE_CATEGORIES = [
+  {
+    name: "Marketing",
+    features: [
+      { id: "insta_reels", name: "Instagram Reels", simple: false, advance: true, master: true, badge: "NEW" },
+      { id: "whatsapp_mkt", name: "WhatsApp Marketing", simple: false, advance: true, master: true, badge: "POPULAR" },
+      { id: "prop_video", name: "Property Showcase Video", simple: true, advance: true, master: true },
+      { id: "newspaper_ad", name: "Newspaper Classified Ad", simple: false, advance: false, master: true },
+      { id: "landing_page", name: "Property Landing Page", simple: false, advance: false, master: true },
+    ]
+  },
+  {
+    name: "Lead Management",
+    features: [
+      { id: "inquiries", name: "Lead Quality", simple: "Raw", advance: "Filtered", master: "Filtered" },
+      { id: "privacy", name: "Phone Number Privacy", simple: true, advance: true, master: true },
+      { id: "spam_free", name: "Freedom from Spam Calls", simple: true, advance: true, master: true, badge: "MOST LOVED" },
+    ]
+  },
+  {
+    name: "Sales Support",
+    features: [
+      { id: "negotiation", name: "Sales Negotiation Support", simple: false, advance: true, master: true },
+      { id: "site_visits", name: "Site Visit Support", simple: false, advance: false, master: true },
+      { id: "agreement", name: "Legal Agreement Support", simple: true, advance: true, master: true },
+    ]
+  },
+  {
+    name: "Enterprise Support",
+    features: [
+      { id: "rel_manager", name: "Relationship Manager", simple: false, advance: true, master: true, badge: "PREMIUM" },
+      { id: "closing_manager", name: "Closing Manager", simple: false, advance: true, master: true },
+      { id: "progress_reports", name: "Weekly Progress Reports", simple: false, advance: true, master: true },
+    ]
+  },
+  {
+    name: "Guarantees",
+    features: [
+      { id: "guaranteed_sell", name: "Guaranteed Sell", simple: false, advance: true, master: true, badge: "LIMITED" },
+      { id: "money_back", name: "Money-Back Guarantee", simple: false, advance: true, master: true },
+    ]
+  }
+];
+
+const METRICS = [
+  { label: "Deals Closed", value: "₹250Cr+", icon: <Briefcase className="h-5 w-5" /> },
+  { label: "Leads Generated", value: "18K+", icon: <Target className="h-5 w-5" /> },
+  { label: "Properties Listed", value: "3500+", icon: <Building className="h-5 w-5" /> },
+  { label: "Faster Closures", value: "92%", icon: <Zap className="h-5 w-5" /> },
+];
+
+const AFTER_PURCHASE_STEPS = [
+  { title: "Plan Activated", desc: "Instant access to your seller dashboard and tools." },
+  { title: "Relationship Manager Assigned", desc: "A dedicated expert contacts you within 4 hours." },
+  { title: "Property Marketing Starts", desc: "Professional shoots and multi-platform campaigns go live." },
+  { title: "Buyer Leads Generated", desc: "Verified and filtered inquiries start arriving." },
+  { title: "Deal Closure Assistance", desc: "Expert negotiation and legal support until the deal is won." }
+];
+
+const WHY_CHOOSE_US = [
+  { title: "Verified Buyers", desc: "No more time-wasters. Every lead is pre-screened for intent and budget.", icon: <Users /> },
+  { title: "Faster Closures", desc: "Our data-driven matching closes deals 3x faster than traditional methods.", icon: <Zap /> },
+  { title: "Multi-platform Promotion", desc: "Reach buyers across Instagram, Facebook, Google, and premium portals.", icon: <Globe /> },
+  { title: "Legal & Agreement Support", desc: "End-to-end documentation handling for a stress-free experience.", icon: <FileText /> },
+  { title: "Zero Spam Calls", desc: "Your privacy is protected. We filter all initial calls for you.", icon: <Smartphone /> },
+  { title: "Dedicated Managers", desc: "Expert guidance at every step of your selling journey.", icon: <Headphones /> }
+];
+
+const FAQ_DATA = [
+  { q: "How does plan activation work?", a: "Once payment is confirmed, your dashboard is instantly upgraded. A welcome kit and manager assignment follow within hours." },
+  { q: "Can I upgrade later?", a: "Absolutely. You can upgrade to a higher tier at any time. We'll prorate your existing plan value toward the new one." },
+  { q: "Is GST included?", a: "Prices shown are base prices. 18% GST will be applied during checkout." },
+  { q: "How does the Money-Back Guarantee work?", a: "On Advance and Master plans, if we don't deliver verified leads within 30 days, you're eligible for a refund as per our terms." },
+  { q: "What is 'Guaranteed Sell'?", a: "It's our commitment to continue premium marketing and negotiation until your property is closed, beyond the standard plan duration." }
+];
+
+// --- Helper Functions ---
+
 function normalizePlanKey(value = '') {
-  return value
-    .toString()
-    .toLowerCase()
-    .trim()
-    .replace(/plan/g, '')
-    .replace(/[^a-z]/g, '')
-    .trim();
+  return value.toString().toLowerCase().trim().replace(/plan/g, '').replace(/[^a-z]/g, '').trim();
 }
 
-// Extract current plan key from subscription object
 function getCurrentPlanKey(subscription) {
   if (!subscription) return null;
-
   const possibleValues = [
-    subscription.current_plan_slug,
-    subscription.current_plan,
-    subscription.plan_slug,
-    subscription.plan_id,
-    subscription.tier,
-    subscription.name,
-    subscription?.plan?.slug,
-    subscription?.plan?.name,
-    subscription?.plan?.id,
-    subscription?.plan?.displayName,
-    subscription.id,
+    subscription.current_plan_slug, subscription.current_plan, subscription.plan_slug,
+    subscription.plan_id, subscription.tier, subscription.name, subscription?.plan?.slug,
+    subscription?.plan?.name, subscription?.plan?.id, subscription?.plan?.displayName,
+    subscription.planName, subscription.planSlug
   ];
-
   for (const value of possibleValues) {
     if (!value) continue;
     const normalized = normalizePlanKey(value);
-    if (PLAN_HIERARCHY[normalized]) {
-      return normalized;
-    }
+    if (PLAN_HIERARCHY[normalized]) return normalized;
   }
   return null;
 }
 
-// Extract plan key from plan object
-function getPlanKey(plan) {
-  const possibleValues = [
-    plan.slug,
-    plan.name,
-    plan.displayName,
-    plan.id,
-  ];
-
-  for (const value of possibleValues) {
-    if (!value) continue;
-    const normalized = normalizePlanKey(value);
-    if (PLAN_HIERARCHY[normalized]) {
-      return normalized;
-    }
-  }
-  return null;
-}
-
-// Helper: determine plan action based on current subscription
-function getPlanAction(plan, currentSubscription) {
-  if (!currentSubscription) {
-    return { type: 'subscribe', label: 'Subscribe', disabled: false };
-  }
-
+function getPlanAction(planKey, currentSubscription) {
+  if (!currentSubscription) return { type: 'subscribe', label: 'Subscribe Now', disabled: false };
+  
   const currentPlanKey = getCurrentPlanKey(currentSubscription);
-  const planKey = getPlanKey(plan);
-
   const currentLevel = PLAN_HIERARCHY[currentPlanKey] || 0;
   const planLevel = PLAN_HIERARCHY[planKey] || 0;
 
-  if (import.meta.env.DEV) {
-    console.log({ currentPlanKey, planKey, currentLevel, planLevel });
-  }
-
-  // Current plan
-  if (currentLevel === planLevel) {
-    return { type: 'current', label: 'Current Plan', disabled: true };
-  }
-
-  // Lower plan → hide
-  if (planLevel < currentLevel) {
-    return { type: 'hidden', label: '', disabled: true };
-  }
-
-  // Higher plan → upgrade
-  if (planLevel > currentLevel) {
-    return { type: 'upgrade', label: `Upgrade to ${plan.name}`, disabled: false };
-  }
-
-  return { type: 'subscribe', label: 'Subscribe', disabled: false };
+  if (currentLevel === planLevel) return { type: 'current', label: 'Current Plan', disabled: true };
+  // Lower grade plans: hide button entirely (null type)
+  if (planLevel < currentLevel) return { type: 'hidden', label: '', disabled: true };
+  
+  return { type: 'upgrade', label: 'Upgrade Now', disabled: false };
 }
 
-function includedFeatureList(plan) {
-  const raw = plan?.features;
-  if (Array.isArray(raw)) return raw.filter(Boolean);
-  if (raw && typeof raw === 'object' && Array.isArray(raw.included_features)) {
-    return raw.included_features.filter(Boolean);
-  }
-  if (typeof raw === 'string') {
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed?.included_features)) return parsed.included_features.filter(Boolean);
-    } catch {
-      return [];
-    }
-  }
-  return [];
-}
+// --- Components ---
 
-// Skeleton loader
-function SubscriptionSkeleton() {
+const GlassCard = ({ children, className = "" }) => (
+  <div className={`bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl ${className}`}>
+    {children}
+  </div>
+);
+
+const AnimatedCounter = ({ value }) => {
+  // Simplified counter for now, could use a real hook
+  return <span className="font-bold">{value}</span>;
+};
+
+const ComparisonMatrix = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-zinc-50">
-      {/* Hero Skeleton */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900/20 via-transparent to-zinc-900/20" />
-        <div className="relative max-w-7xl mx-auto px-6 py-24">
-          <div className="text-center space-y-6">
-            <div className="h-12 w-96 mx-auto bg-slate-200 rounded-2xl animate-pulse" />
-            <div className="h-6 w-2/3 mx-auto bg-slate-200 rounded-xl animate-pulse" />
-            <div className="flex justify-center gap-4">
-              <div className="h-8 w-32 bg-slate-200 rounded-xl animate-pulse" />
-              <div className="h-8 w-32 bg-slate-200 rounded-xl animate-pulse" />
-              <div className="h-8 w-32 bg-slate-200 rounded-xl animate-pulse" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Current Subscription Card Skeleton */}
-      <div className="max-w-7xl mx-auto px-6 mb-12">
-        <div className="h-32 bg-white rounded-3xl border border-slate-200 shadow-sm animate-pulse" />
-      </div>
-
-      {/* Plan Cards Skeleton */}
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-8 space-y-4">
-                <div className="h-8 w-24 bg-slate-200 rounded-xl animate-pulse" />
-                <div className="h-12 w-32 bg-slate-200 rounded-xl animate-pulse" />
-                <div className="space-y-2">
-                  {[...Array(6)].map((_, j) => (
-                    <div key={j} className="h-4 bg-slate-200 rounded-lg animate-pulse" />
-                  ))}
-                </div>
-                <div className="h-12 bg-slate-200 rounded-xl animate-pulse" />
-              </div>
-            </div>
-          ))}
-        </div>
+    <div className="mt-20 overflow-hidden rounded-[32px] border border-white/10 bg-white/5 backdrop-blur-xl">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-white/10 bg-white/5">
+              <th className="p-8 text-sm font-semibold text-slate-400 uppercase tracking-widest">Feature Matrix</th>
+              <th className="p-8 text-center min-w-[200px]">
+                <span className="text-lg font-bold text-slate-300">Simple</span>
+              </th>
+              <th className="p-8 text-center min-w-[200px] bg-blue-500/5">
+                <span className="text-lg font-bold text-cyan-400">Advance</span>
+              </th>
+              <th className="p-8 text-center min-w-[200px] bg-amber-500/5">
+                <span className="text-lg font-bold text-amber-400">Master</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {FEATURE_CATEGORIES.map((cat, idx) => (
+              <React.Fragment key={idx}>
+                <tr className="bg-white/[0.02] border-b border-white/5">
+                  <td colSpan={4} className="px-8 py-4 text-xs font-black uppercase tracking-[0.3em] text-slate-500">
+                    {cat.name}
+                  </td>
+                </tr>
+                {cat.features.map((feat, fidx) => (
+                  <tr key={fidx} className="border-b border-white/5 hover:bg-white/5 transition-all duration-300">
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-3">
+                        <span className="text-slate-300 font-medium">{feat.name}</span>
+                        {feat.badge && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400">
+                            {feat.badge}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-8 py-6 text-center">
+                      <FeatureValue value={feat.simple} />
+                    </td>
+                    <td className="px-8 py-6 text-center bg-blue-500/5">
+                      <FeatureValue value={feat.advance} color="cyan" />
+                    </td>
+                    <td className="px-8 py-6 text-center bg-amber-500/5">
+                      <FeatureValue value={feat.master} color="amber" />
+                    </td>
+                  </tr>
+                ))}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
-}
+};
+
+const FeatureValue = ({ value, color = "slate" }) => {
+  if (typeof value === 'boolean') {
+    return value ? (
+      <div className={`mx-auto flex h-6 w-6 items-center justify-center rounded-full bg-${color === 'slate' ? 'emerald' : color}-500/20`}>
+        <Check className={`h-4 w-4 text-${color === 'slate' ? 'emerald' : color}-400`} />
+      </div>
+    ) : (
+      <div className="mx-auto h-0.5 w-4 bg-white/10 rounded-full" />
+    );
+  }
+  return <span className={`text-sm font-bold text-${color}-400`}>{value}</span>;
+};
+
+// --- Main Page Component ---
 
 export default function SubscriptionPage() {
   const { isLoggedIn, openLogin, user } = useAuth();
@@ -201,783 +273,370 @@ export default function SubscriptionPage() {
   const [currentSubscription, setCurrentSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [expandedFeatures, setExpandedFeatures] = useState({});
-  const [expandedFAQ, setExpandedFAQ] = useState({});
+  const [activeFAQ, setActiveFAQ] = useState(null);
 
   const subscriptionCacheKey = useMemo(() => {
     const userId = user?.id ? String(user.id) : "anon";
     const orgId = user?.organization_id || user?.organizationId || user?.organization?.id;
-    const orgPart = orgId ? String(orgId) : "org-unknown";
-    return `revo_current_subscription:${orgPart}:${userId}`;
-  }, [user?.id, user?.organization_id, user?.organizationId, user?.organization?.id]);
+    return `revo_sub:${orgId}:${userId}`;
+  }, [user]);
 
-  // Enhanced data fetching with current subscription
   useEffect(() => {
+    let isMounted = true;
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
-        setCurrentSubscription(null);
-
-        // Fetch plans and current subscription in parallel
-        const [plansResponse, subscriptionResponse] = await Promise.allSettled([
+        
+        // Fetch plans and subscription in parallel
+        const [plansRes, subRes] = await Promise.allSettled([
           billingApi.getPlans({ categoryKey: 'property_owner_sell' }),
-          billingApi.getCurrentSubscription().catch(() => null)
+          billingApi.getCurrentSubscription({ categoryKey: 'property_owner_sell' }).catch(() => null)
         ]);
 
-        // Handle plans data
-        if (plansResponse.status === 'fulfilled') {
-          let plansData = plansResponse.value?.plans || [];
+        if (!isMounted) return;
 
-          if (plansData.length === 0) {
-            // Fallback to hardcoded data
-            plansData = [
-              {
-                id: 'simple',
-                name: 'Simple',
-                displayName: 'Simple',
-                priceLabel: 'Rs. 15,000 + GST',
-                basePrice: 15000,
-                totalPrice: 17700,
-                service: '60 + 30 Days',
-                serviceValidityDays: 60,
-                bonusDays: 30,
-                features: {
-                  guaranteedSell: false,
-                  instagramReels: false,
-                  propertyShowcaseVideo: true,
-                  whatsappMarketing: false,
-                  rawInquiries: 'Raw',
-                  salesNegotiation: false,
-                  propertySiteVisit: false,
-                  promotionPortals: true,
-                  propertyLandingPage: false,
-                  promptReply: true,
-                  newspaperAd: false,
-                  brokerNetwork: true,
-                  propertyListing: true,
-                  progressReports: false,
-                  relationshipManager: false,
-                  closingManager: false,
-                  propertyAgreement: true,
-                  moneyBackGuarantee: 'NA'
-                }
-              },
-              {
-                id: 'advance',
-                name: 'Advance',
-                displayName: 'Advance',
-                priceLabel: 'Rs. 50,000 + GST',
-                basePrice: 50000,
-                totalPrice: 59000,
-                service: '60 + 60 Days',
-                serviceValidityDays: 60,
-                bonusDays: 60,
-                features: {
-                  guaranteedSell: true,
-                  instagramReels: true,
-                  propertyShowcaseVideo: true,
-                  whatsappMarketing: true,
-                  rawInquiries: 'Filtered',
-                  salesNegotiation: true,
-                  propertySiteVisit: false,
-                  promotionPortals: true,
-                  propertyLandingPage: false,
-                  promptReply: true,
-                  newspaperAd: false,
-                  brokerNetwork: true,
-                  propertyListing: true,
-                  progressReports: true,
-                  relationshipManager: true,
-                  closingManager: true,
-                  propertyAgreement: true,
-                  moneyBackGuarantee: 'Included'
-                }
-              },
-              {
-                id: 'master',
-                name: 'Master',
-                displayName: 'Master',
-                priceLabel: 'Rs. 1,00,000 + GST',
-                basePrice: 100000,
-                totalPrice: 118000,
-                service: '90 + 60 Days',
-                serviceValidityDays: 90,
-                bonusDays: 60,
-                features: {
-                  guaranteedSell: true,
-                  instagramReels: true,
-                  propertyShowcaseVideo: true,
-                  whatsappMarketing: true,
-                  rawInquiries: 'Filtered',
-                  salesNegotiation: true,
-                  propertySiteVisit: true,
-                  promotionPortals: true,
-                  propertyLandingPage: true,
-                  promptReply: true,
-                  newspaperAd: true,
-                  brokerNetwork: true,
-                  propertyListing: true,
-                  progressReports: true,
-                  relationshipManager: true,
-                  closingManager: true,
-                  propertyAgreement: true,
-                  moneyBackGuarantee: 'Included'
-                }
-              }
-            ];
+        if (plansRes.status === 'fulfilled') {
+          // Handle both { plans: [] } and raw [] response formats
+          const rawPlans = plansRes.value;
+          const plansData = Array.isArray(rawPlans) ? rawPlans : (rawPlans?.plans || []);
+          
+          if (plansData.length > 0) {
+            setPlans(plansData.map(p => ({
+              ...p,
+              slug: normalizePlanKey(p.slug || p.name || p.displayName)
+            })));
+          } else {
+            console.warn("No plans found for category: property_owner_sell");
           }
-
-          const transformedPlans = plansData.map((plan) => {
-            const basePrice = Number(plan.basePrice ?? plan.base_price ?? 0);
-            const totalPrice = Number(plan.totalPrice ?? plan.total_price ?? basePrice);
-            const incl = includedFeatureList(plan);
-            return {
-              id: plan.id,
-              slug: normalizePlanKey(
-                plan.slug || plan.name || plan.displayName
-              ),
-              categoryKey: plan.categoryKey || plan.category_key,
-              name: plan.displayName || plan.name,
-              displayName: plan.displayName || plan.name,
-              priceLabel: basePrice === 0 ? 'Free' : `Rs. ${basePrice.toLocaleString('en-IN')} + GST`,
-              basePrice,
-              totalPrice,
-              gstAmount: Number(plan.gstAmount ?? plan.gst_amount ?? 0),
-              gstRate: Number(plan.gstRate ?? plan.gst_rate ?? 18),
-              billingCycle: plan.billingCycle || plan.billing_cycle || 'one_time',
-              service: `${plan.serviceValidityDays ?? plan.service_validity_days ?? 0} + ${plan.bonusDays ?? plan.bonus_days ?? 0} Days`,
-              serviceValidityDays: plan.serviceValidityDays ?? plan.service_validity_days ?? 0,
-              bonusDays: plan.bonusDays ?? plan.bonus_days ?? 0,
-              includedFeatures: incl,
-              features: plan.features || {},
-              hasGuarantee: plan.hasGuarantee ?? plan.has_guarantee,
-              commissionPercent: plan.commissionPercent ?? plan.commission_percent,
-              badgeText: plan.badgeText ?? plan.badge_text,
-              isRecommended: plan.isRecommended ?? plan.is_recommended,
-            };
-          });
-          setPlans(transformedPlans);
         } else {
-          throw new Error('Failed to fetch plans');
+          console.error("Failed to fetch plans:", plansRes.reason);
+          setError("Failed to load subscription plans. Please try again.");
         }
-
-        // Handle current subscription — try multiple sources
-        let subscriptionData = null;
-        if (subscriptionResponse.status === 'fulfilled') {
-          subscriptionData = subscriptionResponse.value;
+        
+        if (subRes.status === 'fulfilled' && subRes.value) {
+          setCurrentSubscription(subRes.value.subscription || subRes.value);
         }
-        // If getCurrentSubscription returned null/404, try getActiveSubscription
-        if (!subscriptionData) {
-          try {
-            const activeSub = await billingApi.getActiveSubscription();
-            subscriptionData = activeSub;
-          } catch (e) {
-            // silent fail
-          }
-        }
-        // Final fallback: check localStorage cached subscription (scoped per user/org)
-        if (!subscriptionData) {
-          try {
-            const cached = localStorage.getItem(subscriptionCacheKey);
-            if (cached) subscriptionData = JSON.parse(cached);
-          } catch (e) {
-            // ignore parse error
-          }
-        }
-        if (subscriptionData) {
-          // Normalize: if API returns array, take first item; if nested under 'subscription', unwrap it
-          let normalized = subscriptionData;
-          if (Array.isArray(normalized)) normalized = normalized[0] || null;
-          if (normalized?.subscription) normalized = normalized.subscription;
-          if (normalized) {
-            setCurrentSubscription(normalized);
-            try {
-              localStorage.setItem(subscriptionCacheKey, JSON.stringify(normalized));
-            } catch {
-              // ignore quota errors
-            }
-            if (import.meta.env.DEV) {
-              console.log('[SubscriptionPage] Detected subscription:', normalized);
-            }
-          }
-        }
-
       } catch (err) {
-        console.error('Failed to fetch data:', err);
-        setError(err?.message || 'Failed to load subscription data');
+        if (isMounted) setError(err.message);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
-
+    
     fetchData();
-  }, [subscriptionCacheKey]);
+    return () => { isMounted = false; };
+  }, [user?.id, isLoggedIn]);
 
-  const handleSubscribe = (planId) => {
+  const handleAction = (plan) => {
     if (!isLoggedIn) return openLogin();
-    const selectedPlan = plans.find(
-      (p) => String(p.id) === String(planId) || p.slug === planId
-    );
-    if (!selectedPlan) return;
-
-    const params = new URLSearchParams(location.search);
-    const from = params.get('from') || location.state?.from;
-    const returnTo = location.state?.returnTo;
-    const savedStep = location.state?.savedStep;
-
-    navigate('/checkout', {
-      state: {
-        plan: selectedPlan,
-        categoryKey: selectedPlan.categoryKey || selectedPlan.category_key || 'property_owner_sell',
-        from,
-        returnTo,
-        savedStep
-      }
+    navigate('/checkout', { 
+      state: { 
+        plan, 
+        planId: plan.id || plan._id,
+        planSlug: plan.slug || normalizePlanKey(plan.name || plan.displayName),
+        categoryKey: 'property_owner_sell',
+        from: location.pathname 
+      } 
     });
   };
 
-  // Feature comparison data
-  const featureComparison = useMemo(() => [
-    {
-      category: 'Marketing',
-      icon: <Zap className="h-5 w-5" />,
-      features: [
-        { name: 'Instagram Reels', simple: false, advance: true, master: true },
-        { name: 'Property Showcase Video', simple: true, advance: true, master: true },
-        { name: 'WhatsApp Marketing', simple: false, advance: true, master: true },
-        { name: 'Newspaper Classified Ad', simple: false, advance: false, master: true },
-        { name: 'Property Landing Page', simple: false, advance: false, master: true },
-      ]
-    },
-    {
-      category: 'Lead Generation',
-      icon: <Users className="h-5 w-5" />,
-      features: [
-        { name: 'Raw Inquiries', simple: 'Raw', advance: 'Filtered', master: 'Filtered' },
-        { name: 'Prompt Reply to Inquiries', simple: true, advance: true, master: true },
-        { name: 'Privacy of Your Phone Number', simple: true, advance: true, master: true },
-        { name: 'Freedom from Irritating Calls', simple: true, advance: true, master: true },
-      ]
-    },
-    {
-      category: 'Brokerage Network',
-      icon: <Building className="h-5 w-5" />,
-      features: [
-        { name: 'Promotion to Broker Network', simple: true, advance: true, master: true },
-        { name: 'Property Listing on Our Portal', simple: true, advance: true, master: true },
-        { name: 'Promotion on Real Estate Portals', simple: true, advance: true, master: true },
-      ]
-    },
-    {
-      category: 'Deal Closure',
-      icon: <Award className="h-5 w-5" />,
-      features: [
-        { name: 'Sales Negotiation Support', simple: false, advance: true, master: true },
-        { name: 'Dedicated Closing Assistance', simple: false, advance: true, master: true },
-        { name: 'Property Site Visit Support', simple: false, advance: false, master: true },
-        { name: 'Property Agreement Service', simple: true, advance: true, master: true },
-      ]
-    },
-    {
-      category: 'Enterprise Support',
-      icon: <Headphones className="h-5 w-5" />,
-      features: [
-        { name: 'Relationship Manager', simple: false, advance: true, master: true },
-        { name: 'Progress Reports', simple: false, advance: true, master: true },
-        { name: 'Closing Manager', simple: false, advance: true, master: true },
-      ]
-    },
-    {
-      category: 'Guarantee & Protection',
-      icon: <Shield className="h-5 w-5" />,
-      features: [
-        { name: 'Guaranteed Sell', simple: false, advance: true, master: true },
-        { name: 'Money-Back Guarantee', simple: 'NA', advance: 'Included', master: 'Included' },
-        { name: 'Dedicated closing assistance', simple: false, advance: true, master: true },
-      ]
-    }
-  ], []);
-
-  // FAQ data
-  const faqData = [
-    {
-      question: 'How does plan activation work?',
-      answer: 'Once you complete the payment, your plan is activated immediately. You\'ll receive a confirmation email with all the details and access to your dashboard.'
-    },
-    {
-      question: 'Can I upgrade later?',
-      answer: 'Yes! You can upgrade to any higher plan at any time. The upgrade is prorated and you only pay the difference for the remaining period.'
-    },
-    {
-      question: 'Is GST included?',
-      answer: 'All prices mentioned are exclusive of GST. 18% GST is added at checkout. The total amount including GST will be shown before payment.'
-    },
-    {
-      question: 'What happens after payment?',
-      answer: 'After successful payment, you\'ll get immediate access to all features of your chosen plan. Our team will contact you within 24 hours to kickstart your property marketing.'
-    },
-    {
-      question: 'Is support included?',
-      answer: 'Yes! All plans include email support. Advance and Master plans include a dedicated relationship manager and priority support channels.'
-    },
-    {
-      question: 'How does guaranteed sales work?',
-      answer: 'Our guaranteed sell plans ensure your property gets sold within the specified period, or we provide additional marketing services until it sells, subject to terms and conditions.'
-    }
-  ];
-
-  if (loading) {
-    return <SubscriptionSkeleton />;
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-zinc-50 flex items-center justify-center px-6">
-        <div className="max-w-md w-full bg-white rounded-3xl border border-slate-200 shadow-sm p-8 text-center">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-slate-900 mb-2">Unable to Load Plans</h3>
-          <p className="text-slate-600 mb-6">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-colors"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen bg-[#050816] flex items-center justify-center"><Loader2 className="h-10 w-10 text-blue-500 animate-spin" /></div>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-zinc-50">
-      {/* Premium Hero Section */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900/20 via-transparent to-zinc-900/20" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(59,130,246,0.1),transparent_70%)]" />
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="relative max-w-7xl mx-auto px-6 py-24 text-center"
-        >
-          <div className="space-y-8">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              className="space-y-4"
-            >
-              <h1 className="text-4xl md:text-6xl font-bold text-slate-900 leading-tight">
-                Scale Your Property Sales With{' '}
-                <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  Premium Growth Plans
-                </span>
-              </h1>
-              <p className="text-lg md:text-xl text-slate-600 max-w-4xl mx-auto leading-relaxed">
-                End-to-end marketing, lead generation, brokerage distribution, negotiation support, and deal closure solutions for real estate projects.
-              </p>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="flex flex-wrap justify-center gap-4"
-            >
-              {[
-                { icon: <Building className="h-5 w-5" />, text: 'Trusted by Builders' },
-                { icon: <Shield className="h-5 w-5" />, text: 'Guaranteed Sales Support' },
-                { icon: <Zap className="h-5 w-5" />, text: 'Enterprise CRM Enabled' }
-              ].map((badge, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm border border-white/20 rounded-full shadow-sm"
-                >
-                  <div className="text-blue-600">{badge.icon}</div>
-                  <span className="text-sm font-medium text-slate-700">{badge.text}</span>
-                </div>
-              ))}
-            </motion.div>
-          </div>
-        </motion.div>
+    <div className="min-h-screen bg-[#050816] text-white selection:bg-blue-500/30 selection:text-white font-sans antialiased">
+      {/* 1. HERO SECTION */}
+      <section className="relative pt-32 pb-24 px-6 overflow-hidden">
+        {/* Layered luxury background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-1/3 w-[600px] h-[600px] bg-cyan-500/10 blur-[120px] rounded-full" />
+          <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-purple-500/10 blur-[120px] rounded-full" />
+          <motion.div 
+            animate={{ rotate: 360 }}
+            transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
+            className="absolute top-1/4 right-1/4 w-[400px] h-[400px] bg-blue-500/5 blur-[100px] rounded-full"
+          />
+        </div>
+
+        <div className="relative max-w-7xl mx-auto text-center space-y-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+            className="space-y-4"
+          >
+            <h1 className="text-6xl md:text-8xl font-black tracking-tight leading-[1.05]">
+              Sell Faster. <br />
+              <span className="bg-gradient-to-r from-blue-400 via-cyan-400 to-indigo-400 bg-clip-text text-transparent">
+                Close Smarter.
+              </span>
+            </h1>
+            <p className="text-xl md:text-2xl text-slate-400 max-w-3xl mx-auto leading-relaxed">
+              Premium Real Estate Growth Plans Built for Serious Sellers.
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="flex flex-wrap justify-center gap-4 pt-4"
+          >
+            {["10,000+ Qualified Buyers", "₹250Cr+ Property Transactions", "98% Client Satisfaction", "24hr Lead Response"].map((stat, i) => (
+              <GlassCard key={i} className="px-6 py-3 border-white/5 bg-white/[0.03]">
+                <span className="text-sm font-semibold text-slate-300 tracking-wide">{stat}</span>
+              </GlassCard>
+            ))}
+          </motion.div>
+        </div>
       </section>
 
-      {/* Current Subscription Status Card */}
-      {currentSubscription && (
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-          className="max-w-7xl mx-auto px-6 mb-12"
-        >
-          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-3xl p-8 shadow-sm">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="h-6 w-6 text-emerald-600" />
-                  <h3 className="text-lg font-semibold text-emerald-900">Current Active Plan</h3>
+      {/* 2. PRICING CARDS */}
+      <section className="relative px-6 py-20">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+            {['simple', 'advance', 'master'].map((tier, idx) => {
+              const plan = plans.find(p => p.slug === tier) || { name: tier.charAt(0).toUpperCase() + tier.slice(1), basePrice: tier === 'simple' ? 15000 : tier === 'advance' ? 50000 : 100000 };
+              const action = getPlanAction(tier, currentSubscription);
+              const isAdvance = tier === 'advance';
+              const isMaster = tier === 'master';
+
+              return (
+                <motion.div
+                  key={tier}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: idx * 0.1 }}
+                  whileHover={{ y: -8 }}
+                  className={`relative flex flex-col rounded-[40px] p-10 border transition-all duration-500 overflow-hidden
+                    ${tier === 'simple' ? 'bg-slate-900/50 border-slate-800 hover:border-slate-700' : ''}
+                    ${tier === 'advance' ? 'bg-gradient-to-br from-blue-600 via-cyan-600 to-indigo-600 border-white/20 shadow-[0_0_60px_rgba(59,130,246,0.35)]' : ''}
+                    ${tier === 'master' ? 'bg-gradient-to-br from-[#1a1a1a] via-[#111827] to-black border-amber-400/30 shadow-[0_0_80px_rgba(251,191,36,0.25)]' : ''}
+                  `}
+                >
+                  {/* Badge */}
+                  {isAdvance && (
+                    <div className="absolute top-6 right-8">
+                      <span className="px-4 py-1.5 bg-white text-blue-600 text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg">MOST POPULAR</span>
+                    </div>
+                  )}
+                  {isMaster && (
+                    <div className="absolute top-6 right-8">
+                      <span className="px-4 py-1.5 bg-amber-400 text-black text-[10px] font-black uppercase tracking-widest rounded-full">ELITE LUXURY</span>
+                    </div>
+                  )}
+
+                  <div className="flex-1 space-y-8">
+                    <div className="space-y-4">
+                      <h3 className={`text-lg font-black uppercase tracking-[0.2em] ${isAdvance ? 'text-white' : isMaster ? 'text-amber-400' : 'text-slate-400'}`}>
+                        {tier} Plan
+                      </h3>
+                      <div className="space-y-1">
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-5xl font-black tabular-nums">₹{plan.basePrice.toLocaleString()}</span>
+                          <span className={`text-sm font-medium ${isAdvance ? 'text-blue-100' : 'text-slate-500'}`}>+GST</span>
+                        </div>
+                        <p className={`text-sm font-medium ${isAdvance ? 'text-blue-100' : 'text-slate-400'}`}>
+                          {PLAN_TAGLINES[tier]}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Features highlight */}
+                    <div className="space-y-4">
+                      <p className={`text-xs font-black uppercase tracking-widest ${isAdvance ? 'text-blue-200' : 'text-slate-500'}`}>Top Features</p>
+                      <ul className="space-y-4">
+                        {PLAN_HIGHLIGHTS[tier].map((feat, i) => (
+                          <li key={i} className="flex items-start gap-3">
+                            <div className={`mt-1 p-0.5 rounded-full ${isAdvance ? 'bg-white/20' : 'bg-white/10'}`}>
+                              <Check className={`h-3 w-3 ${isAdvance ? 'text-white' : isMaster ? 'text-amber-400' : 'text-emerald-400'}`} />
+                            </div>
+                            <span className={`text-sm font-medium ${isAdvance ? 'text-white' : 'text-slate-300'}`}>{feat}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="h-px bg-white/10" />
+
+                    {/* CTA */}
+                    {action.type === 'hidden' ? (
+                      <div className="w-full py-5 rounded-2xl border border-white/5 bg-white/[0.02] flex items-center justify-center gap-2">
+                        <CheckCircle2 className={`h-4 w-4 ${isMaster ? 'text-amber-400' : 'text-emerald-400'}`} />
+                        <span className="text-sm font-semibold text-slate-500">Included in Your Plan</span>
+                      </div>
+                    ) : action.type === 'current' ? (
+                      <motion.button
+                        disabled
+                        className={`relative w-full py-5 rounded-2xl font-bold tracking-wide overflow-hidden cursor-not-allowed
+                          ${isAdvance ? 'bg-white/20 text-white border border-white/30' : isMaster ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}
+                        `}
+                      >
+                        <span className="relative z-10 flex items-center justify-center gap-2">
+                          <CheckCircle2 className="h-4 w-4" />
+                          Current Plan
+                        </span>
+                      </motion.button>
+                    ) : (
+                      <motion.button
+                        whileHover={{ scale: 1.03, y: -2 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => handleAction(plan)}
+                        className={`relative w-full py-5 rounded-2xl font-bold tracking-wide transition-all overflow-hidden group
+                          ${isAdvance ? 'bg-white text-blue-600 shadow-xl' : isMaster ? 'bg-amber-400 text-black shadow-[0_10px_30px_rgba(251,191,36,0.3)]' : 'bg-white/10 text-white hover:bg-white/20 border border-white/10'}
+                        `}
+                      >
+                        <span className="relative z-10">{action.label}</span>
+                        {/* Shine effect */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                      </motion.button>
+                    )}
+                  </div>
+
+                  <p className={`mt-6 text-center text-xs font-black uppercase tracking-widest ${isAdvance ? 'text-blue-200' : 'text-slate-600'}`}>
+                    {tier === 'master' ? '90+60 Days Validity' : tier === 'advance' ? '60+60 Days Validity' : '60+30 Days Validity'}
+                  </p>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* 3. COMPARISON TABLE */}
+      <section className="px-6 py-24 bg-white/[0.01]">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center space-y-4 mb-16">
+            <h2 className="text-4xl md:text-5xl font-black tracking-tight">The Detail View</h2>
+            <p className="text-slate-400 text-lg">Compare every strategic advantage side-by-side.</p>
+          </div>
+          <ComparisonMatrix />
+        </div>
+      </section>
+
+      {/* 4. PERFORMANCE METRICS */}
+      <section className="px-6 py-24">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            {METRICS.map((metric, i) => (
+              <GlassCard key={i} className="p-8 text-center space-y-4 border-white/5">
+                <div className="mx-auto w-12 h-12 flex items-center justify-center rounded-2xl bg-blue-500/10 text-blue-400">
+                  {metric.icon}
                 </div>
                 <div className="space-y-1">
-                  <p className="text-2xl font-bold text-emerald-900 capitalize">
-                    {getCurrentPlanKey(currentSubscription) ||
-                      currentSubscription?.plan?.name ||
-                      currentSubscription?.name ||
-                      'Active'}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-emerald-700">
-                    {(() => {
-                      const expiry = currentSubscription.expires_at || currentSubscription.end_date || currentSubscription.expiry_date;
-                      return expiry ? (
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          Valid until {new Date(expiry).toLocaleDateString()}
-                        </span>
-                      ) : null;
-                    })()}
-                    <span className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-lg text-xs font-medium capitalize">
-                      {typeof currentSubscription.status === 'string' ? currentSubscription.status : 'active'}
-                    </span>
-                  </div>
+                  <h4 className="text-4xl font-black tracking-tighter text-white">
+                    <AnimatedCounter value={metric.value} />
+                  </h4>
+                  <p className="text-xs font-black uppercase tracking-widest text-slate-500">{metric.label}</p>
                 </div>
-              </div>
-              <div className="text-left md:text-right">
-                <p className="text-sm text-emerald-700 mb-1">Ready to upgrade?</p>
-                <p className="text-xs text-emerald-600">Unlock more features and benefits</p>
-              </div>
-            </div>
+              </GlassCard>
+            ))}
           </div>
-        </motion.section>
-      )}
-
-      {/* Plan Cards Grid */}
-      <section className="max-w-7xl mx-auto px-6 mb-20">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-        >
-          {plans.map((plan, index) => {
-            const action = getPlanAction(plan, currentSubscription);
-            const isMaster = plan.id === 'master';
-            const isCurrent = action.type === 'current';
-            const topFeatures = [
-              plan.features?.guaranteedSell && 'Guaranteed Sell',
-              plan.features?.relationshipManager && 'Dedicated Manager',
-              plan.features?.instagramReels && 'Instagram Reels',
-              plan.features?.propertySiteVisit && 'Site Visit Support',
-              plan.features?.propertyLandingPage && 'Property Landing Page',
-              plan.features?.newspaperAd && 'Newspaper Classified Ad',
-            ].filter(Boolean).slice(0, 4);
-
-            return (
-              <motion.div
-                key={plan.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.1 * index }}
-                whileHover={{ y: -4 }}
-                className={`
-                  relative rounded-3xl border overflow-hidden transition-all duration-300
-                  ${isMaster
-                    ? 'bg-gradient-to-br from-slate-900 to-slate-800 border-slate-700 shadow-2xl'
-                    : isCurrent
-                      ? 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200 shadow-lg'
-                      : 'bg-white border-slate-200 shadow-sm hover:shadow-lg'
-                  }
-                `}
-              >
-                {isMaster && (
-                  <div className="absolute top-4 right-4 z-10">
-                    <div className="flex items-center gap-1 px-3 py-1 bg-amber-500 text-white rounded-full text-xs font-bold">
-                      <Crown className="h-3 w-3" />
-                      Most Powerful
-                    </div>
-                  </div>
-                )}
-                {isCurrent && (
-                  <div className="absolute top-4 right-4 z-10">
-                    <div className="flex items-center gap-1 px-3 py-1 bg-emerald-600 text-white rounded-full text-xs font-bold">
-                      <CheckCircle2 className="h-3 w-3" />
-                      Current Plan
-                    </div>
-                  </div>
-                )}
-                <div className="p-8 space-y-6">
-                  <div className="space-y-2">
-                    <h3 className={`text-2xl font-bold ${isMaster ? 'text-white' : 'text-slate-900'}`}>
-                      {plan.name}
-                    </h3>
-                    <div className="space-y-1">
-                      <p className={`text-3xl font-bold ${isMaster ? 'text-white' : 'text-slate-900'}`}>
-                        {plan.priceLabel}
-                      </p>
-                      <p className={`text-sm ${isMaster ? 'text-slate-300' : 'text-slate-600'}`}>
-                        {plan.service} validity
-                      </p>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    {topFeatures.map((feature, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <Check className={`h-4 w-4 ${isMaster ? 'text-emerald-400' : 'text-emerald-600'}`} />
-                        <span className={`text-sm ${isMaster ? 'text-slate-200' : 'text-slate-700'}`}>
-                          {feature}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  {action.type !== 'hidden' && action.label && (
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleSubscribe(plan.id)}
-                      disabled={action.disabled}
-                      aria-label={action.label}
-                      className={`
-                        w-full py-4 px-6 rounded-2xl font-semibold transition-all duration-200
-                        ${action.type === 'current'
-                          ? 'border-2 border-emerald-600 text-emerald-600 bg-emerald-50 cursor-not-allowed'
-                          : action.type === 'upgrade'
-                            ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 shadow-lg'
-                            : 'bg-slate-900 text-white hover:bg-slate-800'
-                        }
-                        ${action.disabled ? 'cursor-not-allowed opacity-60' : ''}
-                      `}
-                    >
-                      {action.label}
-                    </motion.button>
-                  )}
-                </div>
-              </motion.div>
-            );
-          })}
-        </motion.div>
+        </div>
       </section>
 
-      {/* Feature Comparison */}
-      <section className="max-w-7xl mx-auto px-6 mb-20">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.5 }}
-          className="space-y-8"
-        >
-          <div className="text-center space-y-4">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900">
-              Compare Features Across Plans
-            </h2>
-            <p className="text-lg text-slate-600 max-w-3xl mx-auto">
-              Detailed comparison of all features included in each plan
-            </p>
+      {/* 5. AFTER PURCHASE TIMELINE */}
+      <section className="px-6 py-24 bg-gradient-to-b from-transparent to-blue-500/5">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center space-y-4 mb-20">
+            <h2 className="text-4xl md:text-5xl font-black tracking-tight">Your Success Roadmap</h2>
+            <p className="text-slate-400 text-lg">What happens after you choose a plan.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 relative">
+            {/* Connector line for desktop */}
+            <div className="hidden md:block absolute top-1/2 left-0 right-0 h-px bg-white/10 -translate-y-12" />
+            
+            {AFTER_PURCHASE_STEPS.map((step, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className="relative z-10 flex flex-col items-center text-center space-y-6"
+              >
+                <div className="w-12 h-12 rounded-full bg-blue-600 border-4 border-[#050816] flex items-center justify-center text-lg font-bold shadow-2xl">
+                  {i + 1}
+                </div>
+                <div className="space-y-2">
+                  <h4 className="text-lg font-bold text-white leading-tight">{step.title}</h4>
+                  <p className="text-sm text-slate-400 leading-relaxed">{step.desc}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 6. WHY SELLERS CHOOSE US */}
+      <section className="px-6 py-24">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center space-y-4 mb-20">
+            <h2 className="text-4xl md:text-5xl font-black tracking-tight">Why Sellers Choose Us</h2>
+            <p className="text-slate-400 text-lg">The Revo Homes advantage in property selling.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {WHY_CHOOSE_US.map((item, i) => (
+              <GlassCard key={i} className="p-10 space-y-6 hover:bg-white/[0.08] transition-all group">
+                <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-blue-400 group-hover:scale-110 group-hover:bg-blue-500 group-hover:text-white transition-all duration-300">
+                  {item.icon && React.cloneElement(item.icon, { className: "h-7 w-7" })}
+                </div>
+                <div className="space-y-3">
+                  <h4 className="text-xl font-bold text-white">{item.title}</h4>
+                  <p className="text-slate-400 leading-relaxed">{item.desc}</p>
+                </div>
+              </GlassCard>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 7. FAQ */}
+      <section className="px-6 py-24 mb-20">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center space-y-4 mb-16">
+            <h2 className="text-4xl font-black tracking-tight">Questions?</h2>
+            <p className="text-slate-400">Everything you need to know about our plans.</p>
           </div>
           <div className="space-y-4">
-            {featureComparison.map((category, categoryIndex) => (
-              <motion.div
-                key={category.category}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.1 * categoryIndex }}
-                className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
-              >
-                <button
-                  onClick={() => setExpandedFeatures(prev => ({
-                    ...prev,
-                    [category.category]: !prev[category.category]
-                  }))}
-                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
-                  aria-expanded={!!expandedFeatures[category.category]}
+            {FAQ_DATA.map((item, i) => (
+              <GlassCard key={i} className="overflow-hidden border-white/5">
+                <button 
+                  onClick={() => setActiveFAQ(activeFAQ === i ? null : i)}
+                  className="w-full px-8 py-6 flex items-center justify-between text-left"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                      {category.icon}
-                    </div>
-                    <h3 className="text-lg font-semibold text-slate-900">
-                      {category.category}
-                    </h3>
-                  </div>
-                  <ChevronDown
-                    className={`h-5 w-5 text-slate-400 transition-transform ${expandedFeatures[category.category] ? 'rotate-180' : ''
-                      }`}
-                  />
+                  <span className="text-lg font-bold text-slate-200">{item.q}</span>
+                  <ChevronDown className={`h-5 w-5 text-slate-500 transition-transform ${activeFAQ === i ? 'rotate-180' : ''}`} />
                 </button>
                 <AnimatePresence>
-                  {expandedFeatures[category.category] && (
+                  {activeFAQ === i && (
                     <motion.div
-                      initial={{ height: 0 }}
-                      animate={{ height: 'auto' }}
-                      exit={{ height: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="border-t border-slate-200"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden"
                     >
-                      <div className="p-6 space-y-4">
-                        {category.features.map((feature, featureIndex) => (
-                          <div key={featureIndex} className="grid grid-cols-4 gap-4 items-center py-3 border-b border-slate-100 last:border-0">
-                            <div className="text-sm font-medium text-slate-900">
-                              {feature.name}
-                            </div>
-                            {['simple', 'advance', 'master'].map((tier) => (
-                              <div key={tier} className="text-center">
-                                {typeof feature[tier] === 'boolean' ? (
-                                  feature[tier] ? (
-                                    <Check className="h-5 w-5 text-emerald-600 mx-auto" />
-                                  ) : (
-                                    <span className="text-slate-400">—</span>
-                                  )
-                                ) : (
-                                  <span className="text-sm text-slate-700">{feature[tier]}</span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        ))}
+                      <div className="px-8 pb-8 text-slate-400 leading-relaxed">
+                        {item.a}
                       </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </motion.div>
+              </GlassCard>
             ))}
           </div>
-        </motion.div>
+        </div>
       </section>
 
-      {/* Trust & Guarantee Section */}
-      <section className="max-w-7xl mx-auto px-6 mb-20">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
-          className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-8 md:p-12 text-white"
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-            <div className="space-y-6">
-              <h2 className="text-3xl font-bold">Your Investment is Protected</h2>
-              <p className="text-slate-300 leading-relaxed">
-                We stand behind our service with comprehensive guarantees and enterprise-grade security measures to ensure your peace of mind.
-              </p>
-              <div className="space-y-4">
-                {[
-                  { icon: <Shield className="h-5 w-5" />, title: '50% Money-Back Guarantee', desc: 'Get refunded if we don\'t deliver results' },
-                  { icon: <Lock className="h-5 w-5" />, title: 'Secure Payment Processing', desc: 'Bank-level security for all transactions' },
-                  { icon: <FileText className="h-5 w-5" />, title: 'Digital Agreement Protection', desc: 'Legally binding service contracts' },
-                  { icon: <Users className="h-5 w-5" />, title: 'Dedicated Relationship Manager', desc: 'Personal support throughout your journey' }
-                ].map((item, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400">
-                      {item.icon}
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-white">{item.title}</h4>
-                      <p className="text-sm text-slate-400">{item.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-6">
-              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6">
-                <h3 className="text-xl font-semibold mb-4">Guarantee Terms</h3>
-                <ul className="space-y-3 text-sm text-slate-300">
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <span>50% refund on basic package if property remains unsold despite our efforts</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <span>Minimum 30 days service provided even if client withdraws</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <span>Refunds processed within 15 working days of eligibility</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <span>Full transparency with no hidden terms or conditions</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      </section>
-
-      {/* FAQ Section */}
-      <section className="max-w-7xl mx-auto px-6 mb-20">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.7 }}
-          className="space-y-8"
-        >
-          <div className="text-center space-y-4">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900">
-              Frequently Asked Questions
-            </h2>
-            <p className="text-lg text-slate-600 max-w-3xl mx-auto">
-              Everything you need to know about our subscription plans
-            </p>
-          </div>
-          <div className="max-w-3xl mx-auto space-y-4">
-            {faqData.map((faq, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.1 * index }}
-                className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
-              >
-                <button
-                  onClick={() => setExpandedFAQ(prev => ({
-                    ...prev,
-                    [index]: !prev[index]
-                  }))}
-                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors text-left"
-                  aria-expanded={!!expandedFAQ[index]}
-                >
-                  <h3 className="text-lg font-semibold text-slate-900">
-                    {faq.question}
-                  </h3>
-                  <ChevronDown
-                    className={`h-5 w-5 text-slate-400 transition-transform flex-shrink-0 ${expandedFAQ[index] ? 'rotate-180' : ''
-                      }`}
-                  />
-                </button>
-                <AnimatePresence>
-                  {expandedFAQ[index] && (
-                    <motion.div
-                      initial={{ height: 0 }}
-                      animate={{ height: 'auto' }}
-                      exit={{ height: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="border-t border-slate-200"
-                    >
-                      <div className="p-6">
-                        <p className="text-slate-600 leading-relaxed">{faq.answer}</p>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      </section>
-
-      {/* Sticky Mobile CTA */}
-      {!currentSubscription && (
-        <motion.div
-          initial={{ y: 100 }}
-          animate={{ y: 0 }}
-          className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 z-50"
-        >
-          <button
-            onClick={() => handleSubscribe('simple')}
-            className="w-full py-3 bg-slate-900 text-white rounded-xl font-semibold hover:bg-slate-800 transition-colors"
-          >
-            Get Started with Simple Plan
+      {/* Mobile Sticky CTA Placeholder */}
+      <div className="md:hidden fixed bottom-6 left-6 right-6 z-50">
+        <GlassCard className="p-4 bg-blue-600 border-none shadow-2xl">
+          <button className="w-full py-4 text-center font-black uppercase tracking-widest text-sm">
+            Compare All Plans
           </button>
-        </motion.div>
-      )}
+        </GlassCard>
+      </div>
     </div>
   );
 }

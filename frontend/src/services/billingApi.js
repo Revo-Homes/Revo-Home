@@ -99,8 +99,8 @@ export const billingApi = {
     return apiClient(path);
   },
 
-  getCurrentSubscription: async () => {
-    return apiClient('/subscriptions/current');
+  getCurrentSubscription: async (params = {}) => {
+    return apiClient(`/subscriptions/active${query(params)}`);
   },
 
   getEntitlements: async (orgId, params = {}) => {
