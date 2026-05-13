@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Home, ArrowRight } from 'lucide-react';
 import { buildStructuredMessage, submitPublicEnquiry } from '../services/publicEnquiry';
+import { useContactVerification, InlineContactVerifier } from '../components/ContactVerification';
 
 export default function PropertyManagement() {
   const [formData, setFormData] = useState({
@@ -23,9 +24,16 @@ export default function PropertyManagement() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const verification = useContactVerification({ email: formData.email, phone: formData.phone });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const blocker = verification.getSubmitBlocker();
+    if (blocker) {
+      setSubmitError(blocker);
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError('');
 
@@ -91,11 +99,26 @@ export default function PropertyManagement() {
 
           {/* OWNER */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input label="Full Name" value={formData.name} onChange={(e)=>setFormData({...formData,name:e.target.value})} />
-            <Input label="Email Address" value={formData.email} onChange={(e)=>setFormData({...formData,email:e.target.value})} />
+            <div>
+              <label className="block text-sm text-slate-600 mb-1">Full Name</label>
+              <input value={formData.name} onChange={(e)=>setFormData({...formData,name:e.target.value})}
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" />
+            </div>
+
+            <div>
+              <label className="block text-sm text-slate-600 mb-1">Email Address</label>
+              <input value={formData.email} onChange={(e)=>setFormData({...formData,email:e.target.value})}
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" />
+              <div className="mt-2"><InlineContactVerifier channel="email" verification={verification} /></div>
+            </div>
           </div>
 
-          <Input label="Phone Number" value={formData.phone} onChange={(e)=>setFormData({...formData,phone:e.target.value})} />
+          <div>
+            <label className="block text-sm text-slate-600 mb-1">Phone Number</label>
+            <input value={formData.phone} onChange={(e)=>setFormData({...formData,phone:e.target.value})}
+              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" />
+            <div className="mt-2"><InlineContactVerifier channel="sms" verification={verification} /></div>
+          </div>
 
           <Select label="Owner Type" value={formData.ownerType} onChange={(e)=>setFormData({...formData,ownerType:e.target.value})}
             options={["Individual","Company","NRI Owner"]}/>
@@ -161,6 +184,8 @@ export default function PropertyManagement() {
           </div>
 
           {/* SUBMIT */}
+          {/* Verification inline controls placed next to email/phone inputs */}
+
           <button
             type="submit"
             disabled={submitting}

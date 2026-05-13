@@ -1,5 +1,5 @@
 import React from 'react';
-import { IndianRupee, Tag, Clock, Calendar, Info, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
+import { IndianRupee, Tag, Clock, Calendar, Info, CheckCircle2, AlertCircle, ShieldCheck, Sparkles } from 'lucide-react';
 
 const Step4Pricing = ({ 
   formData, 

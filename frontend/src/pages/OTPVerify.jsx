@@ -6,14 +6,51 @@ function OTPVerify({ isModal = false, modalMethod, modalIdentifier }) {
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [timer, setTimer] = useState(30);
+  const [canResend, setCanResend] = useState(false);
   const inputRefs = useRef([]);
   const navigate = useNavigate();
   const location = useLocation();
-  const { verifyOtp, closeAuthModal } = useAuth();
+  const { verifyOtp, sendOtp, closeAuthModal } = useAuth();
 
-  const { method, identifier } = isModal 
-    ? { method: modalMethod, identifier: modalIdentifier }
-    : (location.state || { method: 'email', identifier: '' });
+  const { method, identifier, mode } = isModal 
+    ? { method: modalMethod, identifier: modalIdentifier, mode: modalMethod === 'sms' ? 'signup' : 'login' }
+    : (location.state || { method: 'email', identifier: '', mode: 'login' });
+
+  useEffect(() => {
+    let interval;
+    if (timer > 0 && !canResend) {
+      interval = setInterval(() => {
+        setTimer((prev) => prev - 1);
+      }, 1000);
+    } else {
+      setCanResend(true);
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [timer, canResend]);
+
+  const handleResend = async () => {
+    if (!canResend) return;
+    
+    setError('');
+    setLoading(true);
+    try {
+      const result = await sendOtp(identifier, method, mode);
+      if (result.success) {
+        setTimer(30);
+        setCanResend(false);
+        setError('');
+        // Optional: Show success message
+      } else {
+        setError(result.message || 'Failed to resend OTP');
+      }
+    } catch (err) {
+      setError('Failed to resend OTP. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChange = (index, value) => {
     if (!/^\d*$/.test(value)) return;
@@ -134,8 +171,13 @@ function OTPVerify({ isModal = false, modalMethod, modalIdentifier }) {
 
           <p className="text-center text-sm text-gray-500">
             Didn't receive OTP?{' '}
-            <button type="button" className="text-primary font-semibold hover:underline">
-              Resend
+            <button 
+              type="button" 
+              onClick={handleResend}
+              disabled={!canResend || loading}
+              className={`font-semibold hover:underline ${canResend ? 'text-primary' : 'text-gray-400 cursor-not-allowed'}`}
+            >
+              {canResend ? 'Resend' : `Resend in ${timer}s`}
             </button>
           </p>
         </form>

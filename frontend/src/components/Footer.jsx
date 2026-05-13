@@ -74,7 +74,7 @@ function Footer() {
 
         <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
           <p className="text-gray-500 text-sm">
-            © {new Date().getFullYear()} REVO HOMES. All rights reserved.
+            © {new Date().getFullYear()} REVO HOMES. A venture by Practomind Solutions LLP. All rights reserved.
           </p>
           <div className="flex gap-6 text-sm">
             <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>

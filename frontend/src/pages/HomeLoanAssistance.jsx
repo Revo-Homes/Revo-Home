@@ -200,6 +200,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { buildStructuredMessage, submitPublicEnquiry } from '../services/publicEnquiry';
+import { ContactVerificationPanel, useContactVerification } from '../components/ContactVerification';
 
 const BANKS = ['HDFC', 'ICICI', 'SBI', 'Axis Bank', 'Kotak', 'PNB'];
 
@@ -218,6 +219,7 @@ function HomeLoanAssistance() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const verification = useContactVerification({ email: formData.email, phone: formData.phone });
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -229,6 +231,12 @@ function HomeLoanAssistance() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const blocker = verification.getSubmitBlocker();
+    if (blocker) {
+      setSubmitError(blocker);
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError('');
 
@@ -413,6 +421,11 @@ function HomeLoanAssistance() {
             I agree to be contacted by banks and REVO HOMES for loan assistance
           </span>
         </label>
+
+        {/* Contact verification */}
+        <div className="mt-4">
+          <ContactVerificationPanel verification={verification} />
+        </div>
 
         <button
           type="submit"

@@ -22,6 +22,7 @@ import {
   Lock,
   ArrowRight
 } from 'lucide-react';
+import { ContactVerificationPanel, useContactVerification } from '../components/ContactVerification';
 
 const STEPS = [
   { id: 1, title: 'Personal Details', icon: User },
@@ -67,6 +68,7 @@ function BecomeBuilder() {
     governmentIdPreview: null
   });
   const [errors, setErrors] = useState({});
+  const verification = useContactVerification({ email: formData.email, phone: formData.mobileNumber });
 
   // Load saved form data on mount
   useEffect(() => {
@@ -213,6 +215,12 @@ function BecomeBuilder() {
 
   const handleSubmit = async () => {
     if (!validateStep2()) return;
+
+    const blocker = verification.getSubmitBlocker();
+    if (blocker) {
+      setErrors((prev) => ({ ...prev, form: blocker }));
+      return;
+    }
 
     // Check if user is logged in
     if (!isLoggedIn) {
@@ -419,18 +427,15 @@ function BecomeBuilder() {
               <div className="space-y-6">
                 <div className="mb-6 pb-4 border-b border-gray-100">
                   <h3 className="text-xl flex items-center gap-2 font-bold text-gray-900">
-                    <User className="w-5 h-5 text-primary" /> 
+                    <User className="w-5 h-5 text-primary" />
                     Personal Details
                   </h3>
                   <p className="text-xs text-gray-500 mt-1 ml-7">Enter your contact information and professional details</p>
                 </div>
 
-                {/* Mobile Number & Email */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">
-                      Mobile Number <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Mobile Number <span className="text-red-500">*</span></label>
                     <div className="relative">
                       <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                       <input
@@ -439,20 +444,14 @@ function BecomeBuilder() {
                         value={formData.mobileNumber}
                         onChange={handleChange}
                         placeholder="Enter 10-digit mobile number"
-                        className={`w-full pl-9 pr-4 py-2.5 bg-white border rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm ${
-                          errors.mobileNumber ? 'border-red-500' : 'border-gray-200'
-                        }`}
+                        className={`w-full pl-9 pr-4 py-2.5 bg-white border rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm ${errors.mobileNumber ? 'border-red-500' : 'border-gray-200'}`}
                       />
+                      {errors.mobileNumber && <p className="text-xs text-red-500 mt-1 ml-1">{errors.mobileNumber}</p>}
                     </div>
-                    {errors.mobileNumber && (
-                      <p className="text-xs text-red-500 mt-1 ml-1">{errors.mobileNumber}</p>
-                    )}
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">
-                      Email Address <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Email Address <span className="text-red-500">*</span></label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                       <input
@@ -461,82 +460,43 @@ function BecomeBuilder() {
                         value={formData.email}
                         onChange={handleChange}
                         placeholder="your@email.com"
-                        className={`w-full pl-9 pr-4 py-2.5 bg-white border rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm ${
-                          errors.email ? 'border-red-500' : 'border-gray-200'
-                        }`}
+                        className={`w-full pl-9 pr-4 py-2.5 bg-white border rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm ${errors.email ? 'border-red-500' : 'border-gray-200'}`}
                       />
+                      {errors.email && <p className="text-xs text-red-500 mt-1 ml-1">{errors.email}</p>}
                     </div>
-                    {errors.email && (
-                      <p className="text-xs text-red-500 mt-1 ml-1">{errors.email}</p>
-                    )}
                   </div>
                 </div>
 
-                {/* Full Name & City */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">
-                      Full Name
-                    </label>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Full Name</label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <input
-                        type="text"
-                        name="fullName"
-                        value={formData.fullName}
-                        onChange={handleChange}
-                        placeholder="Enter your full name"
-                        className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
-                      />
+                      <input type="text" name="fullName" value={formData.fullName} onChange={handleChange} placeholder="Enter your full name" className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm" />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">
-                      City / Location
-                    </label>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">City / Location</label>
                     <div className="relative">
                       <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <input
-                        type="text"
-                        name="city"
-                        value={formData.city}
-                        onChange={handleChange}
-                        placeholder="Enter your city"
-                        className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
-                      />
+                      <input type="text" name="city" value={formData.city} onChange={handleChange} placeholder="Enter your city" className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm" />
                     </div>
                   </div>
                 </div>
 
-                {/* Role Type */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-3 ml-1">
-                    Role Type <span className="text-red-500">*</span>
-                  </label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-3 ml-1">Role Type <span className="text-red-500">*</span></label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {ROLE_TYPES.map((role) => {
                       const isSelected = formData.roleType === role.value;
                       return (
-                        <button
-                          key={role.value}
-                          type="button"
-                          onClick={() => setFormData(prev => ({ ...prev, roleType: role.value }))}
-                          className={`flex items-start gap-4 p-4 rounded-xl border-2 transition-all text-left ${
-                            isSelected 
-                              ? 'border-primary bg-primary/5' 
-                              : 'border-gray-200 hover:border-primary/50 hover:bg-gray-50'
-                          }`}
-                        >
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                            isSelected ? 'bg-primary text-white' : 'bg-gray-100 text-gray-400'
-                          }`}>
+                        <button key={role.value} type="button" onClick={() => setFormData(prev => ({ ...prev, roleType: role.value }))} className={`flex items-start gap-4 p-4 rounded-xl border-2 transition-all text-left ${isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-primary/50 hover:bg-gray-50'}`}>
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-primary text-white' : 'bg-gray-100 text-gray-400'}`}>
                             {role.value === 'builder' ? <Building2 className="w-5 h-5" /> : <Briefcase className="w-5 h-5" />}
                           </div>
                           <div>
-                            <h4 className={`font-bold text-sm ${isSelected ? 'text-primary' : 'text-gray-900'}`}>
-                              {role.label}
-                            </h4>
+                            <h4 className={`font-bold text-sm ${isSelected ? 'text-primary' : 'text-gray-900'}`}>{role.label}</h4>
                             <p className="text-xs text-gray-500 mt-0.5">{role.description}</p>
                           </div>
                         </button>
@@ -545,20 +505,12 @@ function BecomeBuilder() {
                   </div>
                 </div>
 
-                {/* Experience & Agency Name */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">
-                      Experience (Years) <span className="text-gray-400">- Optional</span>
-                    </label>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Experience (Years) <span className="text-gray-400">- Optional</span></label>
                     <div className="relative">
                       <Award className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <select
-                        name="experience"
-                        value={formData.experience}
-                        onChange={handleChange}
-                        className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none"
-                      >
+                      <select name="experience" value={formData.experience} onChange={handleChange} className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none">
                         <option value="">Select experience</option>
                         <option value="0-2">0-2 years</option>
                         <option value="2-5">2-5 years</option>
@@ -569,19 +521,14 @@ function BecomeBuilder() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">
-                      Agency/Company Name <span className="text-gray-400">- Optional</span>
-                    </label>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Agency/Company Name <span className="text-gray-400">- Optional</span></label>
                     <div className="relative">
                       <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <input
-                        type="text"
-                        name="agencyName"
-                        value={formData.agencyName}
-                        onChange={handleChange}
-                        placeholder="Enter agency or company name"
-                        className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
-                      />
+                      <input type="text" name="agencyName" value={formData.agencyName} onChange={handleChange} placeholder="Enter agency or company name" className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm" />
+                    </div>
+                    <div className="mt-4">
+                      <ContactVerificationPanel verification={verification} />
+                      {errors.form && <p className="text-xs text-red-500 mt-2">{errors.form}</p>}
                     </div>
                   </div>
                 </div>
@@ -592,95 +539,44 @@ function BecomeBuilder() {
               <div className="space-y-6">
                 <div className="mb-6 pb-4 border-b border-gray-100">
                   <h3 className="text-xl flex items-center gap-2 font-bold text-gray-900">
-                    <Shield className="w-5 h-5 text-primary" /> 
+                    <Shield className="w-5 h-5 text-primary" />
                     Legal Documents
                   </h3>
                   <p className="text-xs text-gray-500 mt-1 ml-7">Upload your verification documents for approval</p>
                 </div>
 
-                {/* RERA Number */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">
-                    RERA Number <span className="text-gray-400">- Optional</span>
-                  </label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">RERA Number <span className="text-gray-400">- Optional</span></label>
                   <div className="relative">
                     <Award className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <input
-                      type="text"
-                      name="reraNumber"
-                      value={formData.reraNumber}
-                      onChange={handleChange}
-                      placeholder="e.g., PRM/KA/RERA/1234/2024"
-                      className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm"
-                    />
+                    <input type="text" name="reraNumber" value={formData.reraNumber} onChange={handleChange} placeholder="e.g., PRM/KA/RERA/1234/2024" className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm" />
                   </div>
-                  <p className="text-xs text-gray-400 mt-1 ml-1">
-                    If you have a valid RERA registration number, please provide it for faster verification.
-                  </p>
+                  <p className="text-xs text-gray-400 mt-1 ml-1">If you have a valid RERA registration number, please provide it for faster verification.</p>
                 </div>
 
-                {/* Government ID Name */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">
-                    Name of Government ID <span className="text-red-500">*</span>
-                  </label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Name of Government ID <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <input
-                      type="text"
-                      name="governmentIdName"
-                      value={formData.governmentIdName || ''}
-                      onChange={handleChange}
-                      placeholder="e.g., Aadhaar, PAN, Passport"
-                      className={`w-full pl-9 pr-4 py-2.5 bg-white border rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm ${
-                        errors.governmentIdName ? 'border-red-500' : 'border-gray-200'
-                      }`}
-                    />
+                    <input type="text" name="governmentIdName" value={formData.governmentIdName || ''} onChange={handleChange} placeholder="e.g., Aadhaar, PAN, Passport" className={`w-full pl-9 pr-4 py-2.5 bg-white border rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm ${errors.governmentIdName ? 'border-red-500' : 'border-gray-200'}`} />
                   </div>
-                  {errors.governmentIdName && (
-                    <p className="text-xs text-red-500 mt-1 ml-1">{errors.governmentIdName}</p>
-                  )}
+                  {errors.governmentIdName && <p className="text-xs text-red-500 mt-1 ml-1">{errors.governmentIdName}</p>}
                 </div>
 
-                {/* Government ID Upload */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-3 ml-1">
-                    Government ID Upload <span className="text-red-500">*</span>
-                  </label>
-                  
-                  <div className={`border-2 border-dashed rounded-2xl p-8 transition-all ${
-                    errors.governmentId 
-                      ? 'border-red-300 bg-red-50' 
-                      : formData.governmentId || formData.governmentIdPreview
-                      ? 'border-primary bg-primary/5'
-                      : 'border-gray-300 bg-gray-50 hover:border-primary/50'
-                  }`}>
+                  <label className="block text-xs font-semibold text-gray-600 mb-3 ml-1">Government ID Upload <span className="text-red-500">*</span></label>
+                  <div className={`border-2 border-dashed rounded-2xl p-8 transition-all ${errors.governmentId ? 'border-red-300 bg-red-50' : formData.governmentId || formData.governmentIdPreview ? 'border-primary bg-primary/5' : 'border-gray-300 bg-gray-50 hover:border-primary/50'}`}>
+                    {/* simplified upload UI preserved */}
                     {!formData.governmentId && !formData.governmentIdPreview ? (
                       <div className="text-center">
                         <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
                           <Upload className="w-8 h-8 text-primary" />
                         </div>
-                        <h4 className="font-bold text-gray-900 mb-2">
-                          Upload {formData.governmentIdName || 'Government ID'}
-                        </h4>
-                        <p className="text-xs text-gray-500 mb-4 max-w-xs mx-auto">
-                          {formData.governmentIdName 
-                            ? `Please upload your valid ${formData.governmentIdName}` 
-                            : "Please upload a valid government-issued ID (Aadhaar, PAN, Passport, or Driver's License)"}
-                        </p>
+                        <h4 className="font-bold text-gray-900 mb-2">Upload {formData.governmentIdName || 'Government ID'}</h4>
+                        <p className="text-xs text-gray-500 mb-4 max-w-xs mx-auto">{formData.governmentIdName ? `Please upload your valid ${formData.governmentIdName}` : "Please upload a valid government-issued ID (Aadhaar, PAN, Passport, or Driver's License)"}</p>
                         <div className="relative inline-block">
-                          <button
-                            type="button"
-                            className="px-6 py-3 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary/90 transition-all"
-                          >
-                            Choose File
-                          </button>
-                          <input
-                            type="file"
-                            accept=".jpg,.jpeg,.png,.pdf"
-                            onChange={handleFileChange}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                          />
+                          <button type="button" className="px-6 py-3 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary/90 transition-all">Choose File</button>
+                          <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                         </div>
                         <p className="text-xs text-gray-400 mt-3">Maximum file size: 5MB (JPG, PNG, PDF)</p>
                       </div>
@@ -688,90 +584,32 @@ function BecomeBuilder() {
                       <div className="max-w-sm mx-auto">
                         <div className="relative group bg-white rounded-3xl p-4 border border-gray-100 shadow-sm hover:shadow-md transition-all">
                           <div className="relative aspect-video rounded-2xl overflow-hidden bg-gray-50 mb-3 border border-gray-50">
-                            {formData.governmentIdPreview && (
-                              formData.governmentId?.type?.startsWith('image/') || 
-                              formData.governmentIdPreview.match(/\.(jpeg|jpg|gif|png|webp)$/i)
-                            ) ? (
-                              <img 
-                                src={formData.governmentIdPreview} 
-                                alt="ID Preview" 
-                                className="w-full h-full object-cover" 
-                              />
+                            {formData.governmentIdPreview && (formData.governmentId?.type?.startsWith('image/') || formData.governmentIdPreview.match(/\.(jpeg|jpg|gif|png|webp)$/i)) ? (
+                              <img src={formData.governmentIdPreview} alt="ID Preview" className="w-full h-full object-cover" />
                             ) : (
                               <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 gap-2">
                                 <FileText size={40} className="text-gray-200" />
                                 <span className="text-[10px] font-black uppercase tracking-widest text-gray-300">PDF Document</span>
                               </div>
                             )}
-
-                            {/* Edit/Delete Overlay */}
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-[2px]">
-                              <button
-                                type="button"
-                                onClick={() => document.getElementById('id-replace').click()}
-                                className="w-10 h-10 bg-white/20 hover:bg-white/40 text-white rounded-xl backdrop-blur-md transition-all flex items-center justify-center"
-                                title="Replace File"
-                              >
-                                <Edit2 size={18} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={removeFile}
-                                className="w-10 h-10 bg-red-500/80 hover:bg-red-500 text-white rounded-xl backdrop-blur-md transition-all flex items-center justify-center"
-                                title="Remove File"
-                              >
-                                <X size={18} />
-                              </button>
+                              <button type="button" onClick={() => document.getElementById('id-replace').click()} className="w-10 h-10 bg-white/20 hover:bg-white/40 text-white rounded-xl backdrop-blur-md transition-all flex items-center justify-center" title="Replace File"><Edit2 size={18} /></button>
+                              <button type="button" onClick={removeFile} className="w-10 h-10 bg-red-500/80 hover:bg-red-500 text-white rounded-xl backdrop-blur-md transition-all flex items-center justify-center" title="Remove File"><X size={18} /></button>
                             </div>
                           </div>
-
                           <div className="px-1">
-                            <p className="text-[11px] font-bold text-gray-500 truncate mb-1">
-                              {formData.governmentId?.name || 'Government ID'}
-                            </p>
+                            <p className="text-[11px] font-bold text-gray-500 truncate mb-1">{formData.governmentId?.name || 'Government ID'}</p>
                             <div className="flex items-center gap-1.5">
-                              <div className={`w-1.5 h-1.5 rounded-full ${
-                                formData.governmentId?.type?.startsWith('image/') || 
-                                formData.governmentIdPreview?.match(/\.(jpeg|jpg|gif|png|webp)$/i)
-                                  ? 'bg-green-400' 
-                                  : 'bg-blue-400'
-                              }`}></div>
-                              <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">
-                                {formData.governmentId?.type?.startsWith('image/') || 
-                                 formData.governmentIdPreview?.match(/\.(jpeg|jpg|gif|png|webp)$/i)
-                                  ? 'Image' 
-                                  : 'PDF / Document'}
-                              </span>
+                              <div className={`w-1.5 h-1.5 rounded-full ${formData.governmentId?.type?.startsWith('image/') || formData.governmentIdPreview?.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? 'bg-green-400' : 'bg-blue-400'}`}></div>
+                              <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">{formData.governmentId?.type?.startsWith('image/') || formData.governmentIdPreview?.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? 'Image' : 'PDF / Document'}</span>
                             </div>
                           </div>
-
-                          {/* Hidden input for replacement */}
-                          <input
-                            type="file"
-                            id="id-replace"
-                            accept=".jpg,.jpeg,.png,.pdf"
-                            onChange={handleFileChange}
-                            className="hidden"
-                          />
+                          <input type="file" id="id-replace" accept=".jpg,.jpeg,.png,.pdf" onChange={handleFileChange} className="hidden" />
                         </div>
                       </div>
                     )}
                   </div>
-                  {errors.governmentId && (
-                    <p className="text-xs text-red-500 mt-2 ml-1">{errors.governmentId}</p>
-                  )}
-                </div>
-
-                {/* Info Box */}
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
-                  <Shield className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="font-bold text-sm text-blue-900 mb-1">Document Verification</h4>
-                    <p className="text-xs text-blue-700">
-                      Your documents will be securely stored and used only for verification purposes. 
-                      Verification typically takes 24-48 hours. You will be notified once approved.
-                    </p>
-                  </div>
+                  {errors.governmentId && <p className="text-xs text-red-500 mt-2 ml-1">{errors.governmentId}</p>}
                 </div>
               </div>
             )}

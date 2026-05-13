@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Paintbrush, CheckCircle2, ArrowRight, Palette, Home, Star } from 'lucide-react';
 import { buildStructuredMessage, submitPublicEnquiry } from '../services/publicEnquiry';
+import { ContactVerificationPanel, useContactVerification } from '../components/ContactVerification';
 
 export default function InteriorDesign() {
   const [formData, setFormData] = useState({
@@ -14,6 +15,7 @@ export default function InteriorDesign() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const verification = useContactVerification({ email: formData.email, phone: formData.phone });
 
   const services = [
     {
@@ -81,6 +83,12 @@ export default function InteriorDesign() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const blocker = verification.getSubmitBlocker();
+    if (blocker) {
+      setSubmitError(blocker);
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError('');
 
@@ -273,6 +281,10 @@ export default function InteriorDesign() {
                   placeholder="Describe your design vision..."
                 />
               </div>
+              <div className="mt-4">
+                <ContactVerificationPanel verification={verification} />
+              </div>
+
               <button
                 type="submit"
                 disabled={submitting}

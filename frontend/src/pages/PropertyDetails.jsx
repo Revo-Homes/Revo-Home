@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useProperty } from '../contexts/PropertyContext';
 import { useRevoLeadTracker } from '../hooks/useRevoLeadTracker';
 import { buildStructuredMessage, splitFullName, submitPublicEnquiry } from '../services/publicEnquiry';
+import { ContactVerificationPanel, useContactVerification } from '../components/ContactVerification';
 import { billingApi } from '../services/billingApi';
 import PropertyMap from "../components/PropertyMap";
 import ImageGallery from "../components/ImageGallery";
@@ -667,10 +668,20 @@ const buildGroupedMedia = (property = {}) => {
     documents: [],
   };
 
-  const addItem = (target, item, title, type) => {
-    const normalized = normalizeMediaItem(item, title, { type });
-    if (normalized.url || normalized.title) grouped[target].push(normalized);
-  };
+    const addItem = (target, item, title, type) => {
+      const normalized = normalizeMediaItem(item, title, { type });
+      if (normalized.url || normalized.title) grouped[target].push(normalized);
+    };
+
+    [...toArray(source.documents), ...toArray(source.brochures)].forEach((item, idx) => {
+      addItem('documents', item, `Document ${idx + 1}`, 'Document');
+    });
+
+    // Mark resale documents so UI can require payment before download
+    [...toArray(source.resale_documents)].forEach((item, idx) => {
+      const normalized = normalizeMediaItem(item, `Resale Document ${idx + 1}`, { type: 'Document', requiresPayment: true });
+      if (normalized.url || normalized.title) grouped.documents.push(normalized);
+    });
 
   [...toArray(source.images), ...toArray(source.photos)].forEach((item, idx) => {
     addItem('images', item, `Property Image ${idx + 1}`, 'Image');
@@ -819,11 +830,22 @@ const LinkMediaCard = ({ item }) => (
   </a>
 );
 
-const DocumentMediaCard = ({ item, onOpen }) => (
-  <div
-    onClick={onOpen}
-    className="group flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-gray-50 hover:shadow-lg hover:shadow-gray-200/70 cursor-pointer"
-  >
+const DocumentMediaCard = ({ item, onOpen }) => {
+  const handleClick = (e) => {
+    if (typeof onOpen === 'function') return onOpen(e);
+    try {
+      window.dispatchEvent(new CustomEvent('revo:open-document', { detail: { item } }));
+    } catch (err) {
+      // fallback: open directly
+      if (item?.url) window.open(item.url, '_blank');
+    }
+  };
+
+  return (
+    <div
+      onClick={handleClick}
+      className="group flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-gray-50 hover:shadow-lg hover:shadow-gray-200/70 cursor-pointer"
+    >
     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
       <FileText size={20} />
     </span>
@@ -836,7 +858,8 @@ const DocumentMediaCard = ({ item, onOpen }) => (
       <Download size={14} />
     </span>
   </div>
-);
+  );
+};
 
 const GroupedMediaSection = ({ icon, title, description, count, emptyText, children, tone }) => (
   <div className="rounded-2xl border border-gray-100 bg-gray-50/40 p-4">
@@ -1179,7 +1202,7 @@ function ContactSidePanel({
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
               <Phone className="text-primary" size={16} />
-              Contact Owner
+              Contact Us
             </h3>
             {owner.verified && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-600 text-[10px] font-semibold rounded-full border border-amber-100">
@@ -1310,6 +1333,7 @@ function EnquiryModal({
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const verification = useContactVerification({ email: formData.email, phone: formData.phone });
 
   // Reset form when modal opens
   useEffect(() => {
@@ -1342,6 +1366,12 @@ function EnquiryModal({
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
+
+    const blocker = verification.getSubmitBlocker();
+    if (blocker) {
+      setErrors((prev) => ({ ...prev, form: blocker }));
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -1480,6 +1510,12 @@ function EnquiryModal({
             </div>
           </div>
 
+          {/* Contact Verification Panel */}
+          <div className="mt-4">
+            <ContactVerificationPanel verification={verification} />
+            {errors.form && <p className="text-xs text-red-500 mt-2">{errors.form}</p>}
+          </div>
+
           {/* Submit Button */}
           <motion.button
             whileHover={{ scale: 1.02, y: -2 }}
@@ -1553,6 +1589,24 @@ function PropertyDetails() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [hasPaidForDocuments, setHasPaidForDocuments] = useState(false);
+
+  // Global handler for document open requests from media cards
+  useEffect(() => {
+    const onOpenDocument = (e) => {
+      const item = e?.detail?.item;
+      if (!item) return;
+      // If document requires payment and user hasn't paid, show payment modal
+      if (item.requiresPayment && !hasPaidForDocuments) {
+        setShowPaymentModal(true);
+        return;
+      }
+      // Otherwise open in new tab
+      if (item.url) window.open(item.url, '_blank');
+    };
+
+    window.addEventListener('revo:open-document', onOpenDocument);
+    return () => window.removeEventListener('revo:open-document', onOpenDocument);
+  }, [hasPaidForDocuments]);
 
   // SquareYards-style UI States
   const [activeTab, setActiveTab] = useState('overview');

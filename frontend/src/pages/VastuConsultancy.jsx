@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Home, ArrowRight, Compass, Sparkles, Building2, Sun } from 'lucide-react';
 import { buildStructuredMessage, submitPublicEnquiry } from '../services/publicEnquiry';
+import { useContactVerification, InlineContactVerifier } from '../components/ContactVerification';
 
 export default function VastuConsultancy() {
   const [formData, setFormData] = useState({
@@ -15,6 +16,7 @@ export default function VastuConsultancy() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const verification = useContactVerification({ email: formData.email, phone: formData.phone });
 
   const services = [
     {
@@ -49,6 +51,12 @@ export default function VastuConsultancy() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const blocker = verification.getSubmitBlocker();
+    if (blocker) {
+      setSubmitError(blocker);
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError('');
 
@@ -139,6 +147,9 @@ export default function VastuConsultancy() {
                 className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary"
                 placeholder="your@email.com"
               />
+              <div className="mt-2">
+                <InlineContactVerifier channel="email" verification={verification} />
+              </div>
             </div>
           </div>
 
@@ -157,6 +168,9 @@ export default function VastuConsultancy() {
                 className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary"
                 placeholder="+91 98765 43210"
               />
+              <div className="mt-2">
+                <InlineContactVerifier channel="sms" verification={verification} />
+              </div>
             </div>
 
             <div>
@@ -217,6 +231,8 @@ export default function VastuConsultancy() {
           </p>
 
           {/* Submit */}
+          {/* Verification inline controls are placed near inputs */}
+
           <button
             type="submit"
             disabled={submitting}

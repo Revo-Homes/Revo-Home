@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useProperty } from '../contexts/PropertyContext';
 import { useRevoLeadTracker } from '../hooks/useRevoLeadTracker';
 import { buildStructuredMessage, splitFullName, submitPublicEnquiry } from '../services/publicEnquiry';
+import { useContactVerification, InlineContactVerifier } from '../components/ContactVerification';
 import { X, Info, User, Mail, Phone, MessageSquare, Loader2 } from 'lucide-react';
 
 function CompareModal({ isOpen, onClose, properties }) {
@@ -39,6 +40,7 @@ function CompareModal({ isOpen, onClose, properties }) {
     phone: '',
     message: ''
   });
+  const verification = useContactVerification({ email: expertFormData.email, phone: expertFormData.phone });
   const [expertFormErrors, setExpertFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -73,6 +75,13 @@ function CompareModal({ isOpen, onClose, properties }) {
   const handleExpertSubmit = async () => {
     if (!validateExpertForm()) return;
     setIsSubmitting(true);
+
+    const blocker = verification.getSubmitBlocker();
+    if (blocker) {
+      setExpertFormErrors((prev) => ({ ...prev, form: blocker }));
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       const { firstName, lastName } = splitFullName(expertFormData.name);
@@ -326,6 +335,7 @@ function CompareModal({ isOpen, onClose, properties }) {
                           className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm"
                         />
                       </div>
+                        <div className="mt-2"><InlineContactVerifier channel="email" verification={verification} /></div>
                       {expertFormErrors.email && <p className="text-xs text-red-500 mt-1">{expertFormErrors.email}</p>}
                     </div>
 
@@ -343,6 +353,7 @@ function CompareModal({ isOpen, onClose, properties }) {
                           className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm"
                         />
                       </div>
+                        <div className="mt-2"><InlineContactVerifier channel="sms" verification={verification} /></div>
                       {expertFormErrors.phone && <p className="text-xs text-red-500 mt-1">{expertFormErrors.phone}</p>}
                     </div>
 

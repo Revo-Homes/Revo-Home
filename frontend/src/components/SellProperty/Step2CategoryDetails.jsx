@@ -1,25 +1,26 @@
 import React, { useState } from 'react';
-import { 
-  LayoutDashboard, 
-  Home, 
-  Maximize, 
-  Layers, 
-  Clock, 
-  Plus, 
-  X, 
+import {
+  LayoutDashboard,
+  Home,
+  Maximize,
+  Layers,
+  Clock,
+  Plus,
+  X,
   Upload,
   FileText,
   Edit2,
   BedDouble,
   Bath,
   Utensils,
-  Wind
+  Wind,
+  Navigation
 } from 'lucide-react';
 
-const Step2CategoryDetails = ({ 
-  formData, 
-  setFormData, 
-  formOptions, 
+const Step2CategoryDetails = ({
+  formData,
+  setFormData,
+  formOptions,
   propertyKind,
   handleChange,
   getAreaUnitOptions,
@@ -35,7 +36,7 @@ const Step2CategoryDetails = ({
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col gap-1 mb-8">
         <h2 className="text-2xl font-black text-gray-900 flex items-center gap-2">
-          <LayoutDashboard className="w-6 h-6 text-primary" /> 
+          <LayoutDashboard className="w-6 h-6 text-primary" />
           Category Details
         </h2>
         <p className="text-sm text-gray-500 font-medium">
@@ -113,15 +114,15 @@ const Step2CategoryDetails = ({
                 const bhkLabel = typeof b === 'object' ? (b.label || b.value || b.option_key || b) : b;
                 const bhkSlug = typeof b === 'object' ? (b.slug || b.value || b.option_key) : b;
                 const isSelected = formData.selectedBHKs?.includes(bhkSlug) || formData.bhk?.includes(bhkValue);
-                
+
                 return (
                   <button
                     key={bhkSlug || bhkValue}
                     type="button"
                     onClick={() => toggleBHK(bhkSlug || bhkValue)}
                     className={`px-6 py-3 rounded-2xl text-sm font-black uppercase tracking-widest transition-all border-2 flex items-center gap-2 ${isSelected
-                        ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105'
-                        : 'bg-white text-gray-400 border-gray-100 hover:border-primary/30 hover:text-primary/70'
+                      ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105'
+                      : 'bg-white text-gray-400 border-gray-100 hover:border-primary/30 hover:text-primary/70'
                       }`}
                   >
                     <Home size={16} />
@@ -138,7 +139,7 @@ const Step2CategoryDetails = ({
               <div key={detail.type} className="bg-white p-8 rounded-[40px] border-2 border-gray-100 shadow-xl shadow-gray-200/50 relative overflow-hidden group hover:border-primary/20 transition-all duration-500">
                 {/* Accent Background */}
                 <div className="absolute -right-20 -top-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors"></div>
-                
+
                 <div className="flex items-center justify-between mb-10 relative z-10">
                   <div className="flex items-center gap-5">
                     <div className="w-16 h-16 bg-primary/10 text-primary flex items-center justify-center rounded-[24px] font-black text-xl shadow-inner border-2 border-white">
@@ -273,7 +274,7 @@ const Step2CategoryDetails = ({
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Image or PDF format</p>
                       </div>
                     </div>
-                    
+
                     <div className="relative">
                       <input
                         type="file"
@@ -306,7 +307,7 @@ const Step2CategoryDetails = ({
                             <span className="text-[10px] font-black uppercase tracking-widest tracking-tighter">PDF Document</span>
                           </div>
                         )}
-                        
+
                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 backdrop-blur-sm">
                           <button
                             type="button"
@@ -376,7 +377,7 @@ const Step2CategoryDetails = ({
         <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
           <Layers className="w-5 h-5 text-primary" /> Structure & Age
         </h3>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {/* Total Floors */}
           <div className="space-y-2">
@@ -395,7 +396,7 @@ const Step2CategoryDetails = ({
           </div>
 
           {/* Floor Number */}
-          <div className="space-y-2">
+          {/* <div className="space-y-2">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Floor Number</label>
             <div className="relative group">
               <Layers className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors w-5 h-5" />
@@ -408,7 +409,7 @@ const Step2CategoryDetails = ({
                 className="w-full pl-12 pr-4 py-4 bg-white border-2 border-gray-100 rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/5 outline-none text-sm font-bold text-gray-900 transition-all shadow-sm"
               />
             </div>
-          </div>
+          </div> */}
 
           {/* Year Built */}
           <div className="space-y-2">

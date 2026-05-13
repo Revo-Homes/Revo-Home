@@ -49,8 +49,7 @@ function SellProperty() {
   // Dynamic form options from database
   const [formOptions, setFormOptions] = useState({});
   const [loadingFormOptions, setLoadingFormOptions] = useState(true);
-  const [builders, setBuilders] = useState([]);
-  const [isLoadingBuilders, setIsLoadingBuilders] = useState(false);
+  const [duplicateTicket, setDuplicateTicket] = useState(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -70,8 +69,6 @@ function SellProperty() {
     is_featured: false,
     is_verified: false,
     is_published: false,
-    is_builder_listed: false,
-    builder_id: "",
     listed_by_type: "owner", // Default to owner for revo-home additions
     listed_by_id: "",
     listed_by_name: "",
@@ -79,7 +76,7 @@ function SellProperty() {
     address_line1: "",
     address_line2: "",
     city: "",
-    state: "Maharashtra",
+    state: "",
     country: "IN",
     zip_code: "",
     locality: "",
@@ -156,9 +153,13 @@ function SellProperty() {
 
     rera_number: "",
     rera_expiry_date: "",
+    rera_registered: false,
+    rera_state: "",
+    rera_authority_id: "",
 
     meta_title: "",
     meta_description: "",
+    meta_keywords: "",
     meta_text: "{}",
 
     media_items: [],
@@ -173,7 +174,7 @@ function SellProperty() {
     terms_accepted: false,
   });
 
-  const [errors, setErrors] = useState({});
+  const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [customBhkInput, setCustomBhkInput] = useState('');
   const [customFeatures, setCustomFeatures] = useState([]);
@@ -195,24 +196,6 @@ function SellProperty() {
     };
     fetchOptions();
   }, []);
-
-  // Fetch Builders
-  useEffect(() => {
-    if (formData.is_builder_listed) {
-      const fetchBuilders = async () => {
-        setIsLoadingBuilders(true);
-        try {
-          const response = await propertyApi.getBuilders();
-          setBuilders(response?.data || response || []);
-        } catch (err) {
-          console.error('Failed to load builders:', err);
-        } finally {
-          setIsLoadingBuilders(false);
-        }
-      };
-      fetchBuilders();
-    }
-  }, [formData.is_builder_listed]);
 
   // Handle Load for Edit
   useEffect(() => {
@@ -415,45 +398,67 @@ function SellProperty() {
     }));
   };
 
-  const validateStep = () => {
-    const newErrors = {};
-    if (step === 1) {
-      if (!formData.name) newErrors.name = "Property name is required";
-      if (!formData.property_type_id) newErrors.property_type_id = "Property type is required";
-    }
-    if (step === 2) {
-      if (propertyKind === 'Residential' && formData.bhkDetails.length === 0) {
-        newErrors.bhk = "Please select at least one BHK configuration";
-      }
-      if (!formData.total_area) newErrors.total_area = "Total area is required";
-    }
-    if (step === 4) {
-      if (formData.listingType === 'Sale' && !formData.price_min && !formData.price_on_request) {
-        newErrors.price = "Minimum price is required";
-      }
-      if (formData.listingType === 'Rent' && !formData.rent_amount && !formData.price_on_request) {
-        newErrors.rent = "Rent amount is required";
-      }
-    }
-    if (step === 5) {
-      if (!formData.city) newErrors.city = "City is required";
-      if (!formData.locality) newErrors.locality = "Locality is required";
-      if (!formData.full_address) newErrors.address = "Address is required";
-    }
+  const getDescriptionText = (html) => {
+    if (!html) return '';
+    return html.replace(/<[^>]+>/g, '').trim();
+  };
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const validateStep = () => {
+    // Step 1 — Identification
+    if (step === 1) {
+      const descText = getDescriptionText(formData.description);
+      if (!formData.name?.trim() || !formData.property_type_id || !formData.property_category_id || !descText) {
+        return 'Property name, type, category, and description are required.';
+      }
+    }
+    // Step 2 — Property Details
+    if (step === 2) {
+      if (!formData.total_area) {
+        return 'Total area is required.';
+      }
+    }
+    // Step 4 — Pricing
+    if (step === 4) {
+      const listingType = formData.listing_type || 'sale';
+      if (listingType === 'rent') {
+        if (!formData.rent_amount && !formData.price_on_request) {
+          return 'Monthly rent amount is required (or check \'Price on request\').';
+        }
+      } else {
+        if (!formData.price_min && !formData.price_on_request) {
+          return 'Price is required (or check \'Price on request\').';
+        }
+      }
+    }
+    // Step 5 — Location
+    if (step === 5) {
+      if (!formData.address_line1?.trim() || !formData.city?.trim() || !formData.state?.trim()) {
+        return 'Address line 1, city, and state are required.';
+      }
+    }
+    return null;
   };
 
   const nextStep = () => {
-    if (validateStep()) setStep(prev => Math.min(prev + 1, STEPS.length));
+    const err = validateStep();
+    if (err) {
+      setFormError(err);
+      return;
+    }
+    setFormError('');
+    setStep(prev => Math.min(prev + 1, STEPS.length));
   };
 
-  const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
+  const prevStep = () => {
+    setFormError('');
+    setStep(prev => Math.max(prev - 1, 1));
+  };
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
-    if (!validateStep()) return;
+    const err = validateStep();
+    if (err) { setFormError(err); return; }
+    setFormError('');
 
     setSubmitting(true);
     try {
@@ -505,7 +510,15 @@ function SellProperty() {
       navigate(`/property/${navigateId}`);
     } catch (err) {
       console.error('Submission failed:', err);
-      setErrors({ submit: err.message || "Failed to save property. Please try again." });
+      if (err.body?.code === 'DUPLICATE_PROPERTY') {
+        setDuplicateTicket({
+          number: err.body.ticketNumber,
+          id: err.body.ticketId
+        });
+        setErrors({ submit: "Duplicate property data detected (Name or RERA). A support ticket has been raised." });
+      } else {
+        setErrors({ submit: err.message || "Failed to save property. Please try again." });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -558,7 +571,44 @@ function SellProperty() {
             </div>
 
             <div className="p-8 md:p-16">
+              {duplicateTicket && (
+                <div className="mb-8 p-6 bg-blue-50 border border-blue-100 rounded-3xl flex items-start gap-4">
+                  <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 shrink-0">
+                    <AlertCircle size={24} />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-black text-blue-900 mb-1">Duplicate Property Detected</h3>
+                    <p className="text-blue-700 font-medium mb-4">
+                      A property with this name already exists. We have automatically raised a support ticket for you:
+                    </p>
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div className="bg-white px-4 py-2 rounded-xl border border-blue-100">
+                        <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest block">Ticket Number</span>
+                        <span className="text-blue-900 font-black">{duplicateTicket.number}</span>
+                      </div>
+                      <button
+                        onClick={() => navigate('/support')}
+                        className="bg-blue-600 text-white px-6 py-2 rounded-xl font-black text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-200"
+                      >
+                        View Status
+                      </button>
+                    </div>
+                  </div>
+                  <button onClick={() => setDuplicateTicket(null)} className="text-blue-300 hover:text-blue-500">
+                    <ChevronRight className="rotate-90" />
+                  </button>
+                </div>
+              )}
               <form onSubmit={(e) => e.preventDefault()}>
+                {formError && (
+                  <div className="mb-8 p-5 bg-red-50 border-2 border-red-100 rounded-3xl flex items-center gap-4">
+                    <div className="w-10 h-10 bg-red-100 rounded-2xl flex items-center justify-center text-red-500 shrink-0">
+                      <AlertCircle size={20} />
+                    </div>
+                    <p className="text-red-700 font-bold text-sm">{formError}</p>
+                  </div>
+                )}
+
                 {step === 1 && (
                   <Step1BasicInfo
                     formData={formData}
@@ -566,8 +616,6 @@ function SellProperty() {
                     formOptions={formOptions}
                     loadingFormOptions={loadingFormOptions}
                     handleChange={handleChange}
-                    builders={builders}
-                    isLoadingBuilders={isLoadingBuilders}
                     propertyKind={propertyKind}
                     getOptionLabel={getOptionLabel}
                     getOptionValue={getOptionValue}
@@ -618,11 +666,6 @@ function SellProperty() {
                     formData={formData}
                     setFormData={setFormData}
                     handleChange={handleChange}
-                    nearbyLocations={nearbyLocations}
-                    setNearbyLocations={setNearbyLocations}
-                    handleNearbyLocationChange={handleNearbyLocationChange}
-                    addNearbyLocation={addNearbyLocation}
-                    removeNearbyLocation={removeNearbyLocation}
                     formOptions={formOptions}
                   />
                 )}
@@ -643,7 +686,7 @@ function SellProperty() {
                     handleChange={handleChange}
                     handleSubmit={handleSubmit}
                     submitting={submitting}
-                    errors={errors}
+                    formError={formError}
                     propertyKind={propertyKind}
                   />
                 )}

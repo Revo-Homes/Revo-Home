@@ -17,8 +17,6 @@ const Step1BasicInfo = ({
   formOptions,
   loadingFormOptions,
   handleChange,
-  builders,
-  isLoadingBuilders,
   propertyKind,
   getOptionLabel,
   getOptionValue,
@@ -322,71 +320,7 @@ const Step1BasicInfo = ({
         </div>
       </div>
 
-      {/* Builder Selection */}
-      {/* <div className="pt-8 border-t-2 border-gray-50">
-        <div className="bg-primary/5 p-8 rounded-[32px] border-2 border-primary/10">
-          <div className="flex items-center gap-4 mb-6">
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                id="is_builder_listed"
-                name="is_builder_listed"
-                checked={formData.is_builder_listed}
-                onChange={handleChange}
-                className="peer sr-only"
-              />
-              <div className="w-14 h-8 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:start-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary transition-colors"></div>
-            </label>
-            <label htmlFor="is_builder_listed" className="text-lg font-black text-gray-900 cursor-pointer select-none">
-              Is this property listed by a builder?
-            </label>
-          </div>
 
-          {formData.is_builder_listed && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">
-                Select Builder <span className="text-red-500">*</span>
-              </label>
-              <div className="relative group">
-                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors w-5 h-5 z-10" />
-                <select
-                  name="builder_id"
-                  value={formData.builder_id}
-                  onChange={(e) => {
-                    const selectedBuilder = builders.find(b => String(b.id) === e.target.value);
-                    setFormData(prev => ({
-                      ...prev,
-                      builder_id: e.target.value,
-                      builder_name: selectedBuilder?.name || ''
-                    }));
-                  }}
-                  disabled={isLoadingBuilders || builders.length === 0}
-                  className="w-full pl-12 pr-4 py-4 bg-white border-2 border-gray-100 rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/5 outline-none text-sm font-bold text-gray-900 transition-all appearance-none cursor-pointer disabled:opacity-50 disabled:bg-gray-100 shadow-sm relative z-0"
-                >
-                  <option value="">
-                    {isLoadingBuilders ? 'Loading builders...' : builders.length === 0 ? 'No builders available' : 'Choose a builder...'}
-                  </option>
-                  {builders.map((builder) => (
-                    <option key={builder.id} value={String(builder.id)}>
-                      {builder.name} {builder.city ? `(${builder.city})` : ''}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                  <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
-                </div>
-              </div>
-              
-              {builders.length === 0 && !isLoadingBuilders && (
-                <div className="flex items-center gap-3 p-4 bg-yellow-50 border-2 border-yellow-100 rounded-2xl text-yellow-800 text-sm font-bold">
-                  <Info className="w-5 h-5 flex-shrink-0" />
-                  No builders found in the database.
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div> */}
     </div>
   );
 };

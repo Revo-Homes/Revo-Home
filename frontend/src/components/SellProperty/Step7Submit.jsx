@@ -16,7 +16,7 @@ const Step7Submit = ({
   handleChange,
   handleSubmit,
   submitting,
-  errors,
+  formError,
   propertyKind
 }) => {
   return (
@@ -130,20 +130,10 @@ const Step7Submit = ({
           </div>
         </div>
 
-        {/* Errors Display */}
-        {Object.keys(errors).length > 0 && (
-          <div className="p-6 bg-red-50 border-2 border-red-100 rounded-3xl space-y-3 animate-in shake duration-500">
-            <div className="flex items-center gap-2 text-red-600 font-black text-sm uppercase tracking-widest">
-              <AlertCircle size={18} />
-              Please fix the following:
-            </div>
-            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1">
-              {Object.entries(errors).map(([key, msg]) => (
-                <li key={key} className="text-xs font-bold text-red-500 list-disc ml-4 capitalize">
-                  {msg}
-                </li>
-              ))}
-            </ul>
+        {formError && (
+          <div className="p-6 bg-red-50 border-2 border-red-100 rounded-3xl flex items-center gap-3">
+            <AlertCircle size={18} className="text-red-500 shrink-0" />
+            <span className="text-xs font-bold text-red-600">{formError}</span>
           </div>
         )}
 
@@ -153,7 +143,9 @@ const Step7Submit = ({
             <input
               type="checkbox"
               id="terms"
-              required
+              name="terms_accepted"
+              checked={formData.terms_accepted}
+              onChange={(e) => setFormData(prev => ({ ...prev, terms_accepted: e.target.checked }))}
               className="w-5 h-5 rounded-lg border-2 border-primary/30 text-primary focus:ring-primary/20 cursor-pointer"
             />
           </div>

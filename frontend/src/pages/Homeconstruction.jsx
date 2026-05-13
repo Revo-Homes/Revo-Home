@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Home, ArrowRight, Building2, Hammer, ClipboardList, Users } from 'lucide-react';
 import { buildStructuredMessage, submitPublicEnquiry } from '../services/publicEnquiry';
+import { ContactVerificationPanel, useContactVerification } from '../components/ContactVerification';
 
 export default function HomeConstruction() {
   const [formData, setFormData] = useState({
@@ -15,6 +16,7 @@ export default function HomeConstruction() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const verification = useContactVerification({ email: formData.email, phone: formData.phone });
 
   const services = [
     {
@@ -49,6 +51,12 @@ export default function HomeConstruction() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const blocker = verification.getSubmitBlocker();
+    if (blocker) {
+      setSubmitError(blocker);
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError('');
 
@@ -212,6 +220,11 @@ export default function HomeConstruction() {
               rows={3}
               placeholder="Tell us about your construction project..."
             />
+          </div>
+
+          {/* Contact verification */}
+          <div className="mt-4">
+            <ContactVerificationPanel verification={verification} />
           </div>
 
           {/* Button */}

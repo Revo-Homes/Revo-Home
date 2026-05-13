@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { TrendingUp, CheckCircle2, ArrowRight, MapPin, Home, Calculator } from 'lucide-react';
 import { buildStructuredMessage, submitPublicEnquiry } from '../services/publicEnquiry';
+import { useContactVerification, InlineContactVerifier } from '../components/ContactVerification';
 
 export default function PropertyValuation() {
   const [formData, setFormData] = useState({
@@ -17,6 +18,7 @@ export default function PropertyValuation() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const verification = useContactVerification({ email: formData.email, phone: formData.phone });
 
   const services = [
     {
@@ -90,6 +92,12 @@ export default function PropertyValuation() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const blocker = verification.getSubmitBlocker();
+    if (blocker) {
+      setSubmitError(blocker);
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError('');
 
@@ -286,6 +294,9 @@ export default function PropertyValuation() {
                     className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     placeholder="your@email.com"
                   />
+                  <div className="mt-2">
+                    <InlineContactVerifier channel="email" verification={verification} />
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -298,6 +309,9 @@ export default function PropertyValuation() {
                     className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     placeholder="+91 98765 43210"
                   />
+                  <div className="mt-2">
+                    <InlineContactVerifier channel="sms" verification={verification} />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Property Type</label>
@@ -330,6 +344,7 @@ export default function PropertyValuation() {
                 {submitting ? 'Submitting...' : 'Get Expert Valuation'}
                 <ArrowRight className="h-4 w-4" />
               </button>
+              {/* Verification controls are placed inline next to inputs */}
               {submitError && (
                 <p className="text-sm text-red-600">{submitError}</p>
               )}

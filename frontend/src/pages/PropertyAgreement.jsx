@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { buildStructuredMessage, submitPublicEnquiry } from '../services/publicEnquiry';
+import { ContactVerificationPanel, useContactVerification } from '../components/ContactVerification';
 
 const BANKS = ["HDFC", "ICICI", "SBI", "Axis Bank", "Kotak", "PNB"];
 
@@ -28,6 +29,7 @@ function PropertyAgreement() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const verification = useContactVerification({ email: formData.email, phone: formData.phone });
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -39,6 +41,12 @@ function PropertyAgreement() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const blocker = verification.getSubmitBlocker();
+    if (blocker) {
+      setSubmitError(blocker);
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError('');
 
@@ -225,6 +233,10 @@ function PropertyAgreement() {
           </div>
 
           {/* SUBMIT */}
+          <div className="mt-4">
+            <ContactVerificationPanel verification={verification} />
+          </div>
+
           <button
             type="submit"
             disabled={submitting}
