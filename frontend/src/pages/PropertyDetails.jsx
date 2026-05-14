@@ -953,7 +953,7 @@ const PriceConfigRow = ({ bhk, area, price, unit, config, isHighlighted = false 
         <BedDouble size={20} />
       </div>
       <div>
-        <p className="font-bold text-gray-900">{bhk} BHK</p>
+        <p className="font-bold text-gray-900">{String(bhk).replace(/\s*bhk\s*/i, '').trim()} BHK</p>
         <div className="flex items-center gap-2">
           <p className="text-sm text-gray-500">{area} sq.ft</p>
           {config?.bathrooms > 0 && <span className="text-xs text-gray-400">• {config.bathrooms} Bath</span>}
@@ -1250,7 +1250,7 @@ function ContactSidePanel({
               Enquiry Now
             </motion.button>
 
-            <div className={`grid gap-2 ${property?.hasBrochure ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            <div className={`grid gap-2 ${(toArray(property?.documents).length > 0 || toArray(property?.resale_documents).length > 0 || toArray(property?.brochures).length > 0) ? 'grid-cols-2' : 'grid-cols-1'}`}>
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -1260,7 +1260,7 @@ function ContactSidePanel({
                 <Phone size={14} />
                 Call Back
               </motion.button>
-              {property?.hasBrochure && (
+              {(toArray(property?.documents).length > 0 || toArray(property?.resale_documents).length > 0 || toArray(property?.brochures).length > 0) && (
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -1698,12 +1698,15 @@ function PropertyDetails() {
       openLoginForPropertyDetails();
       return;
     }
-    if (hasPaidForDocuments) {
-      generateAndDownloadDocument();
-      return;
-    }
-    if (property?.hasBrochure) {
-      setShowPaymentModal(true);
+    const isResale =
+      ['resale'].includes((property?.listingType || property?.listing_type || '').toLowerCase()) ||
+      toArray(property?.resale_documents).length > 0;
+    if (isResale) {
+      if (hasPaidForDocuments) {
+        generateAndDownloadDocument();
+      } else {
+        setShowPaymentModal(true);
+      }
       return;
     }
     generateAndDownloadDocument();
@@ -1735,68 +1738,78 @@ function PropertyDetails() {
     }
   };
 
-  const generateAndDownloadDocument = () => {
-    // Create a comprehensive property document using jsPDF
+  // const generateAndDownloadDocument = () => {
+  //   // Create a comprehensive property document using jsPDF
   
-    const doc = new jsPDF();
+  //   const doc = new jsPDF();
 
-    // Header
-    doc.setFontSize(20);
-    doc.setTextColor(99, 102, 241);
-    doc.text('Revo Homes - Property Document', 105, 20, { align: 'center' });
+  //   // Header
+  //   doc.setFontSize(20);
+  //   doc.setTextColor(99, 102, 241);
+  //   doc.text('Revo Homes - Property Document', 105, 20, { align: 'center' });
 
-    // Property Details
-    doc.setFontSize(12);
-    doc.setTextColor(0, 0, 0);
-    let y = 40;
+  //   // Property Details
+  //   doc.setFontSize(12);
+  //   doc.setTextColor(0, 0, 0);
+  //   let y = 40;
 
-    doc.text('PROPERTY DETAILS', 20, y);
-    y += 10;
-    doc.setFontSize(10);
-    doc.text(`Property: ${property?.title || 'N/A'}`, 20, y);
-    y += 7;
-    doc.text(`Location: ${property?.location || 'N/A'}`, 20, y);
-    y += 7;
-    doc.text(`Price: ₹${property?.price?.toLocaleString() || 'N/A'}`, 20, y);
-    y += 7;
-    doc.text(`BHK: ${property?.bhk || 'N/A'}`, 20, y);
-    y += 7;
-    doc.text(`Area: ${property?.area || 'N/A'} sq.ft`, 20, y);
-    y += 15;
+  //   doc.text('PROPERTY DETAILS', 20, y);
+  //   y += 10;
+  //   doc.setFontSize(10);
+  //   doc.text(`Property: ${property?.title || 'N/A'}`, 20, y);
+  //   y += 7;
+  //   doc.text(`Location: ${property?.location || 'N/A'}`, 20, y);
+  //   y += 7;
+  //   doc.text(`Price: ₹${property?.price?.toLocaleString() || 'N/A'}`, 20, y);
+  //   y += 7;
+  //   doc.text(`BHK: ${property?.bhk || 'N/A'}`, 20, y);
+  //   y += 7;
+  //   doc.text(`Area: ${property?.area || 'N/A'} sq.ft`, 20, y);
+  //   y += 15;
 
-    // Owner Details
-    doc.setFontSize(12);
-    doc.text('OWNER INFORMATION', 20, y);
-    y += 10;
-    doc.setFontSize(10);
-    doc.text(`Name: ${property?.owner?.name || 'N/A'}`, 20, y);
-    y += 7;
-    doc.text(`Phone: ${property?.owner?.phone || 'N/A'}`, 20, y);
-    y += 15;
+  //   // Owner Details
+  //   doc.setFontSize(12);
+  //   doc.text('OWNER INFORMATION', 20, y);
+  //   y += 10;
+  //   doc.setFontSize(10);
+  //   doc.text(`Name: ${property?.owner?.name || 'N/A'}`, 20, y);
+  //   y += 7;
+  //   doc.text(`Phone: ${property?.owner?.phone || 'N/A'}`, 20, y);
+  //   y += 15;
 
-    // Amenities
-    if (property?.amenities && property.amenities.length > 0) {
-      doc.setFontSize(12);
-      doc.text('AMENITIES', 20, y);
-      y += 10;
-      doc.setFontSize(10);
-      property.amenities.slice(0, 10).forEach((amenity, idx) => {
-        doc.text(`• ${amenity}`, 20, y);
-        y += 6;
-      });
-    }
+  //   // Amenities
+  //   if (property?.amenities && property.amenities.length > 0) {
+  //     doc.setFontSize(12);
+  //     doc.text('AMENITIES', 20, y);
+  //     y += 10;
+  //     doc.setFontSize(10);
+  //     property.amenities.slice(0, 10).forEach((amenity, idx) => {
+  //       doc.text(`• ${amenity}`, 20, y);
+  //       y += 6;
+  //     });
+  //   }
 
-    // Footer
-    doc.setFontSize(8);
-    doc.setTextColor(128, 128, 128);
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 280);
-    doc.text('This document is generated by Revo Homes. Payment verified.', 20, 285);
-    doc.text(`Payment ID: DOC_${Date.now()}`, 20, 290);
+  //   // Footer
+  //   doc.setFontSize(8);
+  //   doc.setTextColor(128, 128, 128);
+  //   doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 280);
+  //   doc.text('This document is generated by Revo Homes. Payment verified.', 20, 285);
+  //   doc.text(`Payment ID: DOC_${Date.now()}`, 20, 290);
 
-    // Download
-    doc.save(`${property?.title?.replace(/\s+/g, '_') || 'Property'}_Documents.pdf`);
+  //   // Download
+  //   doc.save(`${property?.title?.replace(/\s+/g, '_') || 'Property'}_Documents.pdf`);
+  // };
+const generateAndDownloadDocument = () => {
+    const allDocs = [
+      ...toArray(property?.resale_documents),
+      ...toArray(property?.documents),
+      ...toArray(property?.brochures),
+    ];
+    allDocs.forEach((doc) => {
+      const url = getMediaUrl(doc);
+      if (url) window.open(url, '_blank');
+    });
   };
-
   useEffect(() => {
     const fetchProperty = async () => {
       setLoading(true);
@@ -2236,8 +2249,12 @@ function PropertyDetails() {
                     icon={IndianRupee}
                     title="Price List & Configuration"
                     action={
-                      <div className="flex gap-2">
-                        {['all', '1', '2', '3', '4'].map((bhk) => (
+                      <div className="flex gap-2 flex-wrap">
+                        {['all', ...new Set(
+                          priceConfigurations
+                            .map(c => String(c.bhk).replace(/\s*bhk\s*/i, '').trim())
+                            .filter(Boolean)
+                        )].map((bhk) => (
                           <button
                             key={bhk}
                             onClick={() => setActiveBhkTab(bhk)}
@@ -2254,7 +2271,7 @@ function PropertyDetails() {
                   />
                   <div className="space-y-3">
                     {priceConfigurations
-                      .filter((item) => activeBhkTab === 'all' || String(item.bhk) === activeBhkTab)
+                      .filter((item) => activeBhkTab === 'all' || String(item.bhk).replace(/\s*bhk\s*/i, '').trim() === activeBhkTab)
                       .map((config) => (
                         <PriceConfigRow
                           key={config.id}
@@ -2812,7 +2829,7 @@ function PropertyDetails() {
                   </div>
 
                   {/* Right - Download Documents */}
-                  {property?.hasBrochure && (
+                  {(toArray(property?.documents).length > 0 || toArray(property?.resale_documents).length > 0 || toArray(property?.brochures).length > 0) && (
                     <div className="lg:w-auto w-full">
                       <div className="bg-primary/5 rounded-xl p-5 border border-primary/10">
                         <div className="flex items-start gap-3">

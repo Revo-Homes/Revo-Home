@@ -154,6 +154,42 @@ const parseNearbyFromLocationInsights = (locationInsights) => {
       distance: `${val} km`,
     }));
 };
+const DISTANCE_FIELD_MAP = {
+  distance_railway:   'Railway Station',
+  distance_busstand:  'Bus Stand',
+  distance_airport:   'Airport',
+  distance_highway:   'Highway / Main Road',
+  distance_auto_taxi: 'Auto / Taxi Stand',
+  distance_hospital:  'Hospital',
+  distance_school:    'School',
+  distance_market:    'Market',
+};
+
+const parseNearbyFromDistanceFields = (source) => {
+  if (!source || typeof source !== 'object') return [];
+  return Object.entries(DISTANCE_FIELD_MAP)
+    .filter(([key]) => source[key] !== null && source[key] !== undefined && source[key] !== '')
+    .map(([key, name]) => ({ name, distance: `${source[key]} km` }));
+};
+
+const parseNearbyFromLandmarkString = (landmark) => {
+  if (!landmark || typeof landmark !== 'string') return [];
+  return landmark
+    .split('|')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(entry => {
+      const distMatch = entry.match(/\(?([\d.]+)\s*km\)?/i);
+      if (!distMatch) return null;
+      const name = entry
+        .replace(/\([\d.]+\s*km\)/i, '')
+        .replace(/[-–]\s*[\d.]+\s*km/i, '')
+        .replace(/^Near\s+/i, '')
+        .trim();
+      return { name, distance: `${distMatch[1]} km` };
+    })
+    .filter(Boolean);
+};
 
 const toArray = (value, fallback = []) => {
   if (Array.isArray(value)) return value;
@@ -280,10 +316,20 @@ const bhk = bhkFromMeta
     null
   );
   if (explicit && explicit.length > 0) return explicit;
-  // Try location_insights from meta or direct field
-  return parseNearbyFromLocationInsights(
+
+  const fromInsights = parseNearbyFromLocationInsights(
     meta?.location_insights || item.location_insights
   );
+  if (fromInsights.length > 0) return fromInsights;
+
+ // Merge all sources — meta/item distance fields + landmark string
+  const merged = new Map();
+  [...parseNearbyFromDistanceFields(meta), ...parseNearbyFromDistanceFields(item)]
+    .forEach(e => merged.set(e.name, e));
+  parseNearbyFromLandmarkString(item.landmark || meta?.landmark)
+    .forEach(e => merged.set(e.name, e));
+
+  return [...merged.values()];
 })();
 
   // Location string
@@ -1053,6 +1099,35 @@ list.forEach(item => {
   const listing = extractSingle(listingResponse, ['listing']);
   if (listing) {
     const normalized = normalizeProperty(listing, userLocation);
+    // Fetch property to get distance fields missing from listing
+    try {
+      const propId = listing.property_id;
+      if (propId) {
+        const propertyResponse = await propertyApi.getById(propId);
+        const propertyData = propertyResponse?.data || propertyResponse;
+        if (propertyData) {
+          const distanceKeys = [
+            'distance_school', 'distance_hospital', 'distance_market',
+            'distance_railway', 'distance_busstand', 'distance_airport',
+            'distance_highway', 'distance_auto_taxi', 'distance_transport',
+          ];
+          distanceKeys.forEach(key => {
+            if (propertyData[key] !== null && propertyData[key] !== undefined) {
+              normalized[key] = propertyData[key];
+            }
+          });
+          // Re-compute nearby with the enriched item
+          normalized.nearby = (() => {
+            const merged = new Map();
+            [...parseNearbyFromDistanceFields(normalized)]
+              .forEach(e => merged.set(e.name, e));
+            parseNearbyFromLandmarkString(propertyData.landmark || listing.landmark)
+              .forEach(e => merged.set(e.name, e));
+            return [...merged.values()];
+          })();
+        }
+      }
+    } catch (propErr) { /* silent */ }
 
     // Single listing API doesn't return image fields like the list API does
     // So fall back to cached listing data which was fetched from the list API
