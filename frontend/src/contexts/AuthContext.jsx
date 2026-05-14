@@ -81,6 +81,7 @@ export function AuthProvider({ children }) {
     } catch (err) {
       console.error('AuthContext: Profile sync failed:', err);
       if (err.status === 401) {
+        await authApi.logout().catch(() => {});
         handleLogoutLocally();
       }
       return null;

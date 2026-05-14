@@ -584,26 +584,27 @@ list.forEach(item => {
         }
       })
     );
-    // Fetch tags for all properties
-    await Promise.all(
-      collected.map(async (item) => {
-        try {
-          const propertyId = item.propertyId || item.property_id;
-          if (!propertyId) return;
-          const tagsResponse = await propertyApi.getPropertyTags(propertyId);
-          const tagList = Array.isArray(tagsResponse) ? tagsResponse : (tagsResponse?.data || []);
-          if (tagList.length > 0) {
-            const slugs = tagList.map(t => t.slug || t.tag_slug).filter(Boolean);
-            item.labels = slugs.includes('sold_out') ? ['sold_out'] : slugs.slice(0, 2);
-          }
-        } catch (err) { /* silent */ }
-      })
-    );
+    if (isLoggedIn) {
+      await Promise.all(
+        collected.map(async (item) => {
+          try {
+            const propertyId = item.propertyId || item.property_id;
+            if (!propertyId) return;
+            const tagsResponse = await propertyApi.getPropertyTags(propertyId);
+            const tagList = Array.isArray(tagsResponse) ? tagsResponse : (tagsResponse?.data || []);
+            if (tagList.length > 0) {
+              const slugs = tagList.map(t => t.slug || t.tag_slug).filter(Boolean);
+              item.labels = slugs.includes('sold_out') ? ['sold_out'] : slugs.slice(0, 2);
+            }
+          } catch (err) { /* silent */ }
+        })
+      );
+    }
 
    
 
     return collected;
-  }, [userLocation]);
+  }, [isLoggedIn, userLocation]);
 
   const applyPropertyCatalog = useCallback((catalogItems, featuredItems = null) => {
     const nextProperties = catalogItems || [];
@@ -1084,7 +1085,8 @@ if (cached) {
     normalized.is_exclusive = cached.is_exclusive;
   }
 }
-// Fetch tags
+    // Fetch auth-only property tags only after login to avoid anonymous 401 noise.
+    if (isLoggedIn) {
     try {
       const propId = normalized.propertyId || normalized.property_id;
       if (propId) {
@@ -1098,6 +1100,7 @@ if (cached) {
         }
       }
     } catch (tagErr) { /* silent */ }
+    }
     try {
   const propId = normalized.propertyId || normalized.property_id;
   if (propId) {
@@ -1213,7 +1216,7 @@ return normalized;
     }
 
     return null;
-  }, [listings, properties, userLocation]);
+  }, [isLoggedIn, listings, properties, userLocation]);
 
   const createProperty = useCallback(async (data) => {
     try {
