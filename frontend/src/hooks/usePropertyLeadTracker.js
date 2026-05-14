@@ -4,7 +4,7 @@ export { useRevoLeadTracker as usePropertyLeadTracker } from "./useRevoLeadTrack
 import { useCallback, useRef } from 'react';
 
 // Use Vite env variable (not process.env which is Node/CRA only)
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 /**
  * Custom hook to track property clicks and generate leads in the CRM backend.

@@ -55,7 +55,7 @@ class PropertyClickService {
       };
 
       // Create lead via API
-      const response = await fetch('/api/v1/leads/property-click', {
+      const response = await fetch('/api/leads/property-click', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -85,7 +85,7 @@ class PropertyClickService {
     try {
       const token = localStorage.getItem('authToken');
       if (token) {
-        const response = await fetch('/api/v1/auth/me', {
+        const response = await fetch('/api/auth/me', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -105,7 +105,7 @@ class PropertyClickService {
       const user = await this.getCurrentUser();
       if (!user) return { exists: false };
 
-      const response = await fetch(`/api/v1/leads/property-click/check/${propertyId}`, {
+      const response = await fetch(`/api/leads/property-click/check/${propertyId}`, {
         headers: { 'Authorization': `Bearer ${user.token}` }
       });
 

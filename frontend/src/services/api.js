@@ -1,12 +1,11 @@
 /**
  * REVO HOMES - API Client
- * Base URL: Set via VITE_API_BASE_URL or defaults to /api/v1
+ * Base URL: Set via VITE_API_BASE_URL or defaults to /api
  * All endpoints align with frontend pages: Login, OTP, Signup, Properties, Sell, Dashboard, Tools, Admin
  */
 
 const normalizeApiBase = (value) => {
-  const base = (value || '/api/v1').replace(/\/+$/, '');
-  return base === '/api' ? '/api/v1' : base;
+  return (value || '/api').replace(/\/+$/, '');
 };
 
 const API_BASE = normalizeApiBase(
