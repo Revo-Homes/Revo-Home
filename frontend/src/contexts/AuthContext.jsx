@@ -70,6 +70,8 @@ export function AuthProvider({ children }) {
       }
       
       setUser(userData);
+      setIsPhoneVerified(Boolean(userData?.phone_verified_at || userData?.isPhoneVerified));
+      setUserPhoneNumber(userData?.phone || '');
       try {
         if (typeof window !== 'undefined') {
           localStorage.setItem(USER_KEY, JSON.stringify(userData));
@@ -483,7 +485,7 @@ export function AuthProvider({ children }) {
   const signup = async (data) => {
     try {
       setLoading(true);
-      const response = await userApi.create({ ...data, role: 'revo_user' }); 
+      const response = await userApi.create({ ...data, role: 'user' }); 
       const token = response.token || response.access_token || response.data?.access_token;
       if (token) {
         localStorage.setItem(TOKEN_KEY, token);

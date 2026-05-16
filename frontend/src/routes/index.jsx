@@ -61,9 +61,10 @@ function AppRoutes() {
             <Route path="become-builder" element={<BecomeBuilder />} />
           </Route>
 
-          <Route path="/login" element={<Login />} />
+          <Route path="/login" element={<Navigate to="/" replace state={{ openAuth: "login" }} />} />
+          <Route path="/signup" element={<Navigate to="/" replace state={{ openAuth: "signup" }} />} />
+          <Route path="/register" element={<Navigate to="/" replace state={{ openAuth: "signup" }} />} />
           <Route path="/otp-verify" element={<OTPVerify />} />
-          <Route path="/signup" element={<Signup />} />
           <Route path="/payment/success" element={<PaymentSuccess />} />
           <Route path="/payment/failure" element={<PaymentFailure />} />
 

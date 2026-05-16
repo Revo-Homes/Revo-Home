@@ -1178,7 +1178,10 @@ function ContactSidePanel({
   onLoginClick
 }) {
   const owner = property?.owner || { name: 'Property Owner', phone: '', verified: false };
-  const maskedPhone = owner.phone ? owner.phone.replace(/\d(?=\d{3})/g, 'X') : 'Available after enquiry';
+  const ownerDigits = owner.phone ? String(owner.phone).replace(/\D/g, '') : '';
+  const maskedPhone = ownerDigits
+    ? `${'X'.repeat(Math.max(ownerDigits.length - 3, 0))}${ownerDigits.slice(-3)}`
+    : 'Contact Us';
   const fullPhone = owner.phone || '';
   const ownerEmail = property?.owner?.email || '';
   const quickFacts = [

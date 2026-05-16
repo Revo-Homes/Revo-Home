@@ -457,8 +457,8 @@ const bhk = bhkFromMeta
     floors: item.floors || [],
     owner: {
       name: item.owner_name || item.listed_by_name || meta.listed_by_name || item.organization_name || 'Property Owner',
-      phone: item.owner_phone || item.organization_phone || '',
-      email: item.owner_email || item.organization_email || '',
+      phone: item.owner_phone || item.listed_by_phone || meta.owner_phone || meta.listed_by_phone || item.created_by_phone || '',
+      email: item.owner_email || item.listed_by_email || meta.owner_email || meta.listed_by_email || item.created_by_email || '',
       type: item.listed_by_type || meta.listed_by_type || (item.organization_name ? 'organisation' : 'owner'),
       organization_type: item.organization_type,
       verified: Boolean(item.is_verified || item.property_is_verified),
