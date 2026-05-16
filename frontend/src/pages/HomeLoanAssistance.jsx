@@ -422,10 +422,7 @@ function HomeLoanAssistance() {
           </span>
         </label>
 
-        {/* Contact verification */}
-        <div className="mt-4">
-          <ContactVerificationPanel verification={verification} />
-        </div>
+        {/* verification removed as inline verification is present */}
 
         <button
           type="submit"

@@ -138,16 +138,16 @@ export default function VastuConsultancy() {
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Email
               </label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary"
-                placeholder="your@email.com"
-              />
-              <div className="mt-2">
+              <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary"
+                  placeholder="your@email.com"
+                />
                 <InlineContactVerifier channel="email" verification={verification} />
               </div>
             </div>
@@ -159,16 +159,16 @@ export default function VastuConsultancy() {
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Phone
               </label>
-              <input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) =>
-                  setFormData({ ...formData, phone: e.target.value })
-                }
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary"
-                placeholder="+91 98765 43210"
-              />
-              <div className="mt-2">
+              <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) =>
+                    setFormData({ ...formData, phone: e.target.value })
+                  }
+                  className="w-full sm:w-1/2 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary"
+                  placeholder="+91 98765 43210"
+                />
                 <InlineContactVerifier channel="sms" verification={verification} />
               </div>
             </div>

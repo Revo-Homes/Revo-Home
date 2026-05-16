@@ -513,6 +513,9 @@ export function PropertyProvider({ children }) {
   const [error, setError] = useState(null);
   const [propertyTypes, setPropertyTypes] = useState({}); // { id: name } mapping
   const [reraAuthorities, setReraAuthorities] = useState({});
+  const fetchBuilders = (params) => propertyApi.getBuilders(params);
+          const fetchAgents = (params) => userApi.list({ ...params, role: 'agent' });
+
 
   useEffect(() => {
     const fetchReraAuthorities = async () => {
@@ -982,7 +985,7 @@ list.forEach(item => {
       return true;
     } catch (err) {
       console.error('Failed to toggle favorite:', err);
-       if (err?.status === 401) logout();
+       // if (err?.status === 401) logout();
       return false;
     }
   }, [logout]);
@@ -1476,7 +1479,10 @@ return normalized;
         addEnquiry,
         deleteEnquiry,
         isSaved: (id) => savedIds.has(Number(id)),
-        reraAuthorities,
+                reraAuthorities,
+        fetchBuilders,
+        fetchAgents,
+
       }}
     >
       {children}

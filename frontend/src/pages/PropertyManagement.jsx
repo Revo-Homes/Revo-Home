@@ -107,17 +107,21 @@ export default function PropertyManagement() {
 
             <div>
               <label className="block text-sm text-slate-600 mb-1">Email Address</label>
-              <input value={formData.email} onChange={(e)=>setFormData({...formData,email:e.target.value})}
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" />
-              <div className="mt-2"><InlineContactVerifier channel="email" verification={verification} /></div>
+              <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                <input value={formData.email} onChange={(e)=>setFormData({...formData,email:e.target.value})}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" />
+                <InlineContactVerifier channel="email" verification={verification} />
+              </div>
             </div>
           </div>
 
           <div>
             <label className="block text-sm text-slate-600 mb-1">Phone Number</label>
-            <input value={formData.phone} onChange={(e)=>setFormData({...formData,phone:e.target.value})}
-              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" />
-            <div className="mt-2"><InlineContactVerifier channel="sms" verification={verification} /></div>
+            <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+              <input value={formData.phone} onChange={(e)=>setFormData({...formData,phone:e.target.value})}
+                className="w-full sm:w-1/2 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" />
+              <InlineContactVerifier channel="sms" verification={verification} />
+            </div>
           </div>
 
           <Select label="Owner Type" value={formData.ownerType} onChange={(e)=>setFormData({...formData,ownerType:e.target.value})}

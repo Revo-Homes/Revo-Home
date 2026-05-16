@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { buildStructuredMessage, submitPublicEnquiry } from '../services/publicEnquiry';
+import { useContactVerification, InlineContactVerifier } from '../components/ContactVerification';
 
 function RentAgreement() {
   const [formData, setFormData] = useState({
@@ -17,6 +18,7 @@ function RentAgreement() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const verification = useContactVerification({ email: formData.email, phone: formData.phone });
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -28,6 +30,12 @@ function RentAgreement() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const blocker = verification.getSubmitBlocker();
+    if (blocker) {
+      setSubmitError(blocker);
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError('');
 
@@ -118,14 +126,17 @@ function RentAgreement() {
               <label className="block text-sm text-slate-600 mb-1">
                 Email
               </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
+              <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+                <InlineContactVerifier channel="email" verification={verification} />
+              </div>
             </div>
           </div>
 
@@ -134,14 +145,17 @@ function RentAgreement() {
             <label className="block text-sm text-slate-600 mb-1">
               Phone
             </label>
-            <input
-              type="tel"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-            />
+            <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+              <input
+                type="tel"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                required
+                className="w-full sm:w-1/2 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
+              <InlineContactVerifier channel="sms" verification={verification} />
+            </div>
           </div>
 
           {/* RENT + INCOME */}

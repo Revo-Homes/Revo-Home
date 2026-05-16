@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { buildStructuredMessage, submitPublicEnquiry } from '../services/publicEnquiry';
-import { ContactVerificationPanel, useContactVerification } from '../components/ContactVerification';
+import { ContactVerificationPanel, useContactVerification, InlineContactVerifier } from '../components/ContactVerification';
 
 const BANKS = ["HDFC", "ICICI", "SBI", "Axis Bank", "Kotak", "PNB"];
 
@@ -126,11 +126,35 @@ function PropertyAgreement() {
           {/* NAME + EMAIL */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {renderInput("Full Name", "name", formData, handleChange)}
-            {renderInput("Email Address", "email", formData, handleChange, "email")}
+            <div>
+              <label className="block text-sm text-slate-600 mb-1">Email Address</label>
+              <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+                <InlineContactVerifier channel="email" verification={verification} />
+              </div>
+            </div>
           </div>
 
           {/* PHONE */}
-          {renderInput("Phone Number", "phone", formData, handleChange)}
+          <div>
+            <label className="block text-sm text-slate-600 mb-1">Phone Number</label>
+            <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+              <input
+                type="text"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                className="w-full sm:w-1/2 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
+              <InlineContactVerifier channel="sms" verification={verification} />
+            </div>
+          </div>
 
           {/* PAN + AADHAAR */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -233,9 +257,7 @@ function PropertyAgreement() {
           </div>
 
           {/* SUBMIT */}
-          <div className="mt-4">
-            <ContactVerificationPanel verification={verification} />
-          </div>
+          {/* verification removed as inline verification is present */}
 
           <button
             type="submit"

@@ -22,7 +22,7 @@ import {
   Lock,
   ArrowRight
 } from 'lucide-react';
-import { ContactVerificationPanel, useContactVerification } from '../components/ContactVerification';
+import { ContactVerificationPanel, useContactVerification, InlineContactVerifier } from '../components/ContactVerification';
 
 const STEPS = [
   { id: 1, title: 'Personal Details', icon: User },
@@ -436,34 +436,40 @@ function BecomeBuilder() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Mobile Number <span className="text-red-500">*</span></label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <input
-                        type="tel"
-                        name="mobileNumber"
-                        value={formData.mobileNumber}
-                        onChange={handleChange}
-                        placeholder="Enter 10-digit mobile number"
-                        className={`w-full pl-9 pr-4 py-2.5 bg-white border rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm ${errors.mobileNumber ? 'border-red-500' : 'border-gray-200'}`}
-                      />
-                      {errors.mobileNumber && <p className="text-xs text-red-500 mt-1 ml-1">{errors.mobileNumber}</p>}
+                    <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                      <div className="relative flex-1 w-full">
+                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <input
+                          type="tel"
+                          name="mobileNumber"
+                          value={formData.mobileNumber}
+                          onChange={handleChange}
+                          placeholder="Enter 10-digit mobile number"
+                          className={`w-full pl-9 pr-4 py-2.5 bg-white border rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm ${errors.mobileNumber ? 'border-red-500' : 'border-gray-200'}`}
+                        />
+                      </div>
+                      <InlineContactVerifier channel="sms" verification={verification} />
                     </div>
+                    {errors.mobileNumber && <p className="text-xs text-red-500 mt-1 ml-1">{errors.mobileNumber}</p>}
                   </div>
 
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Email Address <span className="text-red-500">*</span></label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <input
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        placeholder="your@email.com"
-                        className={`w-full pl-9 pr-4 py-2.5 bg-white border rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm ${errors.email ? 'border-red-500' : 'border-gray-200'}`}
-                      />
-                      {errors.email && <p className="text-xs text-red-500 mt-1 ml-1">{errors.email}</p>}
+                    <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                      <div className="relative flex-1 w-full">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <input
+                          type="email"
+                          name="email"
+                          value={formData.email}
+                          onChange={handleChange}
+                          placeholder="your@email.com"
+                          className={`w-full pl-9 pr-4 py-2.5 bg-white border rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm ${errors.email ? 'border-red-500' : 'border-gray-200'}`}
+                        />
+                      </div>
+                      <InlineContactVerifier channel="email" verification={verification} />
                     </div>
+                    {errors.email && <p className="text-xs text-red-500 mt-1 ml-1">{errors.email}</p>}
                   </div>
                 </div>
 
@@ -527,7 +533,6 @@ function BecomeBuilder() {
                       <input type="text" name="agencyName" value={formData.agencyName} onChange={handleChange} placeholder="Enter agency or company name" className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm" />
                     </div>
                     <div className="mt-4">
-                      <ContactVerificationPanel verification={verification} />
                       {errors.form && <p className="text-xs text-red-500 mt-2">{errors.form}</p>}
                     </div>
                   </div>
@@ -558,7 +563,22 @@ function BecomeBuilder() {
                   <label className="block text-xs font-semibold text-gray-600 mb-1.5 ml-1">Name of Government ID <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <input type="text" name="governmentIdName" value={formData.governmentIdName || ''} onChange={handleChange} placeholder="e.g., Aadhaar, PAN, Passport" className={`w-full pl-9 pr-4 py-2.5 bg-white border rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm ${errors.governmentIdName ? 'border-red-500' : 'border-gray-200'}`} />
+                    <select 
+                      name="governmentIdName" 
+                      value={formData.governmentIdName || ''} 
+                      onChange={handleChange} 
+                      className={`w-full pl-9 pr-4 py-2.5 bg-white border rounded-lg focus:ring-1 focus:outline-none focus:ring-primary focus:border-primary text-sm font-medium text-gray-900 transition-all shadow-sm appearance-none ${errors.governmentIdName ? 'border-red-500' : 'border-gray-200'}`}
+                    >
+                      <option value="">Select Government ID</option>
+                      <option value="Aadhaar">Aadhaar</option>
+                      <option value="PAN">PAN</option>
+                      <option value="Passport">Passport</option>
+                      <option value="Driving License">Driving License</option>
+                      <option value="Electic bill">Electic bill</option>
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <ChevronRight className="w-4 h-4 text-gray-400 rotate-90" />
+                    </div>
                   </div>
                   {errors.governmentIdName && <p className="text-xs text-red-500 mt-1 ml-1">{errors.governmentIdName}</p>}
                 </div>
@@ -573,7 +593,11 @@ function BecomeBuilder() {
                           <Upload className="w-8 h-8 text-primary" />
                         </div>
                         <h4 className="font-bold text-gray-900 mb-2">Upload {formData.governmentIdName || 'Government ID'}</h4>
-                        <p className="text-xs text-gray-500 mb-4 max-w-xs mx-auto">{formData.governmentIdName ? `Please upload your valid ${formData.governmentIdName}` : "Please upload a valid government-issued ID (Aadhaar, PAN, Passport, or Driver's License)"}</p>
+                        <p className="text-xs text-gray-500 mb-4 max-w-xs mx-auto">
+                          {formData.governmentIdName 
+                            ? `Please upload your valid ${formData.governmentIdName} for verification` 
+                            : "Please upload a valid government-issued ID (Aadhaar, PAN, Passport, or Driver's License)"}
+                        </p>
                         <div className="relative inline-block">
                           <button type="button" className="px-6 py-3 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary/90 transition-all">Choose File</button>
                           <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
