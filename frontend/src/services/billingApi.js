@@ -92,9 +92,11 @@ export const billingApi = {
   },
   
   getActiveSubscription: async (orgId, params = {}) => {
-    const path = orgId
-      ? `/subscriptions/active-any/${orgId}${query(params)}`
-      : `/subscriptions/active-any${query(params)}`;
+    const resolvedOrgId = orgId && typeof orgId === 'object' ? null : orgId;
+    const resolvedParams = orgId && typeof orgId === 'object' ? orgId : params;
+    const path = resolvedOrgId
+      ? `/subscriptions/active-any/${resolvedOrgId}${query(resolvedParams)}`
+      : `/subscriptions/active-any${query(resolvedParams)}`;
     return apiClient(path);
   },
 

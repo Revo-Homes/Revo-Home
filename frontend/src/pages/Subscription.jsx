@@ -263,6 +263,19 @@ function normalizePlanKey(value = '') {
     .trim();
 }
 
+function getTierFromPlan(plan = {}) {
+  const key = normalizePlanKey(
+    plan.slug || plan.originalSlug || plan.name || plan.displayName || ''
+  );
+  if (key.includes('simple') || key.includes('basic')) return 'simple';
+  if (key.includes('advance') || key.includes('advanced') || key.includes('pro')) return 'advance';
+  if (key.includes('master') || key.includes('elite') || key.includes('luxury') || key.includes('enterprise')) {
+    return 'master';
+  }
+  if (PLAN_HIERARCHY[key]) return key;
+  return null;
+}
+
 function getCurrentPlanKey(subscription) {
   if (!subscription) return null;
 
@@ -531,12 +544,15 @@ function SubscriptionPage() {
             : rawPlans?.plans || [];
 
           setPlans(
-            plansData.map((p) => ({
-              ...p,
-              slug: normalizePlanKey(
-                p.slug || p.name || p.displayName
-              )
-            }))
+            plansData.map((p) => {
+              const originalSlug = p.slug || p.name || p.displayName;
+              return {
+                ...p,
+                originalSlug,
+                tierKey: getTierFromPlan(p),
+                slug: normalizePlanKey(originalSlug),
+              };
+            })
           );
         }
 
@@ -568,6 +584,12 @@ function SubscriptionPage() {
   const handleAction = (plan) => {
     if (!isLoggedIn) {
       return openLogin();
+    }
+
+    const resolvedPlanId = plan?.id || plan?._id;
+    if (!resolvedPlanId) {
+      console.error('[Subscription] Cannot checkout — plan missing database id:', plan);
+      return;
     }
 
     navigate('/checkout', {
@@ -653,7 +675,7 @@ function SubscriptionPage() {
 
               const plan =
                 plans.find(
-                  (p) => p.slug === tier
+                  (p) => p.tierKey === tier || p.slug === tier
                 ) || {
                   name:
                     tier.charAt(0).toUpperCase() +

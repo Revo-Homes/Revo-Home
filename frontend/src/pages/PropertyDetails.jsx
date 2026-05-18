@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { jsPDF } from 'jspdf';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useProperty } from '../contexts/PropertyContext';
 import { useRevoLeadTracker } from '../hooks/useRevoLeadTracker';
@@ -1570,6 +1570,7 @@ const DOCUMENT_UNLOCK_BASE_INR = 99;
 function PropertyDetails() {
   const navigate = useNavigate();
   const { slug } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const listingIdentifier = extractIdFromSlug(slug);
   const { isLoggedIn, isSubscribed, openLoginForPropertyDetails, user } = useAuth();
   const { getProperty, addEnquiry, isSaved, toggleFavorite, listings = [], reraAuthorities = {}  } = useProperty();
@@ -1592,6 +1593,7 @@ function PropertyDetails() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [hasPaidForDocuments, setHasPaidForDocuments] = useState(false);
+  const autoDownloadHandledRef = useRef(false);
 
   // Global handler for document open requests from media cards
   useEffect(() => {
@@ -1708,7 +1710,20 @@ function PropertyDetails() {
       if (hasPaidForDocuments) {
         generateAndDownloadDocument();
       } else {
-        setShowPaymentModal(true);
+        navigate('/checkout', {
+          state: {
+            checkoutMode: 'listing_documents',
+            listingId: listingIdentifier,
+            listingTitle: property?.title,
+            returnTo: `/properties/${slug}`,
+            plan: {
+              name: 'Property Documents',
+              displayName: 'Property Documents Download',
+              basePrice: DOCUMENT_UNLOCK_BASE_INR,
+              gstRate: 18,
+            },
+          },
+        });
       }
       return;
     }
@@ -1731,8 +1746,25 @@ function PropertyDetails() {
       if (!invoiceId) {
         throw new Error('Could not create invoice for document download');
       }
-      const payuPayload = await billingApi.createPayUOrder({ invoiceId });
+      const payuPayload = await billingApi.createPayUOrder({
+        invoiceId,
+        returnUrl: `${window.location.origin}/payment/success`,
+        failureUrl: `${window.location.origin}/payment/failure`,
+        sourceApp: 'revo_homes',
+        context: 'listing_documents',
+        listingId: listingIdentifier,
+      });
       const order = payuPayload?.order || payuPayload;
+      sessionStorage.setItem('pendingPayment', JSON.stringify({
+        invoiceId,
+        checkoutMode: 'listing_documents',
+        listingId: listingIdentifier,
+        returnTo: `/properties/${slug}`,
+        planName: 'Property Documents',
+        amount: DOCUMENT_UNLOCK_BASE_INR * 1.18,
+        txnid: order?.fields?.txnid,
+        timestamp: Date.now(),
+      }));
       submitPayUForm(order);
     } catch (err) {
       console.error('Document checkout failed:', err);
@@ -1802,7 +1834,7 @@ function PropertyDetails() {
   //   // Download
   //   doc.save(`${property?.title?.replace(/\s+/g, '_') || 'Property'}_Documents.pdf`);
   // };
-const generateAndDownloadDocument = () => {
+  const generateAndDownloadDocument = useCallback(() => {
     const allDocs = [
       ...toArray(property?.resale_documents),
       ...toArray(property?.documents),
@@ -1812,7 +1844,38 @@ const generateAndDownloadDocument = () => {
       const url = getMediaUrl(doc);
       if (url) window.open(url, '_blank');
     });
-  };
+  }, [property]);
+
+  useEffect(() => {
+    if (
+      autoDownloadHandledRef.current ||
+      !isLoggedIn ||
+      !listingIdentifier ||
+      !property ||
+      searchParams.get('downloadDocuments') !== '1'
+    ) return undefined;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const access = await billingApi.getListingDocumentAccess(listingIdentifier);
+        if (cancelled || !access?.paid) return;
+        autoDownloadHandledRef.current = true;
+        setHasPaidForDocuments(true);
+        generateAndDownloadDocument();
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('downloadDocuments');
+        nextParams.delete('documentPaid');
+        setSearchParams(nextParams, { replace: true });
+      } catch (error) {
+        console.error('[PropertyDetails] Auto document download failed:', error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [generateAndDownloadDocument, isLoggedIn, listingIdentifier, property, searchParams, setSearchParams]);
   useEffect(() => {
     const fetchProperty = async () => {
       setLoading(true);
@@ -2846,8 +2909,17 @@ const generateAndDownloadDocument = () => {
                               onClick={handleDownloadDocuments}
                               className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-dark text-white text-sm font-semibold rounded-lg transition-all shadow-md hover:shadow-lg"
                             >
-                              <IndianRupee size={14} />
-                              {DOCUMENT_UNLOCK_BASE_INR} + GST — Download Documents
+                              {hasPaidForDocuments ? (
+                                <>
+                                  <FileDown size={14} />
+                                  View Documents
+                                </>
+                              ) : (
+                                <>
+                                  <IndianRupee size={14} />
+                                  {DOCUMENT_UNLOCK_BASE_INR} + GST - Download Documents
+                                </>
+                              )}
                             </button>
                           </div>
                         </div>
@@ -3137,7 +3209,7 @@ const generateAndDownloadDocument = () => {
                 </button>
 
                 <p className="text-center text-xs text-gray-400 mt-4">
-                  Secure payment powered by Razorpay
+                  Secure payment powered by PayU
                 </p>
               </div>
             </motion.div>

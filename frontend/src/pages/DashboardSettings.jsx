@@ -1053,7 +1053,7 @@ function DashboardSettings() {
     
     try {
       setLoadingSubscription(true);
-      const response = await billingApi.getActiveSubscription();
+      const response = await billingApi.getCurrentSubscription({ categoryKey: 'property_owner_sell' });
       console.log('[DashboardSettings] Active subscription response:', response);
       
       // Handle different response formats

@@ -46,7 +46,7 @@ const Settings = () => {
     const fetchSubscription = async () => {
       try {
         setLoadingSubscription(true);
-        const response = await billingApi.getActiveSubscription({ categoryKey: 'property_owner_sell' });
+        const response = await billingApi.getCurrentSubscription({ categoryKey: 'property_owner_sell' });
         if (response?.data || response) {
           setSubscription(response.data || response);
         }

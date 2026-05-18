@@ -3,6 +3,17 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { billingApi } from '../services/billingApi';
 
+function withQuery(path, params = {}) {
+  if (!path) return '/dashboard/settings';
+  const url = new URL(path, window.location.origin);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(key, value);
+    }
+  });
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
 function PaymentSuccess() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -11,13 +22,16 @@ function PaymentSuccess() {
   const [countdown, setCountdown] = useState(5);
   const [transactionDetails, setTransactionDetails] = useState(null);
   const [planInfo, setPlanInfo] = useState(null);
+  const [redirectTarget, setRedirectTarget] = useState('/dashboard/settings');
 
   useEffect(() => {
     const verifyPayment = async () => {
+      let payuResponse = {};
+      let parsedPending = null;
       try {
         // Get all form data from PayU response
         const formData = new URLSearchParams(location.search);
-        const payuResponse = Object.fromEntries(formData.entries());
+        payuResponse = Object.fromEntries(formData.entries());
 
         console.log('[PaymentSuccess] PayU response:', payuResponse);
 
@@ -25,13 +39,18 @@ function PaymentSuccess() {
         const pendingPayment = sessionStorage.getItem('pendingPayment');
         if (pendingPayment) {
           try {
-            const parsed = JSON.parse(pendingPayment);
-            setPlanInfo(parsed);
-            console.log('[PaymentSuccess] Pending payment info:', parsed);
+            parsedPending = JSON.parse(pendingPayment);
+            setPlanInfo(parsedPending);
+            console.log('[PaymentSuccess] Pending payment info:', parsedPending);
           } catch (e) {
             console.warn('[PaymentSuccess] Failed to parse pending payment:', e);
           }
         }
+
+        const nextRedirect = parsedPending?.checkoutMode === 'listing_documents' && parsedPending?.returnTo
+          ? withQuery(parsedPending.returnTo, { documentPaid: '1', downloadDocuments: '1' })
+          : parsedPending?.returnTo || '/dashboard/settings';
+        setRedirectTarget(nextRedirect);
 
         if (!payuResponse || Object.keys(payuResponse).length === 0) {
           setStatus('success');
@@ -47,10 +66,13 @@ function PaymentSuccess() {
           product: payuResponse.productinfo
         });
 
-        // Verify the payment with backend
-        console.log('[PaymentSuccess] Verifying payment with backend...');
-        const result = await billingApi.verifyPayU(payuResponse);
-        console.log('[PaymentSuccess] Verification result:', result);
+        if (payuResponse.server_verified !== '1') {
+          console.log('[PaymentSuccess] Verifying payment with backend...');
+          const result = await billingApi.verifyPayU(payuResponse);
+          console.log('[PaymentSuccess] Verification result:', result);
+        } else {
+          console.log('[PaymentSuccess] Payment already verified by backend callback.');
+        }
 
         // Clear pending payment from session storage
         sessionStorage.removeItem('pendingPayment');
@@ -64,7 +86,7 @@ function PaymentSuccess() {
             status: 'success',
             txnId: payuResponse.txnid,
             amount: payuResponse.amount,
-            planName: planInfo?.planName
+            planName: parsedPending?.planName
           }
         }));
       } catch (error) {
@@ -82,7 +104,7 @@ function PaymentSuccess() {
               status: 'success',
               txnId: payuResponse.txnid,
               amount: payuResponse.amount,
-              planName: planInfo?.planName
+              planName: parsedPending?.planName
             }
           }));
         } else {
@@ -100,7 +122,7 @@ function PaymentSuccess() {
       const timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
-            navigate('/dashboard/settings', { replace: true });
+            navigate(redirectTarget, { replace: true });
             return 0;
           }
           return prev - 1;
@@ -109,7 +131,7 @@ function PaymentSuccess() {
 
       return () => clearInterval(timer);
     }
-  }, [status, navigate]);
+  }, [status, navigate, redirectTarget]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center px-4 py-8">
@@ -160,7 +182,7 @@ function PaymentSuccess() {
             {status === 'error' && (
               <>
                 <button
-                  onClick={() => navigate('/dashboard/settings', { replace: true })}
+                  onClick={() => navigate(redirectTarget, { replace: true })}
                   className="flex-1 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 font-black rounded-lg transition-colors"
                 >
                   Go to Dashboard
@@ -175,7 +197,7 @@ function PaymentSuccess() {
             )}
             {status === 'success' && (
               <button
-                onClick={() => navigate('/dashboard/settings', { replace: true })}
+                onClick={() => navigate(redirectTarget, { replace: true })}
                 className="w-full px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-black rounded-lg transition-colors"
               >
                 Go to Dashboard Now

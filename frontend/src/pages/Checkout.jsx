@@ -80,20 +80,34 @@ function Checkout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isLoggedIn } = useAuth();
+  const checkoutMode = location.state?.checkoutMode || 'subscription';
+  const isDocumentCheckout = checkoutMode === 'listing_documents';
   const plan = location.state?.plan;
+  const listingId = location.state?.listingId;
+  const listingTitle = location.state?.listingTitle;
   const categoryKey = location.state?.categoryKey || plan?.categoryKey || plan?.category_key || 'property_owner_sell';
   const from = location.state?.from;
   const returnTo = location.state?.returnTo;
   const savedStep = location.state?.savedStep;
+  const statePlanId = location.state?.planId;
   const [status, setStatus] = useState('idle');
   const [countdown, setCountdown] = useState(3);
   const [errorMessage, setErrorMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    if (!plan) navigate('/subscription');
     if (!isLoggedIn) navigate('/login');
-  }, [plan, isLoggedIn, navigate]);
+    if (!plan) {
+      if (isDocumentCheckout && returnTo) {
+        navigate(returnTo);
+      } else {
+        navigate('/subscription');
+      }
+    }
+    if (isDocumentCheckout && !listingId) {
+      navigate(returnTo || '/properties');
+    }
+  }, [plan, isLoggedIn, navigate, isDocumentCheckout, listingId, returnTo]);
 
   useEffect(() => {
     if (status === 'success') {
@@ -107,6 +121,8 @@ function Checkout() {
               savedStep: savedStep || 2
             }
           });
+        } else if (isDocumentCheckout && returnTo) {
+          navigate(returnTo);
         } else if (from === 'buy-plan') {
           navigate('/dashboard/settings?tab=buy-plan');
         } else {
@@ -115,7 +131,7 @@ function Checkout() {
       }, 3000);
       return () => { clearInterval(t); clearTimeout(r); };
     }
-  }, [status, navigate, from, returnTo, savedStep]);
+  }, [status, navigate, from, returnTo, savedStep, isDocumentCheckout]);
 
   if (!plan || !isLoggedIn) return null;
 
@@ -147,33 +163,56 @@ function Checkout() {
         throw new Error('Your account is missing organization context — cannot checkout.');
       }
 
-      console.log('[Checkout] Creating subscription with plan:', plan.id, 'for org:', organizationId);
+      let invoiceId;
 
-      const subscriptionPayload = {
-        planId: plan.id,
-        categoryKey,
-        billingCycle: plan.billingCycle || 'one_time',
-        advancePaymentPercent: ['property_owner_sell', 'property_rent', 'developer_plans'].includes(categoryKey) ? 100 : 0,
-        organizationId,
-        replaceExisting: true,
-      };
+      if (isDocumentCheckout) {
+        console.log('[Checkout] Creating listing document checkout for:', listingId);
+        const checkout = await billingApi.createListingDocumentCheckout({
+          organizationId,
+          listingId,
+          baseAmount: rawPrice || 99,
+          description: listingTitle
+            ? `Listing documents — ${listingTitle}`
+            : `Listing documents — ${listingId}`,
+        });
+        invoiceId = checkout?.invoice?.id;
+        if (!invoiceId) {
+          throw new Error('Could not create invoice for document download');
+        }
+      } else {
+        const resolvedPlanId = plan.id ?? statePlanId ?? plan._id;
+        if (!resolvedPlanId) {
+          throw new Error('planId is required — please select a plan from the subscription page.');
+        }
 
-      let subscriptionResult;
-      try {
-        subscriptionResult = await billingApi.createSubscription(subscriptionPayload);
-      } catch (subError) {
-        console.error('[Checkout] Subscription creation failed:', subError);
-        throw new Error(`Failed to create subscription: ${subError.message}`);
+        console.log('[Checkout] Creating subscription with plan:', resolvedPlanId, 'for org:', organizationId);
+
+        const subscriptionPayload = {
+          planId: resolvedPlanId,
+          categoryKey,
+          billingCycle: plan.billingCycle || 'one_time',
+          advancePaymentPercent: ['property_owner_sell', 'property_rent', 'developer_plans'].includes(categoryKey) ? 100 : 0,
+          organizationId,
+          replaceExisting: true,
+        };
+
+        let subscriptionResult;
+        try {
+          subscriptionResult = await billingApi.createSubscription(subscriptionPayload);
+        } catch (subError) {
+          console.error('[Checkout] Subscription creation failed:', subError);
+          throw new Error(`Failed to create subscription: ${subError.message}`);
+        }
+
+        console.log('[Checkout] Subscription result:', subscriptionResult);
+
+        const sub = subscriptionResult?.subscription || subscriptionResult;
+        invoiceId =
+          sub?.latestInvoiceId ||
+          sub?.latest_invoice_id ||
+          subscriptionResult?.invoice?.id ||
+          sub?.latestInvoice?.id;
       }
-
-      console.log('[Checkout] Subscription result:', subscriptionResult);
-
-      const sub = subscriptionResult?.subscription || subscriptionResult;
-      const invoiceId =
-        sub?.latestInvoiceId ||
-        sub?.latest_invoice_id ||
-        subscriptionResult?.invoice?.id ||
-        sub?.latestInvoice?.id;
 
       if (!invoiceId) {
         console.error('[Checkout] No invoice ID found in subscription:', sub);
@@ -184,7 +223,14 @@ function Checkout() {
 
       let payuPayload;
       try {
-        payuPayload = await billingApi.createPayUOrder({ invoiceId });
+        payuPayload = await billingApi.createPayUOrder({
+          invoiceId,
+          returnUrl: `${window.location.origin}/payment/success`,
+          failureUrl: `${window.location.origin}/payment/failure`,
+          sourceApp: 'revo_homes',
+          context: checkoutMode,
+          listingId: isDocumentCheckout ? listingId : undefined,
+        });
       } catch (payuError) {
         console.error('[Checkout] PayU order creation failed:', payuError);
         throw new Error(`Payment gateway error: ${payuError.message}`);
@@ -202,7 +248,9 @@ function Checkout() {
       // Store payment reference for later verification
       sessionStorage.setItem('pendingPayment', JSON.stringify({
         invoiceId,
-        subscriptionId: sub?.id,
+        checkoutMode,
+        listingId: isDocumentCheckout ? listingId : undefined,
+        returnTo,
         planName: plan.name,
         amount: totalAmount,
         txnid: order.fields.txnid,
@@ -231,7 +279,9 @@ function Checkout() {
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-8 text-center">
           <p className="text-xs font-black text-primary uppercase tracking-widest mb-2">Secure Checkout</p>
-          <h1 className="text-3xl font-black text-gray-900">Complete Your Subscription</h1>
+          <h1 className="text-3xl font-black text-gray-900">
+            {isDocumentCheckout ? 'Complete Your Purchase' : 'Complete Your Subscription'}
+          </h1>
         </motion.div>
 
         <motion.div
@@ -251,7 +301,9 @@ function Checkout() {
                 <div className="flex items-center gap-4 bg-gradient-to-r from-[#0f172a] to-[#1e293b] rounded-2xl p-5 mb-7">
                   <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-2xl">⭐</div>
                   <div>
-                    <p className="text-white/60 text-xs font-black uppercase tracking-widest">Selected Plan</p>
+                    <p className="text-white/60 text-xs font-black uppercase tracking-widest">
+                      {isDocumentCheckout ? 'Purchase' : 'Selected Plan'}
+                    </p>
                     <p className="text-white font-black text-lg">{plan.name}</p>
                   </div>
                   <div className="ml-auto text-right">
@@ -362,7 +414,11 @@ function Checkout() {
                   </svg>
                 </motion.div>
                 <h2 className="text-3xl font-black text-gray-900 mb-2">Payment Successful!</h2>
-                <p className="text-gray-400 font-bold mb-2">Your <strong className="text-gray-700">{plan.name}</strong> subscription is now active.</p>
+                <p className="text-gray-400 font-bold mb-2">
+                  {isDocumentCheckout
+                    ? <>Your <strong className="text-gray-700">{plan.name}</strong> purchase is complete.</>
+                    : <>Your <strong className="text-gray-700">{plan.name}</strong> subscription is now active.</>}
+                </p>
                 <p className="text-primary font-black text-sm mb-8">
                   {returnTo === 'become-builder-form' 
                     ? `Returning to application form in ${countdown}s...` 
