@@ -23,6 +23,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { ContactVerificationPanel, useContactVerification, InlineContactVerifier } from '../components/ContactVerification';
+import { redirectToCrmPlans } from '../utils/crmNavigation';
 
 const STEPS = [
   { id: 1, title: 'Personal Details', icon: User },
@@ -243,10 +244,8 @@ function BecomeBuilder() {
       
       // Clear saved data on success
       clearSavedData();
-      
-      // Show success and redirect
-      alert('Your builder/agent application has been submitted successfully! We will review your documents and get back to you within 24-48 hours.');
-      navigate('/');
+      redirectToCrmPlans({ returnTo: '/become-builder', from: 'builder-registration' });
+      return;
     } catch (error) {
       alert('Failed to submit application. Please try again.');
     } finally {
@@ -261,13 +260,11 @@ function BecomeBuilder() {
 
   const handleSubscribeAndContinue = () => {
     setShowSubscriptionPrompt(false);
-    // Navigate to subscription with return state
-    navigate('/subscription', {
-      state: { 
-        returnTo: 'become-builder-form',
-        savedStep: step,
-        from: 'builder-registration'
-      }
+    localStorage.setItem(FORM_STEP_KEY, String(step));
+    redirectToCrmPlans({
+      returnTo: '/become-builder',
+      savedStep: step,
+      from: 'builder-registration',
     });
   };
 

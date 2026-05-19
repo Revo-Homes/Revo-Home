@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { billingApi } from '../services/billingApi';
+import { propertyDocumentApi } from '../services/propertyDocumentApi';
 
 function withQuery(path, params = {}) {
   if (!path) return '/dashboard/settings';
@@ -68,8 +69,12 @@ function PaymentSuccess() {
 
         if (payuResponse.server_verified !== '1') {
           console.log('[PaymentSuccess] Verifying payment with backend...');
-          const result = await billingApi.verifyPayU(payuResponse);
-          console.log('[PaymentSuccess] Verification result:', result);
+          if (parsedPending?.checkoutMode === 'listing_documents' && parsedPending?.propertyId) {
+            await propertyDocumentApi.verifyPayment(payuResponse).catch(() => billingApi.verifyPayU(payuResponse));
+          } else {
+            const result = await billingApi.verifyPayU(payuResponse);
+            console.log('[PaymentSuccess] Verification result:', result);
+          }
         } else {
           console.log('[PaymentSuccess] Payment already verified by backend callback.');
         }

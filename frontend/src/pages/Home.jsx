@@ -76,49 +76,6 @@ const SERVICES = [
   }
 ];
 
-const BUILDERS = [
-  { 
-    name: 'DLF Limited', 
-    city: 'Delhi NCR', 
-    image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&q=80'
-  },
-  { 
-    name: 'Lodha Group', 
-    city: 'Mumbai', 
-    image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&q=80'
-  },
-  { 
-    name: 'Prestige Group', 
-    city: 'Bangalore', 
-    image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&q=80'
-  },
-  { 
-    name: 'Brigade Group', 
-    city: 'Hyderabad', 
-    image: 'https://images.unsplash.com/photo-1582407947304-fd86f028f716?w=800&q=80'
-  },
-  { 
-    name: 'Godrej Properties', 
-    city: 'Pune', 
-    image: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&q=80'
-  },
-  { 
-    name: 'Sobha Limited', 
-    city: 'Chennai', 
-    image: 'https://images.unsplash.com/photo-1448630360428-654a9d902e17?w=800&q=80'
-  },
-  { 
-    name: 'Puravankara', 
-    city: 'Bangalore', 
-    image: 'https://images.unsplash.com/photo-1460317442991-0ec239397118?w=800&q=80'
-  },
-  { 
-    name: 'Kolte Patil', 
-    city: 'Pune', 
-    image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80'
-  },
-];
-
 const TRUST_INDICATORS = [
   { label: '50,000+', sub: 'Properties Listed' },
   { label: '1M+', sub: 'Happy Customers' },
@@ -206,45 +163,50 @@ function Home() {
         setLoadingBuilders(true);
         setLoadingAgents(true);
 
-        const [buildersRes, agentsRes] = await Promise.all([
-          fetchBuilders({ limit: 8 }).catch(() => ({ data: [] })),
-          fetchAgents({ limit: 8 }).catch(() => ({ data: [] }))
+        const { fetchPopularBuilders } = await import('../services/buildersApi');
+        const [buildersData, agentsRes] = await Promise.all([
+          fetchPopularBuilders(8).catch(() => []),
+          fetchAgents({ limit: 8 }).catch(() => ({ data: [] })),
         ]);
 
-        const buildersData = buildersRes?.data?.organizations || buildersRes?.organizations || buildersRes?.data || [];
         const agentsData = agentsRes?.data?.users || agentsRes?.users || agentsRes?.data || [];
-        
-        // Populate builders
-        if (buildersData.length > 0) {
-          setDynamicBuilders(buildersData.map(b => ({
-            id: b.id,
-            name: b.name,
-            city: b.city || 'India',
-            image: b.logo_url || b.image_url || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&q=80'
-          })));
-        } else {
-          setDynamicBuilders(BUILDERS); 
-        }
 
-        // Populate agents
+        setDynamicBuilders(
+          (buildersData || []).map((b) => ({
+            id: b.id,
+            name: b.full_name || [b.first_name, b.last_name].filter(Boolean).join(' '),
+            city: b.city || 'India',
+            specialization: b.specialization,
+            yearsOfExperience: b.years_of_experience,
+            projectsCompleted: b.projects_completed ?? 0,
+            verified: b.verified,
+            profileUrl: b.profile_url || `/builders/${b.id}`,
+            image:
+              b.avatar_url ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(b.full_name || 'Builder')}&background=random`,
+          }))
+        );
+
         if (agentsData.length > 0) {
-          setDynamicAgents(agentsData.map(a => ({
+          setDynamicAgents(agentsData.map((a) => ({
             id: a.id,
             name: a.full_name || a.name || 'Anonymous Agent',
             role: a.role || 'Property Expert',
-            image: a.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(a.full_name || a.name || 'Agent')}&background=random`
+            image:
+              a.avatar_url ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(a.full_name || a.name || 'Agent')}&background=random`,
           })));
         }
       } catch (err) {
         console.error('Failed to load builders/agents:', err);
-        setDynamicBuilders(BUILDERS);
+        setDynamicBuilders([]);
       } finally {
         setLoadingBuilders(false);
         setLoadingAgents(false);
       }
     };
     loadBuildersAndAgents();
-  }, [fetchBuilders, fetchAgents]);
+  }, [fetchAgents]);
 
   const toggleCompare = useCallback((property) => {
     setCompareProperties(prev => {
@@ -572,34 +534,6 @@ const [isPaused, setIsPaused] = useState(false);
               <p className="text-gray-500 text-lg">Work with the most trusted names in real estate</p>
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-3">
-              {/* Primary CTA - Become a Builder/Agent */}
-              <Link 
-                to="/become-builder" 
-                className="group relative flex items-center gap-2 px-4 py-2.5 bg-red-600 text-white border border-red-600 hover:bg-red-700 hover:border-red-700 hover:shadow-lg hover:shadow-red-500/30 hover:-translate-y-0.5 rounded-lg text-sm font-semibold transition-all duration-300 ease-out overflow-hidden shadow-md shadow-red-500/20"
-              >
-                {/* Animated dot indicator with ring */}
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-40"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white ring-2 ring-white/50"></span>
-                </span>
-                
-                {/* Icon with hover animation */}
-                <svg 
-                  className="w-4 h-4 transition-transform duration-300 ease-out group-hover:scale-110 group-hover:rotate-3" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                </svg>
-                
-                {/* Text with slide effect */}
-                <span className="relative transition-transform duration-300 ease-out group-hover:translate-x-0.5">Become Builder/Agent</span>
-                
-                {/* Subtle shimmer effect on hover */}
-                <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-              </Link>
-
               {/* Secondary CTA - View All Builders */}
               <Link 
                 to="/builders" 
@@ -618,23 +552,34 @@ const [isPaused, setIsPaused] = useState(false);
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {dynamicBuilders.slice(0, 8).map((builder) => (
+            {loadingBuilders
+              ? Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-[280px] rounded-[1.5rem] bg-gray-100 animate-pulse" />
+                ))
+              : dynamicBuilders.length === 0
+                ? (
+                    <div className="col-span-full rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-16 text-center text-gray-500">
+                      No builders are listed yet. Check back soon.
+                    </div>
+                  )
+                : dynamicBuilders.slice(0, 8).map((builder) => (
               <Link
-                key={builder.name}
-                to={`/properties?search=${encodeURIComponent(builder.name)}`}
-                className="group relative h-[240px] rounded-[1.5rem] overflow-hidden shadow-xl hover:shadow-primary/20 transition-all duration-700"
+                key={builder.id || builder.name}
+                to={builder.profileUrl || `/properties?search=${encodeURIComponent(builder.name)}`}
+                className="group relative h-[280px] rounded-[1.5rem] overflow-hidden shadow-xl hover:shadow-primary/20 transition-all duration-700 bg-gray-900"
               >
                 <img
                   src={builder.image}
                   alt={builder.name}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
+                  loading="lazy"
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 opacity-80"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-90 group-hover:opacity-100 transition-opacity duration-500" />
                 
                 <div className="absolute inset-0 p-8 flex flex-col justify-end">
                   <div className="transform group-hover:-translate-y-2 transition-transform duration-500">
                     <p className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mb-2 drop-shadow-md">
-                      Featured Builder
+                      {builder.verified ? 'Verified Builder' : 'Builder'}
                     </p>
                     <h3 className="text-2xl font-black text-white mb-2 leading-tight">
                       {builder.name}
@@ -647,7 +592,7 @@ const [isPaused, setIsPaused] = useState(false);
                   
                   <div className="mt-6 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-500 translate-y-4 group-hover:translate-y-0">
                     <span className="text-[10px] font-black text-white uppercase tracking-widest bg-primary px-4 py-2 rounded-full shadow-lg">
-                      Explore Properties
+                      View Profile
                     </span>
                   </div>
                 </div>
@@ -657,66 +602,7 @@ const [isPaused, setIsPaused] = useState(false);
         </div>
       </section>
 
-      {/* Popular Agents Section */}
-      {dynamicAgents.length > 0 && (
-        <section className="py-20 lg:py-28 bg-gray-50 px-4">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-4 text-center md:text-left">
-              <div>
-                <h2 className="text-4xl font-black text-gray-900 mb-3 tracking-tight">Expert Agents</h2>
-                <p className="text-gray-500 text-lg">Connect with dedicated professionals to find your dream home</p>
-              </div>
-              <Link 
-                to="/agents" 
-                className="group flex items-center px-4 py-2.5 bg-white text-gray-600 border border-gray-200 hover:border-gray-300 hover:text-gray-900 hover:shadow-sm hover:-translate-y-0.5 rounded-lg text-sm font-medium transition-all duration-300 ease-out"
-              >
-                <span className="transition-transform duration-300 ease-out group-hover:translate-x-0.5">View All Agents</span>
-                <svg 
-                  className="w-3.5 h-3.5 ml-1.5 text-gray-400 transition-transform duration-300 ease-out group-hover:translate-x-1 group-hover:text-gray-600" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-              {dynamicAgents.map((agent) => (
-                <div key={agent.id} className="group bg-white rounded-[2rem] p-6 border border-gray-100 hover:border-primary/20 hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500 text-center">
-                  <div className="relative mb-6 inline-block">
-                    <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                    <img 
-                      src={agent.image} 
-                      alt={agent.name}
-                      className="w-32 h-32 rounded-full object-cover relative z-10 border-4 border-white shadow-xl transition-transform duration-500 group-hover:scale-105"
-                    />
-                    <div className="absolute bottom-1 right-1 w-6 h-6 bg-emerald-500 border-4 border-white rounded-full z-20" title="Available" />
-                  </div>
-                  
-                  <h3 className="text-xl font-black text-gray-900 mb-1 tracking-tight">{agent.name}</h3>
-                  <p className="text-xs font-bold text-primary uppercase tracking-[0.2em] mb-4">{agent.role}</p>
-                  
-                  <div className="flex items-center justify-center gap-1 mb-6">
-                    {[...Array(5)].map((_, i) => (
-                      <svg key={i} className="w-4 h-4 text-amber-400 fill-current" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                    ))}
-                    <span className="text-[10px] font-bold text-gray-400 ml-1">(4.9)</span>
-                  </div>
-                  
-                  <button className="w-full py-3 bg-gray-50 hover:bg-primary hover:text-white rounded-xl text-xs font-black uppercase tracking-widest text-gray-500 transition-all duration-300">
-                    Contact Agent
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
+      
       {/* Services Section with Full BG and Refined Cards */}
       <section className="relative py-24 lg:py-32 px-4 overflow-hidden">
         {/* Full Section Background Image */}

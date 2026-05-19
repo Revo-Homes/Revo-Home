@@ -582,14 +582,20 @@ export function AuthProvider({ children }) {
   // Role-based profile management
   const updateUserProfile = useCallback(async (profileData) => {
     try {
-      const response = await userApi.updateMe(profileData);
-      setUser(prev => ({ ...prev, ...response.data.user }));
-      return response.data.user;
+      const response = await userApi.updateProfile(profileData);
+      const updatedUser = response.data?.user || response.user || response?.data || response;
+      setUser(prev => ({ ...prev, ...updatedUser }));
+      try {
+        localStorage.setItem(USER_KEY, JSON.stringify({ ...(user || {}), ...updatedUser }));
+      } catch {
+        // ignore storage sync failures
+      }
+      return updatedUser;
     } catch (error) {
       console.error('Failed to update profile:', error);
       throw error;
     }
-  }, []);
+  }, [user]);
 
   const updateUserPreferences = useCallback(async (preferences) => {
     try {

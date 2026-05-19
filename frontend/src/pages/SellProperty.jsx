@@ -1,745 +1,139 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useProperty } from '../contexts/PropertyContext';
-import { useAuth } from '../contexts/AuthContext';
-import { propertyApi } from '../services/api';
-import PropertySubscriptionGuard from '../guards/PropertySubscriptionGuard';
-import {
-  ChevronRight,
-  ArrowLeft,
-  CheckCircle2,
-  Building2,
-  LayoutDashboard,
-  Sparkles,
-  IndianRupee,
-  MapPin,
-  ImagePlus,
-  Rocket,
-  ShieldCheck,
-  AlertCircle
-} from 'lucide-react';
+import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { Toaster } from '@/components/ui/toaster';
+import { Toaster as Sonner } from '@/components/ui/sonner';
+import { AuthProvider } from '@/context/AuthContext';
+import { syncHomesAuthToCrm } from '../utils/syncHomesAuthToCrm';
+import { Building2, CheckCircle2, Loader2 } from 'lucide-react';
+import '@/index.css';
 
-// Sub-components
-import Step1BasicInfo from '../components/SellProperty/Step1BasicInfo';
-import Step2CategoryDetails from '../components/SellProperty/Step2CategoryDetails';
-import Step3Amenities from '../components/SellProperty/Step3Amenities';
-import Step4Pricing from '../components/SellProperty/Step4Pricing';
-import Step5Location from '../components/SellProperty/Step5Location';
-import Step6Media from '../components/SellProperty/Step6Media';
-import Step7Submit from '../components/SellProperty/Step7Submit';
+const AddProperty = lazy(() => import('@/pages/admin/AddProperty'));
 
 const STEPS = [
-  { id: 1, title: 'Basic Info', icon: Building2 },
-  { id: 2, title: 'Details', icon: LayoutDashboard },
-  { id: 3, title: 'Amenities', icon: Sparkles },
-  { id: 4, title: 'Pricing', icon: IndianRupee },
-  { id: 5, title: 'Location', icon: MapPin },
-  { id: 6, title: 'Media', icon: ImagePlus },
-  { id: 7, title: 'Publish', icon: Rocket },
+  'Property Basics',
+  'Pricing',
+  'Location',
+  'Media Upload',
+  'Amenities',
+  'Ownership & Legal',
+  'Review & Publish',
 ];
 
-function SellProperty() {
-  const [step, setStep] = useState(1);
-  const [searchParams] = useSearchParams();
-  const editId = searchParams.get('edit');
-  const { getProperty, createProperty, updateProperty, uploadPropertyImages, loading: propertyLoading } = useProperty();
-  const { user } = useAuth();
-  const navigate = useNavigate();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: 1, refetchOnWindowFocus: false },
+  },
+});
 
-  // Dynamic form options from database
-  const [formOptions, setFormOptions] = useState({});
-  const [loadingFormOptions, setLoadingFormOptions] = useState(true);
-  const [duplicateTicket, setDuplicateTicket] = useState(null);
+function SellPropertyShell() {
+  const [activeStep, setActiveStep] = useState(0);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    slug: "",
-    property_type_id: "",
-    property_type_slug: "",
-    property_category_id: "",
-    property_category_slug: "",
-    property_subcategory_id: "",
-    property_subcategory_slug: "",
-    listingType: "Sale",
-    listing_type: "sale",
-    property_condition: "",
-    sale_urgency: "Normal",
-    description: "",
-    status: "active",
-    is_featured: false,
-    is_verified: false,
-    is_published: false,
-    listed_by_type: "owner", // Default to owner for revo-home additions
-    listed_by_id: "",
-    listed_by_name: "",
-
-    address_line1: "",
-    address_line2: "",
-    city: "",
-    state: "",
-    country: "IN",
-    zip_code: "",
-    locality: "",
-    landmark: "",
-    near_metro_distance: "",
-    near_metro_distance_custom: "",
-    near_busstand_distance: "",
-    near_busstand_distance_custom: "",
-    near_railway_distance: "",
-    near_railway_distance_custom: "",
-    near_airport_distance: "",
-    near_airport_distance_custom: "",
-    near_highway_distance: "",
-    near_highway_distance_custom: "",
-    near_auto_taxi_distance: "",
-    near_auto_taxi_distance_custom: "",
-    near_hospital_distance: "",
-    near_hospital_distance_custom: "",
-    near_school_distance: "",
-    near_school_distance_custom: "",
-    near_market_distance: "",
-    near_market_distance_custom: "",
-    latitude: "",
-    longitude: "",
-
-    // Property Details
-    selectedBHKs: [],
-    bhkDetails: [],
-    bhk: "",
-    bathrooms: "",
-    unit_name: "",
-    carpet_area: "",
-    builtup_area: "",
-    super_builtup_area: "",
-    floor_number: "",
-    furnishing_status: "",
-    water_source: "",
-    construction_quality: "",
-    parking_type: "",
-    parking_spaces: "",
-    power_backup: false,
-    lift_available: false,
-    rainwater_harvesting: false,
-    security_24x7: false,
-    pet_friendly: false,
-    vegan_friendly: false,
-    is_corner_unit: false,
-    vaastu_compliance: false,
-    smart_home_features: false,
-    otherFeatureEnabled: false,
-    otherFeature: "",
-
-    // Specifications
-    total_units: "0",
-    total_floors: "0",
-    total_area: "",
-    area_unit: "sqft",
-    year_built: "",
-    possession_date: "",
-    facing_direction: "",
-
-    features: [],
-    features_text: "",
-
-    price_min: "",
-    price_max: "",
-    price_per_sqft: "",
-    rent_amount: "",
-    security_deposit: "",
-    maintenance_charges: "",
-    price_on_request: false,
-    negotiable: true,
-    currency: "INR",
-
-    rera_number: "",
-    rera_expiry_date: "",
-    rera_registered: false,
-    rera_state: "",
-    rera_authority_id: "",
-
-    meta_title: "",
-    meta_description: "",
-    meta_keywords: "",
-    meta_text: "{}",
-
-    media_items: [],
-    imagePreviews: [], // Used for UI previews
-
-    // Resale Property Documents
-    resale_documents: [],
-
-    // Tags/Labels
-    selectedTags: [],
-
-    terms_accepted: false,
-  });
-
-  const [formError, setFormError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [customBhkInput, setCustomBhkInput] = useState('');
-  const [customFeatures, setCustomFeatures] = useState([]);
-  const [showOtherInput, setShowOtherInput] = useState(false);
-  const [otherFeature, setOtherFeature] = useState('');
-  const [nearbyLocations, setNearbyLocations] = useState([]);
-
-  // Fetch Form Options
   useEffect(() => {
-    const fetchOptions = async () => {
+    const saved = localStorage.getItem('revo_sell_property_draft_meta');
+    if (saved) {
       try {
-        const response = await propertyApi.getFormOptions();
-        setFormOptions(response?.data || response || {});
-      } catch (err) {
-        console.error('Failed to load form options:', err);
-      } finally {
-        setLoadingFormOptions(false);
+        const meta = JSON.parse(saved);
+        if (typeof meta.activeStep === 'number') setActiveStep(meta.activeStep);
+      } catch {
+        /* ignore */
       }
-    };
-    fetchOptions();
+    }
   }, []);
 
-  // Handle Load for Edit
   useEffect(() => {
-    if (editId) {
-      const loadProperty = async () => {
-        try {
-          const p = await getProperty(editId);
-          if (p) {
-            console.log('[SellProperty] Loading property for edit:', p);
-
-            // Map backend data to formData with proper field mapping
-            setFormData(prev => ({
-              ...prev,
-              ...p,
-
-              // Basic property info
-              listingType: p.listing_type ? p.listing_type.charAt(0).toUpperCase() + p.listing_type.slice(1) : prev.listingType,
-              propertyType: p.property_type?.name || p.propertyType,
-              propertySubType: p.property_category?.name || p.propertySubType,
-
-              // BHK details
-              bhkDetails: p.bhk_details || p.meta?.bhk_details || [],
-              selectedBHKs: (p.bhk_details || p.meta?.bhk_details || []).map(d => d.type_slug || d.type),
-
-              // Fix: Property condition and urgency
-              property_condition: p.property_condition || '',
-              sale_urgency: p.sale_urgency || '',
-
-              // Fix: RERA fields mapping
-              // Backend returns: rera_number, rera_state (mapped from property state)
-              // Frontend form uses: rera_registered, rera_id, rera_state
-              rera_registered: !!(p.rera_number || p.rera_id),
-              rera_id: p.rera_number || p.rera_id || '',
-              rera_state: p.rera_state || p.state || '',
-
-              // Fix: State field
-              state: p.state || '',
-
-              // Fix: Floor numbers
-              total_floors: p.total_floors || '',
-              floor_number: p.unit_floor_number || p.floor_number || '',
-
-              // Fix: Floor images / floor plans
-              floorImages: p.floor_plans || p.floorImages || [],
-
-              // Fix: Images - handle both formats
-              images: p.images || p.imagePreviews || [],
-              imagePreviews: p.images || p.imagePreviews || p.primary_image_url ? [p.primary_image_url] : [],
-
-              // Fix: Nearby locations
-              nearby_locations: p.nearby || p.nearby_locations || [],
-            }));
-          }
-        } catch (err) {
-          console.error('Failed to load property:', err);
-        }
-      };
-      loadProperty();
-    }
-  }, [editId, getProperty]);
-
-  // Handlers
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-  };
-
-  const getOptionLabel = (opt) => opt?.name || opt?.label || opt?.title || String(opt || '');
-  const getOptionValue = (opt) => opt?.slug || opt?.value || opt?.id || String(opt || '');
-
-  const getPropertyKind = (data) => {
-    const type = (data.propertyType || '').toLowerCase();
-    const subType = (data.propertySubType || '').toLowerCase();
-
-    if (
-      type.includes('residential') ||
-      type.includes('flat') ||
-      type.includes('apartment') ||
-      subType.includes('flat') ||
-      subType.includes('apartment')
-    ) return 'Residential';
-
-    if (type.includes('commercial')) return 'Commercial';
-    if (type.includes('land')) return 'Land';
-    if (type.includes('industrial')) return 'Industrial';
-    if (type.includes('hospitality')) return 'Hospitality';
-    return type || 'Residential';
-  };
-
-  const propertyKind = getPropertyKind(formData);
-
-  const getCategoriesForSelectedType = (data, options) => {
-    const categories = options.property_categories || [];
-    if (!data.property_type_id) return categories;
-    return categories.filter(cat =>
-      String(cat.type_id || cat.property_type_id) === String(data.property_type_id)
+    localStorage.setItem(
+      'revo_sell_property_draft_meta',
+      JSON.stringify({ activeStep, updatedAt: Date.now() })
     );
-  };
-
-  const getAreaUnitOptions = (options) => {
-    const units = options.area_units || [];
-    if (units.length > 0) return units.map(u => ({ value: u.value || u, label: u.label || u }));
-    return [
-      { value: 'sqft', label: 'Sq. Ft.' },
-      { value: 'sqm', label: 'Sq. Mtr.' },
-      { value: 'acre', label: 'Acre' }
-    ];
-  };
-
-  const toggleBHK = (slug) => {
-    setFormData(prev => {
-      const selected = prev.selectedBHKs.includes(slug)
-        ? prev.selectedBHKs.filter(s => s !== slug)
-        : [...prev.selectedBHKs, slug];
-
-      const details = prev.selectedBHKs.includes(slug)
-        ? prev.bhkDetails.filter(d => (d.type_slug || d.type) !== slug)
-        : [...prev.bhkDetails, { type: slug, type_slug: slug, bathrooms: '1', kitchens: '1', carpet_area: '', price: '' }];
-
-      return { ...prev, selectedBHKs: selected, bhkDetails: details };
-    });
-  };
-
-  const updateBHKDetail = (index, field, value) => {
-    setFormData(prev => {
-      const details = [...prev.bhkDetails];
-      details[index] = { ...details[index], [field]: value };
-      return { ...prev, bhkDetails: details };
-    });
-  };
-
-  const removeBHKConfiguration = (slug) => {
-    setFormData(prev => ({
-      ...prev,
-      selectedBHKs: prev.selectedBHKs.filter(s => s !== slug),
-      bhkDetails: prev.bhkDetails.filter(d => (d.type_slug || d.type) !== slug)
-    }));
-  };
-
-  const addCustomBHK = () => {
-    if (!customBhkInput.trim()) return;
-    const slug = customBhkInput.trim().toLowerCase().replace(/\s+/g, '_');
-    toggleBHK(slug);
-    setCustomBhkInput('');
-  };
-
-  const getBhkFieldVisibility = (slug) => ({
-    showHallField: !slug.includes('rk'),
-    showBalconyField: true,
-    showAdditionalSpaceField: slug.includes('bhk')
-  });
-
-  const handleNearbyLocationChange = (index, field, value) => {
-    const updated = [...nearbyLocations];
-    updated[index][field] = value;
-    setNearbyLocations(updated);
-  };
-
-  const addNearbyLocation = () => {
-    setNearbyLocations([...nearbyLocations, { type: 'School', name: '', distance: '' }]);
-  };
-
-  const removeNearbyLocation = (index) => {
-    setNearbyLocations(nearbyLocations.filter((_, i) => i !== index));
-  };
-
-  const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files);
-    const previews = files.map(f => URL.createObjectURL(f));
-    setFormData(prev => ({
-      ...prev,
-      images: [...prev.images, ...files],
-      imagePreviews: [...prev.imagePreviews, ...previews]
-    }));
-  };
-
-  const handleImageDelete = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index),
-      imagePreviews: prev.imagePreviews.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleDocumentUpload = (e) => {
-    const files = Array.from(e.target.files);
-    setFormData(prev => ({
-      ...prev,
-      documents: [...prev.documents, ...files]
-    }));
-  };
-
-  const handleDocumentDelete = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      documents: prev.documents.filter((_, i) => i !== index)
-    }));
-  };
-
-  const getDescriptionText = (html) => {
-    if (!html) return '';
-    return html.replace(/<[^>]+>/g, '').trim();
-  };
-
-  const validateStep = () => {
-    // Step 1 — Identification
-    if (step === 1) {
-      const descText = getDescriptionText(formData.description);
-      if (!formData.name?.trim() || !formData.property_type_id || !formData.property_category_id || !descText) {
-        return 'Property name, type, category, and description are required.';
-      }
-    }
-    // Step 2 — Property Details
-    if (step === 2) {
-      if (!formData.total_area) {
-        return 'Total area is required.';
-      }
-    }
-    // Step 4 — Pricing
-    if (step === 4) {
-      const listingType = formData.listing_type || 'sale';
-      if (listingType === 'rent') {
-        if (!formData.rent_amount && !formData.price_on_request) {
-          return 'Monthly rent amount is required (or check \'Price on request\').';
-        }
-      } else {
-        if (!formData.price_min && !formData.price_on_request) {
-          return 'Price is required (or check \'Price on request\').';
-        }
-      }
-    }
-    // Step 5 — Location
-    if (step === 5) {
-      if (!formData.address_line1?.trim() || !formData.city?.trim() || !formData.state?.trim()) {
-        return 'Address line 1, city, and state are required.';
-      }
-    }
-    return null;
-  };
-
-  const nextStep = () => {
-    const err = validateStep();
-    if (err) {
-      setFormError(err);
-      return;
-    }
-    setFormError('');
-    setStep(prev => Math.min(prev + 1, STEPS.length));
-  };
-
-  const prevStep = () => {
-    setFormError('');
-    setStep(prev => Math.max(prev - 1, 1));
-  };
-
-  const handleSubmit = async (e) => {
-    if (e) e.preventDefault();
-    const err = validateStep();
-    if (err) { setFormError(err); return; }
-    setFormError('');
-
-    setSubmitting(true);
-    try {
-      // Helper to safely convert to number
-      const toNumber = (val) => {
-        if (val == null || val === "") return null;
-        const num = Number(val);
-        return isNaN(num) ? null : num;
-      };
-
-      const toISOString = (dateVal) => {
-        if (!dateVal) return null;
-        try {
-          const date = new Date(dateVal);
-          return isNaN(date.getTime()) ? null : date.toISOString();
-        } catch {
-          return null;
-        }
-      };
-
-      // Extract plain text from description if it's HTML
-      const getPlainText = (html) => {
-        if (!html) return "";
-        return html.replace(/<[^>]+>/g, "").trim();
-      };
-
-      const payload = {
-        ...formData,
-        listing_type: formData.listingType.toLowerCase(),
-        subscription_category: formData.listingType === 'Rent' ? 'property_rent' : 'property_owner_sell',
-        property_kind: propertyKind,
-        nearby_locations: nearbyLocations,
-        amenities: formData.features
-      };
-
-      let result;
-      if (editId) {
-        result = await updateProperty(editId, payload);
-      } else {
-        result = await createProperty(payload);
-      }
-
-      if (result && formData.images && formData.images.length > 0) {
-        const uploadId = result.propertyId || result.id || result.data?.id;
-        await uploadPropertyImages(uploadId, formData.images);
-      }
-
-      const navigateId = result.id || result.data?.id || result.propertyId;
-      navigate(`/property/${navigateId}`);
-    } catch (err) {
-      console.error('Submission failed:', err);
-      if (err.body?.code === 'DUPLICATE_PROPERTY') {
-        setDuplicateTicket({
-          number: err.body.ticketNumber,
-          id: err.body.ticketId
-        });
-        setErrors({ submit: "Duplicate property data detected (Name or RERA). A support ticket has been raised." });
-      } else {
-        setErrors({ submit: err.message || "Failed to save property. Please try again." });
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  }, [activeStep]);
 
   return (
-    <PropertySubscriptionGuard>
-      <div className="min-h-screen bg-secondary/30 pt-32 pb-20">
-        <div className="container mx-auto max-w-5xl px-4">
-          {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate(-1)}
-                className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-gray-400 hover:text-primary hover:shadow-lg transition-all"
-              >
-                <ArrowLeft size={24} />
-              </button>
-              <div>
-                <h1 className="text-4xl font-black text-gray-900 tracking-tight">
-                  {editId ? 'Edit Your Property' : 'List Your Property'}
-                </h1>
-                <p className="text-gray-500 font-medium mt-1">Transform your property into a premium listing.</p>
-              </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
+      <header className="border-b border-white/10 bg-white/5 backdrop-blur-xl sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/30">
+              <Building2 className="w-5 h-5 text-primary" />
             </div>
-
-            {/* Simple Step Counter */}
-            <div className="flex items-center gap-3 bg-white px-6 py-3 rounded-2xl shadow-sm border border-gray-100">
-              <div className="flex -space-x-2">
-                {STEPS.map((s) => (
-                  <div
-                    key={s.id}
-                    className={`w-3 h-3 rounded-full border-2 border-white transition-all duration-500 ${s.id < step ? 'bg-green-500' : s.id === step ? 'bg-primary scale-125' : 'bg-gray-200'
-                      }`}
-                  ></div>
-                ))}
-              </div>
-              <span className="text-xs font-black text-gray-900 uppercase tracking-widest ml-2">Step {step} of 7</span>
+            <div>
+              <h1 className="text-lg font-bold tracking-tight">List Your Property</h1>
+              <p className="text-xs text-white/60">Premium listing flow · autosave enabled</p>
             </div>
           </div>
-
-          {/* Main Form Area */}
-          <div className="bg-white rounded-[48px] shadow-2xl shadow-gray-200/50 border border-gray-100 overflow-hidden">
-            {/* Progress Bar */}
-            <div className="h-1.5 w-full bg-gray-50">
-              <div
-                className="h-full bg-primary transition-all duration-700 ease-out"
-                style={{ width: `${(step / STEPS.length) * 100}%` }}
-              ></div>
-            </div>
-
-            <div className="p-8 md:p-16">
-              {duplicateTicket && (
-                <div className="mb-8 p-6 bg-blue-50 border border-blue-100 rounded-3xl flex items-start gap-4">
-                  <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 shrink-0">
-                    <AlertCircle size={24} />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-black text-blue-900 mb-1">Duplicate Property Detected</h3>
-                    <p className="text-blue-700 font-medium mb-4">
-                      A property with this name already exists. We have automatically raised a support ticket for you:
-                    </p>
-                    <div className="flex flex-wrap items-center gap-4">
-                      <div className="bg-white px-4 py-2 rounded-xl border border-blue-100">
-                        <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest block">Ticket Number</span>
-                        <span className="text-blue-900 font-black">{duplicateTicket.number}</span>
-                      </div>
-                      <button
-                        onClick={() => navigate('/support')}
-                        className="bg-blue-600 text-white px-6 py-2 rounded-xl font-black text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-200"
-                      >
-                        View Status
-                      </button>
-                    </div>
-                  </div>
-                  <button onClick={() => setDuplicateTicket(null)} className="text-blue-300 hover:text-blue-500">
-                    <ChevronRight className="rotate-90" />
-                  </button>
-                </div>
-              )}
-              <form onSubmit={(e) => e.preventDefault()}>
-                {formError && (
-                  <div className="mb-8 p-5 bg-red-50 border-2 border-red-100 rounded-3xl flex items-center gap-4">
-                    <div className="w-10 h-10 bg-red-100 rounded-2xl flex items-center justify-center text-red-500 shrink-0">
-                      <AlertCircle size={20} />
-                    </div>
-                    <p className="text-red-700 font-bold text-sm">{formError}</p>
-                  </div>
-                )}
-
-                {step === 1 && (
-                  <Step1BasicInfo
-                    formData={formData}
-                    setFormData={setFormData}
-                    formOptions={formOptions}
-                    loadingFormOptions={loadingFormOptions}
-                    handleChange={handleChange}
-                    propertyKind={propertyKind}
-                    getOptionLabel={getOptionLabel}
-                    getOptionValue={getOptionValue}
-                    getCategoriesForSelectedType={getCategoriesForSelectedType}
-                  />
-                )}
-                {step === 2 && (
-                  <Step2CategoryDetails
-                    formData={formData}
-                    setFormData={setFormData}
-                    formOptions={formOptions}
-                    propertyKind={propertyKind}
-                    handleChange={handleChange}
-                    getAreaUnitOptions={getAreaUnitOptions}
-                    toggleBHK={toggleBHK}
-                    updateBHKDetail={updateBHKDetail}
-                    removeBHKConfiguration={removeBHKConfiguration}
-                    addCustomBHK={addCustomBHK}
-                    customBhkInput={customBhkInput}
-                    setCustomBhkInput={setCustomBhkInput}
-                    getBhkFieldVisibility={getBhkFieldVisibility}
-                  />
-                )}
-                {step === 3 && (
-                  <Step3Amenities
-                    formData={formData}
-                    setFormData={setFormData}
-                    formOptions={formOptions}
-                    handleChange={handleChange}
-                    customFeatures={customFeatures}
-                    setCustomFeatures={setCustomFeatures}
-                    showOtherInput={showOtherInput}
-                    setShowOtherInput={setShowOtherInput}
-                    otherFeature={otherFeature}
-                    setOtherFeature={setOtherFeature}
-                  />
-                )}
-                {step === 4 && (
-                  <Step4Pricing
-                    formData={formData}
-                    setFormData={setFormData}
-                    handleChange={handleChange}
-                    propertyKind={propertyKind}
-                  />
-                )}
-                {step === 5 && (
-                  <Step5Location
-                    formData={formData}
-                    setFormData={setFormData}
-                    handleChange={handleChange}
-                    formOptions={formOptions}
-                  />
-                )}
-                {step === 6 && (
-                  <Step6Media
-                    formData={formData}
-                    setFormData={setFormData}
-                    handleImageUpload={handleImageUpload}
-                    handleImageDelete={handleImageDelete}
-                    handleDocumentUpload={handleDocumentUpload}
-                    handleDocumentDelete={handleDocumentDelete}
-                  />
-                )}
-                {step === 7 && (
-                  <Step7Submit
-                    formData={formData}
-                    setFormData={setFormData}
-                    handleChange={handleChange}
-                    handleSubmit={handleSubmit}
-                    submitting={submitting}
-                    formError={formError}
-                    propertyKind={propertyKind}
-                  />
-                )}
-
-                {/* Navigation Buttons */}
-                <div className="flex items-center justify-between mt-16 pt-10 border-t-2 border-gray-50">
-                  <button
-                    type="button"
-                    onClick={prevStep}
-                    disabled={step === 1 || submitting}
-                    className={`flex items-center gap-2 px-8 py-4 rounded-2xl text-sm font-black uppercase tracking-widest transition-all ${step === 1
-                        ? 'text-gray-300 cursor-not-allowed'
-                        : 'text-gray-400 hover:text-gray-900 hover:bg-gray-50'
-                      }`}
-                  >
-                    <ArrowLeft size={18} />
-                    Back
-                  </button>
-
-                  {step < STEPS.length ? (
-                    <button
-                      type="button"
-                      onClick={nextStep}
-                      className="flex items-center gap-2 bg-gray-900 text-white px-10 py-5 rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-primary transition-all shadow-xl shadow-gray-900/10 active:scale-95 group"
-                    >
-                      Next Step
-                      <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                    </button>
-                  ) : null}
-                </div>
-              </form>
-            </div>
-          </div>
-
-          {/* Trust Badges */}
-          <div className="mt-12 flex flex-wrap items-center justify-center gap-x-12 gap-y-6 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-500">
-            <div className="flex items-center gap-2">
-              <ShieldCheck size={20} />
-              <span className="text-[10px] font-black uppercase tracking-widest">Verified Listings</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 size={20} />
-              <span className="text-[10px] font-black uppercase tracking-widest">Safe Transactions</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Sparkles size={20} />
-              <span className="text-[10px] font-black uppercase tracking-widest">Premium Support</span>
-            </div>
-          </div>
+          <span className="hidden sm:inline-flex text-xs font-semibold px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+            Draft autosave on
+          </span>
         </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-8">
+        <aside className="lg:sticky lg:top-24 h-fit">
+          <nav className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-4 space-y-1">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 px-2 mb-3">Progress</p>
+            {STEPS.map((label, index) => {
+              const done = index < activeStep;
+              const current = index === activeStep;
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setActiveStep(index)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm transition-all ${
+                    current
+                      ? 'bg-primary/20 text-white border border-primary/40'
+                      : done
+                        ? 'text-emerald-300/90 hover:bg-white/5'
+                        : 'text-white/50 hover:bg-white/5 hover:text-white/80'
+                  }`}
+                >
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                      done ? 'bg-emerald-500/20 text-emerald-300' : current ? 'bg-primary text-white' : 'bg-white/10'
+                    }`}
+                  >
+                    {done ? <CheckCircle2 className="w-3.5 h-3.5" /> : index + 1}
+                  </span>
+                  <span className="font-medium leading-tight">{label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+
+        <main className="crm-add-property-root rounded-2xl border border-white/10 bg-white shadow-2xl overflow-hidden min-h-[70vh]">
+          <Suspense
+            fallback={
+              <div className="flex flex-col items-center justify-center py-32 text-gray-500">
+                <Loader2 className="w-8 h-8 animate-spin text-primary mb-3" />
+                <p className="text-sm font-medium">Loading property form…</p>
+              </div>
+            }
+          >
+            <AddProperty variant="homes" />
+          </Suspense>
+        </main>
       </div>
-    </PropertySubscriptionGuard>
+    </div>
   );
 }
 
-export default SellProperty;
+export default function SellProperty() {
+  useEffect(() => {
+    syncHomesAuthToCrm();
+  }, []);
+
+  const client = useMemo(() => queryClient, []);
+
+  return (
+    <QueryClientProvider client={client}>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <SellPropertyShell />
+        </TooltipProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+}

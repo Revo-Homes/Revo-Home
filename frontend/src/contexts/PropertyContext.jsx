@@ -249,6 +249,27 @@ const normalizeProperty = (item, userLocation = null) => {
 const metaRaw = safeJsonParse(item.meta, {});
 const meta = fixCorruptMeta(metaRaw) || {};
 
+const sanitizeDocumentItems = (items = [], fallbackTitle = 'Document') =>
+  toArray(items).map((doc, idx) => {
+    if (doc && typeof doc === 'object') {
+      return {
+        id: doc.id,
+        property_id: doc.property_id,
+        title: doc.title || doc.document_type || doc.file_name || `${fallbackTitle} ${idx + 1}`,
+        document_type: doc.document_type,
+        type: doc.type || doc.document_type || fallbackTitle,
+        mime_type: doc.mime_type,
+        file_size: doc.file_size,
+        requiresPayment: true,
+      };
+    }
+    return {
+      title: `${fallbackTitle} ${idx + 1}`,
+      type: fallbackTitle,
+      requiresPayment: true,
+    };
+  });
+
 // Parse features — can be array string OR object string
 const featuresRaw = safeJsonParse(item.features, null);
 let amenities = [];
@@ -455,6 +476,11 @@ const bhk = bhkFromMeta
     floor_plans: item.floor_plans || [],
     floorPlans: item.floorPlans || [],
     floors: item.floors || [],
+    documents: sanitizeDocumentItems(item.documents, 'Document'),
+    brochures: sanitizeDocumentItems(item.brochures, 'Brochure'),
+    resale_documents: sanitizeDocumentItems(item.resale_documents, 'Document'),
+    brochure_url: null,
+    document_url: null,
     owner: {
       name: item.owner_name || item.listed_by_name || meta.listed_by_name || item.organization_name || 'Property Owner',
       phone: item.owner_phone || item.listed_by_phone || meta.owner_phone || meta.listed_by_phone || item.created_by_phone || '',
@@ -1253,7 +1279,29 @@ if (cached) {
           normalized.hasBrochure = true;
           normalized.documents = [
             ...toArray(normalized.documents),
-            ...allDocs.map(d => d.file_url || d.url || d.document_url).filter(Boolean),
+            ...allDocs.map((d, idx) => ({
+              id: d.id,
+              property_id: d.property_id || propId,
+              title: d.title || d.document_type || `Document ${idx + 1}`,
+              document_type: d.document_type,
+              type: d.document_type || 'Document',
+              mime_type: d.mime_type,
+              file_size: d.file_size,
+              requiresPayment: true,
+            })),
+          ];
+          normalized.resale_documents = [
+            ...toArray(normalized.resale_documents),
+            ...resaleDocs.map((d, idx) => ({
+              id: d.id,
+              property_id: d.property_id || propId,
+              title: d.title || d.document_type || `Resale Document ${idx + 1}`,
+              document_type: d.document_type,
+              type: d.document_type || 'Document',
+              mime_type: d.mime_type,
+              file_size: d.file_size,
+              requiresPayment: true,
+            })),
           ];
         }
       }

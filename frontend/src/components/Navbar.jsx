@@ -273,7 +273,7 @@ function ToolsDropdown() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-gray-700 hover:text-primary hover:bg-primary/5 transition-all text-[11px] font-black uppercase tracking-wider group bg-gray-50/50 border border-gray-100 h-11"
+        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-gray-700 hover:text-primary hover:bg-primary/5 transition-all text-[11px] font-black uppercase tracking-wider group bg-gray-50/50 border border-gray-100 hover:border-primary h-11"
         title="Tools & Services"
       >
         <Wrench size={14} className="text-primary group-hover:rotate-12 transition-transform" />
@@ -365,21 +365,77 @@ function Navbar() {
 
             {/* ── Right: Nav links ──────────────────────────────── */}
             <div className="hidden lg:flex items-center gap-3">
-              {/* Add Property (Owners Only) — styled CTA */}
-              <button
-                onClick={handleAddProperty}
-                className="flex flex-col items-center justify-center px-5 h-11 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl transition-all shadow-sm group"
-              >
-                <span className="text-[9px] font-black uppercase tracking-[0.05em] opacity-70 leading-tight">
-                  Owners Only
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
-                  </svg>
-                  <span className="text-xs font-black whitespace-nowrap">Add Property</span>
-                </div>
-              </button>
+            {/* Become Builder / Agent */}
+<Link
+  to="/become-builder"
+  className="group relative flex items-center gap-3 h-11 px-4 rounded-xl border border-gray-200 bg-white hover:border-primary/30 hover:bg-primary/[0.03] transition-all duration-300"
+>
+  {/* Icon */}
+  <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-violet-50 text-violet-600 transition-all duration-300 group-hover:scale-105 group-hover:bg-violet-100">
+    <svg
+      className="w-4 h-4"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2.2}
+        d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"
+      />
+    </svg>
+  </div>
+
+  {/* Text */}
+  <div className="flex flex-col leading-none">
+    <span className="text-[9px] uppercase tracking-[0.18em] font-bold text-violet-500">
+      Partner
+    </span>
+    <span className="text-[13px] font-semibold text-gray-800 whitespace-nowrap group-hover:text-primary transition-colors">
+      Become Builder/Agent
+    </span>
+  </div>
+
+  {/* Hover Dot */}
+  <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-violet-400 opacity-0 group-hover:opacity-100 transition-all duration-300" />
+</Link>
+
+{/* Add Property */}
+<button
+  onClick={handleAddProperty}
+  className="group relative flex items-center gap-3 h-11 px-4 rounded-xl bg-gradient-to-r from-primary to-red-500 text-white shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-[1px]"
+>
+  {/* Icon */}
+  <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/15 backdrop-blur-sm transition-all duration-300 group-hover:rotate-90">
+    <svg
+      className="w-4 h-4"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={3}
+        d="M12 4v16m8-8H4"
+      />
+    </svg>
+  </div>
+
+  {/* Text */}
+  <div className="flex flex-col items-start leading-none">
+    <span className="text-[9px] uppercase tracking-[0.18em] font-bold text-white/70">
+      Owners Only
+    </span>
+    <span className="text-[13px] font-semibold whitespace-nowrap">
+      Add Property
+    </span>
+  </div>
+
+  {/* Glow */}
+  <div className="absolute inset-0 rounded-xl ring-1 ring-white/10 group-hover:ring-white/20 transition-all duration-300" />
+</button>
 
               {/* Login / Dashboard */}
               {isLoggedIn ? (

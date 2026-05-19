@@ -234,7 +234,9 @@ export const savedApi = {
 export const userApi = {
   // -------------------- USER ME --------------------
   getMe: () => get('/auth/me'),
+  getProfile: () => get('/users/profile'),
   updateMe: (id, data) => patch(`/users/${id}`, data),
+  updateProfile: (data) => patch('/users/profile', data),
   changePasswordMe: (payload) => patch('/users/me/password', payload),
   uploadAvatarMe: (formData) => {
     const url = buildUrl('/users/me/avatar');

@@ -87,8 +87,8 @@ export const billingApi = {
     });
   },
 
-  getListingDocumentAccess: async (listingId) => {
-    return apiClient(`/billing/portal/listing-document-access${query({ listingId })}`);
+  getListingDocumentAccess: async (listingId, extra = {}) => {
+    return apiClient(`/billing/portal/listing-document-access${query({ listingId, ...extra })}`);
   },
   
   getActiveSubscription: async (orgId, params = {}) => {

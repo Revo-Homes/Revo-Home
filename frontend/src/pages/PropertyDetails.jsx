@@ -7,6 +7,7 @@ import { useRevoLeadTracker } from '../hooks/useRevoLeadTracker';
 import { buildStructuredMessage, splitFullName, submitPublicEnquiry } from '../services/publicEnquiry';
 import { ContactVerificationPanel, useContactVerification } from '../components/ContactVerification';
 import { billingApi } from '../services/billingApi';
+import { propertyDocumentApi } from '../services/propertyDocumentApi';
 import PropertyMap from "../components/PropertyMap";
 import ImageGallery from "../components/ImageGallery";
 import EMICalculator from './EMICalculator';
@@ -668,13 +669,13 @@ const buildGroupedMedia = (property = {}) => {
     documents: [],
   };
 
-    const addItem = (target, item, title, type) => {
-      const normalized = normalizeMediaItem(item, title, { type });
+    const addItem = (target, item, title, type, options = {}) => {
+      const normalized = normalizeMediaItem(item, title, { type, ...options });
       if (normalized.url || normalized.title) grouped[target].push(normalized);
     };
 
     [...toArray(source.documents), ...toArray(source.brochures)].forEach((item, idx) => {
-      addItem('documents', item, `Document ${idx + 1}`, 'Document');
+      addItem('documents', item, `Document ${idx + 1}`, 'Document', { requiresPayment: true });
     });
 
     // Mark resale documents so UI can require payment before download
@@ -693,7 +694,7 @@ const buildGroupedMedia = (property = {}) => {
   });
 
   [...toArray(source.documents), ...toArray(source.brochures), ...toArray(source.resale_documents)].forEach((item, idx) => {
-    addItem('documents', item, `Document ${idx + 1}`, 'Document');
+    addItem('documents', item, `Document ${idx + 1}`, 'Document', { requiresPayment: true });
   });
 
   toArray(source.virtual_tour).forEach((item, idx) => {
@@ -708,7 +709,7 @@ const buildGroupedMedia = (property = {}) => {
     source.brochure_url,
     source.floor_plan_url,
   ].filter(Boolean).forEach((url, idx) => {
-    if (url === source.brochure_url) addItem('documents', url, `Brochure ${idx + 1}`, 'Brochure');
+    if (url === source.brochure_url) addItem('documents', url, `Brochure ${idx + 1}`, 'Brochure', { requiresPayment: true });
     else if (url === source.floor_plan_url) addItem('floorPlans', url, `Floor Plan ${idx + 1}`, 'Floor Plan');
     else addItem(isYouTubeUrl(url) ? 'links' : 'videos', url, `Media Link ${idx + 1}`, isYouTubeUrl(url) ? 'YouTube' : 'Video');
   });
@@ -725,7 +726,7 @@ const buildGroupedMedia = (property = {}) => {
     } else if (/video|walkthrough|tour/.test(text) || isVideoUrl(url)) {
       grouped.videos.push({ ...normalized, type: 'Video' });
     } else if (/document|brochure|pdf|file|zip|doc/.test(text) || isDocumentUrl(url)) {
-      grouped.documents.push({ ...normalized, type: /brochure/.test(text) ? 'Brochure' : 'Document' });
+      grouped.documents.push({ ...normalized, type: /brochure/.test(text) ? 'Brochure' : 'Document', requiresPayment: true });
     } else if (/image|photo/.test(text) || isImageUrl(url)) {
       grouped.images.push({ ...normalized, type: 'Image' });
     }
@@ -836,8 +837,7 @@ const DocumentMediaCard = ({ item, onOpen }) => {
     try {
       window.dispatchEvent(new CustomEvent('revo:open-document', { detail: { item } }));
     } catch (err) {
-      // fallback: open directly
-      if (item?.url) window.open(item.url, '_blank');
+      console.warn('[PropertyDetails] Unable to open document payment flow', err);
     }
   };
 
@@ -1370,10 +1370,12 @@ function EnquiryModal({
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
-    const blocker = verification.getSubmitBlocker();
-    if (blocker) {
-      setErrors((prev) => ({ ...prev, form: blocker }));
-      return;
+    if (!isLoggedIn) {
+      const blocker = verification.getSubmitBlocker();
+      if (blocker) {
+        setErrors((prev) => ({ ...prev, form: blocker }));
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -1411,7 +1413,7 @@ function EnquiryModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="bg-white rounded-2xl p-6 md:p-8 max-w-md w-full shadow-2xl"
+          className="bg-white rounded-2xl p-6 md:p-8 max-w-4xl w-full shadow-2xl"
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
@@ -1439,8 +1441,8 @@ function EnquiryModal({
             </div>
           )}
 
-          {/* Form Fields */}
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
             {/* Name Field */}
             <div>
               <label className="text-sm font-medium text-gray-700 mb-1.5 block">
@@ -1494,8 +1496,9 @@ function EnquiryModal({
               </div>
               {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
             </div>
+            </div>
 
-            {/* Message Field */}
+            <div className="space-y-4 flex flex-col">
             <div>
               <label className="text-sm font-medium text-gray-700 mb-1.5 block">
                 Message <span className="text-gray-400">(Optional)</span>
@@ -1506,26 +1509,26 @@ function EnquiryModal({
                   value={formData.message}
                   onChange={e => setFormData({ ...formData, message: e.target.value })}
                   placeholder="Tell us more about your requirements..."
-                  rows={3}
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm resize-none"
+                  rows={6}
+                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm resize-none min-h-[140px]"
                 />
               </div>
             </div>
-          </div>
 
-          {/* Contact Verification Panel */}
-          <div className="mt-4">
-            <ContactVerificationPanel verification={verification} />
-            {errors.form && <p className="text-xs text-red-500 mt-2">{errors.form}</p>}
-          </div>
+          {!isLoggedIn ? (
+            <div>
+              <p className="text-xs font-medium text-gray-500 mb-2">Verify contact details before submitting</p>
+              <ContactVerificationPanel verification={verification} />
+            </div>
+          ) : null}
+          {errors.form && <p className="text-xs text-red-500">{errors.form}</p>}
 
-          {/* Submit Button */}
           <motion.button
             whileHover={{ scale: 1.02, y: -2 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="w-full mt-6 py-3.5 bg-gradient-to-r from-primary to-primary-dark text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/30 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+            className="w-full mt-auto py-3.5 bg-gradient-to-r from-primary to-primary-dark text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/30 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
           >
             {isSubmitting ? (
               <>
@@ -1539,6 +1542,8 @@ function EnquiryModal({
               </>
             )}
           </motion.button>
+            </div>
+          </div>
 
           <p className="text-center text-xs text-gray-400 mt-4">
             Your enquiry will be created directly in Revo CRM
@@ -1593,25 +1598,12 @@ function PropertyDetails() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [hasPaidForDocuments, setHasPaidForDocuments] = useState(false);
+  const [documentAccessLoading, setDocumentAccessLoading] = useState(false);
+  const [paymentVerifying, setPaymentVerifying] = useState(false);
   const autoDownloadHandledRef = useRef(false);
 
-  // Global handler for document open requests from media cards
-  useEffect(() => {
-    const onOpenDocument = (e) => {
-      const item = e?.detail?.item;
-      if (!item) return;
-      // If document requires payment and user hasn't paid, show payment modal
-      if (item.requiresPayment && !hasPaidForDocuments) {
-        setShowPaymentModal(true);
-        return;
-      }
-      // Otherwise open in new tab
-      if (item.url) window.open(item.url, '_blank');
-    };
-
-    window.addEventListener('revo:open-document', onOpenDocument);
-    return () => window.removeEventListener('revo:open-document', onOpenDocument);
-  }, [hasPaidForDocuments]);
+  const resolvedPropertyId = property?.propertyId || property?.property_id || property?.id || null;
+  const resolvedListingId = property?.listingId || property?.listing_id || listingIdentifier;
 
   // SquareYards-style UI States
   const [activeTab, setActiveTab] = useState('overview');
@@ -1655,21 +1647,53 @@ function PropertyDetails() {
     });
   }, [listingIdentifier, property?.reviews]);
 
+  const refreshDocumentAccess = useCallback(async () => {
+    if (!isLoggedIn || !resolvedPropertyId) return false;
+    setDocumentAccessLoading(true);
+    try {
+      const access = await propertyDocumentApi.checkAccess(resolvedPropertyId);
+      const granted = Boolean(access?.hasAccess);
+      setHasPaidForDocuments(granted);
+      return granted;
+    } catch {
+      try {
+        const legacy = await billingApi.getListingDocumentAccess(resolvedListingId, {
+          propertyId: resolvedPropertyId,
+        });
+        const granted = Boolean(legacy?.paid || legacy?.hasAccess);
+        setHasPaidForDocuments(granted);
+        return granted;
+      } catch {
+        setHasPaidForDocuments(false);
+        return false;
+      }
+    } finally {
+      setDocumentAccessLoading(false);
+    }
+  }, [isLoggedIn, resolvedPropertyId, resolvedListingId]);
+
   useEffect(() => {
-    if (!isLoggedIn || !listingIdentifier) return undefined;
+    if (!isLoggedIn || !resolvedPropertyId) return undefined;
+    refreshDocumentAccess();
+  }, [isLoggedIn, resolvedPropertyId, refreshDocumentAccess]);
+
+  useEffect(() => {
+    if (searchParams.get('documentPaid') !== '1' || !isLoggedIn || !resolvedPropertyId) return undefined;
     let cancelled = false;
     (async () => {
+      setPaymentVerifying(true);
       try {
-        const access = await billingApi.getListingDocumentAccess(listingIdentifier);
-        if (!cancelled) setHasPaidForDocuments(Boolean(access?.paid));
-      } catch {
-        if (!cancelled) setHasPaidForDocuments(false);
+        const params = Object.fromEntries(searchParams.entries());
+        if (params.txnid && params.status) {
+          await propertyDocumentApi.verifyPayment(params).catch(() => billingApi.verifyPayU(params));
+        }
+        if (!cancelled) await refreshDocumentAccess();
+      } finally {
+        if (!cancelled) setPaymentVerifying(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isLoggedIn, listingIdentifier]);
+    return () => { cancelled = true; };
+  }, [searchParams, isLoggedIn, resolvedPropertyId, refreshDocumentAccess]);
 
   const handleDeleteReview = (reviewId) => {
     const updatedReviews = reviews.filter(r => r.id !== reviewId);
@@ -1703,62 +1727,46 @@ function PropertyDetails() {
       openLoginForPropertyDetails();
       return;
     }
-    const isResale =
-      ['resale'].includes((property?.listingType || property?.listing_type || '').toLowerCase()) ||
-      toArray(property?.resale_documents).length > 0;
-    if (isResale) {
-      if (hasPaidForDocuments) {
-        generateAndDownloadDocument();
-      } else {
-        navigate('/checkout', {
-          state: {
-            checkoutMode: 'listing_documents',
-            listingId: listingIdentifier,
-            listingTitle: property?.title,
-            returnTo: `/properties/${slug}`,
-            plan: {
-              name: 'Property Documents',
-              displayName: 'Property Documents Download',
-              basePrice: DOCUMENT_UNLOCK_BASE_INR,
-              gstRate: 18,
-            },
-          },
-        });
-      }
+    if (hasPaidForDocuments) {
+      void generateAndDownloadDocument();
       return;
     }
-    generateAndDownloadDocument();
+    setShowPaymentModal(true);
   };
 
   const initiatePayment = async () => {
-    const organizationId = user?.organization?.id || user?.organization_id || user?.organizationId || 1;
+    if (!resolvedPropertyId) {
+      alert('Property details are still loading. Please try again in a moment.');
+      return;
+    }
     setPaymentLoading(true);
     try {
-      const checkout = await billingApi.createListingDocumentCheckout({
-        organizationId,
-        listingId: listingIdentifier,
+      const session = await propertyDocumentApi.createPayment({
+        propertyId: resolvedPropertyId,
+        listingId: resolvedListingId,
         baseAmount: DOCUMENT_UNLOCK_BASE_INR,
         description: property?.title
-          ? `Listing documents — ${property.title}`
-          : `Listing documents — ${listingIdentifier}`,
-      });
-      const invoiceId = checkout?.invoice?.id;
-      if (!invoiceId) {
-        throw new Error('Could not create invoice for document download');
-      }
-      const payuPayload = await billingApi.createPayUOrder({
-        invoiceId,
+          ? `Property documents — ${property.title}`
+          : `Property documents — ${resolvedPropertyId}`,
         returnUrl: `${window.location.origin}/payment/success`,
         failureUrl: `${window.location.origin}/payment/failure`,
-        sourceApp: 'revo_homes',
-        context: 'listing_documents',
-        listingId: listingIdentifier,
       });
-      const order = payuPayload?.order || payuPayload;
+
+      if (session?.alreadyOwned || session?.hasAccess) {
+        setHasPaidForDocuments(true);
+        setShowPaymentModal(false);
+        generateAndDownloadDocument();
+        setPaymentLoading(false);
+        return;
+      }
+
+      const order = session?.payu || session;
+      const invoiceId = session?.invoice?.id;
       sessionStorage.setItem('pendingPayment', JSON.stringify({
         invoiceId,
         checkoutMode: 'listing_documents',
-        listingId: listingIdentifier,
+        propertyId: resolvedPropertyId,
+        listingId: resolvedListingId,
         returnTo: `/properties/${slug}`,
         planName: 'Property Documents',
         amount: DOCUMENT_UNLOCK_BASE_INR * 1.18,
@@ -1834,17 +1842,47 @@ function PropertyDetails() {
   //   // Download
   //   doc.save(`${property?.title?.replace(/\s+/g, '_') || 'Property'}_Documents.pdf`);
   // };
-  const generateAndDownloadDocument = useCallback(() => {
-    const allDocs = [
-      ...toArray(property?.resale_documents),
-      ...toArray(property?.documents),
-      ...toArray(property?.brochures),
-    ];
-    allDocs.forEach((doc) => {
-      const url = getMediaUrl(doc);
-      if (url) window.open(url, '_blank');
-    });
-  }, [property]);
+  const generateAndDownloadDocument = useCallback(async () => {
+    if (resolvedPropertyId && hasPaidForDocuments) {
+      try {
+        const data = await propertyDocumentApi.getDocuments(resolvedPropertyId);
+        const docs = data?.documents || [];
+        if (docs.length > 0) {
+          docs.forEach((doc) => {
+            if (doc.download_url) window.open(doc.download_url, '_blank');
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn('[PropertyDetails] Protected document fetch failed, using fallback', err);
+      }
+    }
+    if (!hasPaidForDocuments) {
+      setShowPaymentModal(true);
+      return;
+    }
+    alert('Your payment is verified, but protected document links are not available yet. Please refresh or contact support.');
+  }, [property, resolvedPropertyId, hasPaidForDocuments]);
+
+  // Global handler for document open requests from media cards.
+  useEffect(() => {
+    const onOpenDocument = (e) => {
+      const item = e?.detail?.item;
+      if (!item) return;
+      if (item.requiresPayment) {
+        if (hasPaidForDocuments) {
+          void generateAndDownloadDocument();
+        } else {
+          setShowPaymentModal(true);
+        }
+        return;
+      }
+      if (item.url) window.open(item.url, '_blank');
+    };
+
+    window.addEventListener('revo:open-document', onOpenDocument);
+    return () => window.removeEventListener('revo:open-document', onOpenDocument);
+  }, [generateAndDownloadDocument, hasPaidForDocuments]);
 
   useEffect(() => {
     if (
@@ -1858,8 +1896,8 @@ function PropertyDetails() {
     let cancelled = false;
     (async () => {
       try {
-        const access = await billingApi.getListingDocumentAccess(listingIdentifier);
-        if (cancelled || !access?.paid) return;
+        const accessGranted = await refreshDocumentAccess();
+        if (cancelled || !accessGranted) return;
         autoDownloadHandledRef.current = true;
         setHasPaidForDocuments(true);
         generateAndDownloadDocument();
@@ -1875,7 +1913,7 @@ function PropertyDetails() {
     return () => {
       cancelled = true;
     };
-  }, [generateAndDownloadDocument, isLoggedIn, listingIdentifier, property, searchParams, setSearchParams]);
+  }, [generateAndDownloadDocument, isLoggedIn, listingIdentifier, property, searchParams, setSearchParams, refreshDocumentAccess]);
   useEffect(() => {
     const fetchProperty = async () => {
       setLoading(true);
@@ -2904,12 +2942,22 @@ function PropertyDetails() {
                           </div>
                           <div>
                             <h3 className="font-semibold text-gray-900 mb-1">Property Documents</h3>
-                            <p className="text-sm text-gray-500 mb-3">Download complete property details, legal documents & more</p>
+                            <p className="text-sm text-gray-500 mb-3">
+                              {hasPaidForDocuments
+                                ? 'You own this document package'
+                                : 'Download complete property details, legal documents & more'}
+                            </p>
                             <button
                               onClick={handleDownloadDocuments}
-                              className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-dark text-white text-sm font-semibold rounded-lg transition-all shadow-md hover:shadow-lg"
+                              disabled={paymentLoading || paymentVerifying || documentAccessLoading}
+                              className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-dark text-white text-sm font-semibold rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-60"
                             >
-                              {hasPaidForDocuments ? (
+                              {paymentVerifying || documentAccessLoading ? (
+                                <>
+                                  <Loader2 size={14} className="animate-spin" />
+                                  Syncing access…
+                                </>
+                              ) : hasPaidForDocuments ? (
                                 <>
                                   <FileDown size={14} />
                                   View Documents

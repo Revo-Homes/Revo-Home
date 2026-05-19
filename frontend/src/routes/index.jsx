@@ -48,6 +48,7 @@ function AppRoutes() {
             <Route path="properties" element={<Properties />} />
             <Route path="properties/:slug" element={<PropertyDetails />} />
             <Route path="sell" element={<SellProperty />} />
+            <Route path="sell/:id/edit" element={<SellProperty />} />
             <Route path="tools" element={<Tools />} />
             <Route path="tools/emi-calculator" element={<EMICalculator />} />
             <Route path="tools/home-loan" element={<HomeLoanAssistance />} />

@@ -23,7 +23,12 @@ const LABEL = "block text-[11px] font-bold text-gray-500 uppercase tracking-wide
 // ─── VIEW MODEL ─────────────────────────────────────────────────────────────────
 class UserProfileViewModel {
   constructor(backendData = {}) {
-    this.raw = backendData;
+    const parsedMeta = typeof backendData.meta === 'string'
+      ? (() => {
+          try { return JSON.parse(backendData.meta || '{}'); } catch { return {}; }
+        })()
+      : (backendData.meta || {});
+    this.raw = { ...backendData, meta: parsedMeta };
     const { firstName, lastName } = this.parseNames(backendData.first_name, backendData.last_name);
     this.firstName  = firstName;
     this.lastName   = lastName;
@@ -34,7 +39,7 @@ class UserProfileViewModel {
     this.bio        = backendData.bio || '';
     this.gender     = backendData.gender || 'prefer_not_to_say';
     this.dateOfBirth = this.formatDate(backendData.date_of_birth);
-    this.locality   = backendData.meta?.locality || '';
+    this.locality   = parsedMeta?.locality || '';
     this.locale     = backendData.locale || 'en';
     this.timezone   = backendData.timezone || 'Asia/Kolkata';
     this.specialization    = backendData.specialization || '';
@@ -95,7 +100,7 @@ class UserProfileViewModel {
     const p = {};
     if (fd.firstName !== undefined)        p.first_name         = fd.firstName || null;
     if (fd.lastName !== undefined)         p.last_name          = fd.lastName || null;
-    if (fd.phone !== undefined)            p.phone              = fd.phone ? fd.phone.replace(/\D/g,'') : null;
+    // email and phone are read-only — never sent from settings
     if (fd.bio !== undefined)              p.bio                = fd.bio || null;
     if (fd.avatarUrl !== undefined)        p.avatar_url         = fd.avatarUrl || null;
     if (fd.gender !== undefined)           p.gender             = fd.gender || null;
@@ -425,20 +430,21 @@ function ProfileForm({ formData, onChange, errors = {} }) {
             <FieldInput label="Last Name"  value={formData.lastName}  onChange={e => set('lastName', e.target.value)}  placeholder="Last name"  error={errors.lastName} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-5">
-            <FieldInput label="Email Address" type="email"
+            <FieldInput label="Email Address" type="email" readOnly disabled
               icon={<Icon path="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" className="w-4 h-4" />}
-              value={formData.email} onChange={e => set('email', e.target.value)} placeholder="you@email.com"
-              hint={!formData.email ? "Add email to improve communication" : ""} error={errors.email} />
-            <FieldInput label="Phone Number" type="tel"
+              value={formData.email} placeholder="you@email.com"
+              className="bg-gray-50 text-gray-500 cursor-not-allowed" />
+            <FieldInput label="Phone Number" type="tel" readOnly disabled
               icon={<Icon path="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" className="w-4 h-4" />}
-              value={formData.phone} onChange={e => set('phone', e.target.value)} placeholder="+91 XXXXX XXXXX" error={errors.phone} />
+              value={formData.phone} placeholder="+91 XXXXX XXXXX"
+              className="bg-gray-50 text-gray-500 cursor-not-allowed" />
           </div>
         </Section>
       </div>
 
       {/* Personal Info */}
       <div className="p-8">
-        <Section title="Personal Details" subtitle="Demographics and location" icon={<Icon path="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" className="w-4 h-4" />}>
+        <Section title="Personal Details" subtitle="Profile preferences" icon={<Icon path="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" className="w-4 h-4" />}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <FieldSelect label="Gender" value={formData.gender} onChange={e => set('gender', e.target.value)}>
               <option value="prefer_not_to_say">Prefer not to say</option>
@@ -448,11 +454,14 @@ function ProfileForm({ formData, onChange, errors = {} }) {
             </FieldSelect>
             <FieldInput label="Date of Birth" type="date" value={formData.dateOfBirth}
               onChange={e => set('dateOfBirth', e.target.value)} max={new Date().toISOString().split('T')[0]} />
-          </div>
-          <div className="mt-5">
-            <FieldInput label="Locality / Area"
-              icon={<Icon path="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z" className="w-4 h-4" />}
-              value={formData.locality} onChange={e => set('locality', e.target.value)} placeholder="Your locality or area" />
+            <FieldSelect label="Locale" value={formData.locale} onChange={e => set('locale', e.target.value)}>
+              <option value="en">English</option>
+              <option value="hi">Hindi</option>
+            </FieldSelect>
+            <FieldSelect label="Timezone" value={formData.timezone} onChange={e => set('timezone', e.target.value)}>
+              <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+              <option value="UTC">UTC</option>
+            </FieldSelect>
           </div>
         </Section>
       </div>
@@ -1159,8 +1168,8 @@ function DashboardSettings() {
     setSaving(true); setError(null); setSaveSuccess(false);
     try {
       const payload = viewModel.toUpdatePayload(formData);
-      const response = await userApi.updateMe(user.id, payload);
-      const updatedUser = response.data?.user || response.user || response;
+      const response = await userApi.updateProfile(payload);
+      const updatedUser = response.data?.user || response.user || response?.data || response;
       if (updatedUser) {
         const newVm = new UserProfileViewModel({ ...user, ...updatedUser });
         setViewModel(newVm);
